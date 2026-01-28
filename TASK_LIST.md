@@ -347,7 +347,7 @@ def test_admin_user_can_access():
 ---
 
 #### TASK 1.7: Create Test Fixtures & Utilities
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Create reusable test helpers for all subsequent tests.
 
@@ -438,7 +438,7 @@ def test_fixtures_work(test_user, test_provider, test_service):
 ---
 
 #### TASK 1.8: Git Setup & Initial Commit
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Initialize Git repository with proper structure and documentation.
 
@@ -497,7 +497,7 @@ def test_fixtures_work(test_user, test_provider, test_service):
 ### WEEK 2: Authentication & Provider Signup Flow
 
 #### TASK 2.1: Create Custom Authentication Backend (Email-Based Login)
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Implement email-based authentication instead of username.
 
@@ -550,7 +550,7 @@ def test_case_insensitive_email():
 ---
 
 #### TASK 2.2: Create Email Verification Token & Utility Functions
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Implement email verification token generation and validation.
 
@@ -612,7 +612,7 @@ def test_send_verification_email():
 ---
 
 #### TASK 2.3: Create Signup View & Form
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Implement provider signup view with form handling.
 
