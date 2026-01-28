@@ -2681,29 +2681,923 @@ def test_provider_detail_query_count():
 
 ---
 
-### WEEK 6-8: Search & Filtering, Reviews, Payments
-*(Follow same detailed format as above, but condensed for brevity)*
+### WEEK 7: Reviews System
 
-[Due to token limits, I'm creating a more concise task list for remaining sprints]
+#### TASK 7.1: Create Review Submission Form
+**Status:** [ ] TODO
 
-#### TASK 6.1-6.N: Week 6 (Search & Filtering)
-**Status:** [✓ DONE] ✓
-[Search filters by service type, location, price - COMPLETED]
+**Objective:** Build form for clients to submit reviews (5-star rating + comment).
 
-#### TASK 7.1-7.N: Week 7 (Reviews System)
-[Review submission, display, moderation]
+**Requirements:**
+- File: `reviews/forms.py` (if needed) or inline form
+- Create review form with:
+  - Rating field (1-5 stars, required)
+  - Comment field (TextArea, max 250 characters, required)
+  - Client name field (optional, CharField)
+- Star rating input (radio buttons or select)
+- Character counter for comment field
+- Validation: 1 ≤ rating ≤ 5, comment ≤ 250 chars
+- Display on provider detail page
 
-#### TASK 8.1-8.N: Week 8 (Payment Forms)
-[Crypto/bank payment method selection, forms]
+**Tests:**
+```python
+def test_review_form_valid():
+    form_data = {'rating': 5, 'comment': 'Great service!', 'client_name': 'John'}
+    form = ReviewForm(data=form_data)
+    assert form.is_valid()
+
+def test_review_form_rating_required():
+    form_data = {'comment': 'Great service!'}
+    form = ReviewForm(data=form_data)
+    assert not form.is_valid()
+
+def test_review_form_comment_max_length():
+    form_data = {'rating': 5, 'comment': 'x' * 251}
+    form = ReviewForm(data=form_data)
+    assert not form.is_valid()
+```
+
+**Acceptance Criteria:**
+- [ ] Review form displays on provider detail page
+- [ ] Rating field works (1-5 stars)
+- [ ] Comment field has character limit
+- [ ] Client name is optional
+- [ ] Form validation works
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Review form displays and validates correctly.
 
 ---
 
-## SPRINT 3: Admin Dashboard, Payments, Launch (Weeks 9-12)
+#### TASK 7.2: Create Review Submission View
+**Status:** [ ] TODO
 
-#### TASK 9.1-9.N: Week 9 (Admin Dashboard)
-#### TASK 10.1-10.N: Week 10 (Crypto/Bank Payment Processing)
-#### TASK 11.1-11.N: Week 11 (Security, Infrastructure, Performance)
-#### TASK 12.1-12.N: Week 12 (Testing, Launch, Go Live)
+**Objective:** Handle POST request for review submission.
+
+**Requirements:**
+- File: `reviews/views.py`
+- Create `ReviewSubmitView` (FormView or CreateView):
+  - POST `/providers/<slug>/review/`
+  - Validates form data
+  - Creates Review object
+  - Links to provider
+  - Redirects back to provider detail
+  - Shows success message
+- Enforce one review per email/IP per provider (basic spam prevention)
+- Use database unique constraint: `unique_together = ['provider', 'client_email']`
+
+**Tests:**
+```python
+def test_submit_review_success():
+    provider = create_test_provider()
+    response = client.post(
+        f'/providers/{provider.user.email}/review/',
+        {'rating': 5, 'comment': 'Great!', 'client_name': 'John', 'client_email': 'john@example.com'}
+    )
+    assert response.status_code == 302  # Redirect
+    assert Review.objects.filter(provider=provider).count() == 1
+
+def test_submit_review_duplicate_prevention():
+    provider = create_test_provider()
+    Review.objects.create(provider=provider, rating=5, comment='First', client_email='john@example.com')
+
+    response = client.post(
+        f'/providers/{provider.user.email}/review/',
+        {'rating': 4, 'comment': 'Second', 'client_email': 'john@example.com'}
+    )
+    # Should fail due to unique constraint
+    assert Review.objects.filter(provider=provider).count() == 1
+```
+
+**Acceptance Criteria:**
+- [ ] Review submission view handles POST
+- [ ] Creates Review object
+- [ ] Links review to provider
+- [ ] Redirects with success message
+- [ ] Spam prevention works (1 review per email per provider)
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Review submission works and spam prevention is active.
+
+---
+
+#### TASK 7.3: Display Reviews on Provider Detail Page
+**Status:** [ ] TODO
+
+**Objective:** Show all reviews on provider profile page.
+
+**Requirements:**
+- File: `templates/clients/provider_detail.html` (already has reviews section)
+- Update to show:
+  - All reviews for provider
+  - Newest first (order by -created_at)
+  - Star rating (visual stars)
+  - Comment text
+  - Client name (if provided) or "Anonymous"
+  - Review date
+- Empty state: "No reviews yet. Be the first to review!"
+- Reviews section already exists, just needs enhancement
+
+**Tests:**
+```python
+def test_provider_detail_shows_reviews():
+    provider = create_test_provider()
+    Review.objects.create(provider=provider, rating=5, comment='Great!', client_name='John')
+    Review.objects.create(provider=provider, rating=4, comment='Good', client_name='Jane')
+
+    response = client.get(f'/providers/{provider.user.email}/')
+    assert b'Great!' in response.content
+    assert b'Good' in response.content
+    assert b'John' in response.content
+    assert b'Jane' in response.content
+
+def test_provider_detail_no_reviews():
+    provider = create_test_provider()
+    response = client.get(f'/providers/{provider.user.email}/')
+    assert b'No reviews yet' in response.content
+```
+
+**Acceptance Criteria:**
+- [ ] Reviews display on provider detail page
+- [ ] Newest reviews shown first
+- [ ] Star rating displays visually
+- [ ] Client name or "Anonymous" shown
+- [ ] Review date displayed
+- [ ] Empty state works
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Reviews display correctly on provider profiles.
+
+---
+
+#### TASK 7.4: Admin Review Moderation
+**Status:** [ ] TODO
+
+**Objective:** Allow admins to moderate reviews (approve/flag/delete).
+
+**Requirements:**
+- Update `Review` model:
+  - Add `status` field (choices: 'pending', 'approved', 'flagged')
+  - Add `moderated_by` ForeignKey to User (nullable)
+  - Add `moderated_at` DateTimeField (nullable)
+- Create admin views:
+  - List all reviews with status filters
+  - Approve/flag/delete actions
+- Django admin integration:
+  - Add Review to admin
+  - Add list filters: status, provider, rating
+  - Add search: comment, client_name
+  - Add bulk actions: approve, flag, delete
+
+**Tests:**
+```python
+def test_review_model_has_status():
+    provider = create_test_provider()
+    review = Review.objects.create(provider=provider, rating=5, comment='Test')
+    assert review.status == 'pending'  # Default
+
+def test_admin_can_approve_review():
+    admin_user = create_admin_user()
+    review = create_test_review()
+
+    # Simulate admin approval
+    review.status = 'approved'
+    review.moderated_by = admin_user
+    review.save()
+
+    assert review.status == 'approved'
+    assert review.moderated_by == admin_user
+```
+
+**Acceptance Criteria:**
+- [ ] Review model has status field
+- [ ] Admin can view all reviews
+- [ ] Admin can filter by status
+- [ ] Admin can approve/flag/delete reviews
+- [ ] Moderation tracked (who, when)
+- [ ] Django admin configured
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Admin review moderation is functional.
+
+---
+
+#### TASK 7.5: Email Notifications for New Reviews
+**Status:** [ ] TODO
+
+**Objective:** Send email to admin when new review is submitted.
+
+**Requirements:**
+- File: `reviews/views.py`
+- In `ReviewSubmitView.form_valid()`:
+  - Send email to admin(s) after review submission
+  - Email subject: "New Review Submitted - [Provider Name]"
+  - Email body includes:
+    - Provider name and email
+    - Rating (stars)
+    - Comment excerpt
+    - Link to provider detail page
+    - Link to admin review moderation
+- Use Django's send_mail()
+- Fail silently (don't break submission if email fails)
+
+**Tests:**
+```python
+def test_review_submission_sends_email():
+    provider = create_test_provider()
+
+    with patch('django.core.mail.send_mail') as mock_send_mail:
+        client.post(
+            f'/providers/{provider.user.email}/review/',
+            {'rating': 5, 'comment': 'Great!', 'client_email': 'test@example.com'}
+        )
+
+        assert mock_send_mail.called
+        args = mock_send_mail.call_args[0]
+        assert 'New Review Submitted' in args[0]  # Subject
+
+def test_review_submission_works_if_email_fails():
+    provider = create_test_provider()
+
+    with patch('django.core.mail.send_mail', side_effect=Exception('Email failed')):
+        response = client.post(
+            f'/providers/{provider.user.email}/review/',
+            {'rating': 5, 'comment': 'Great!', 'client_email': 'test@example.com'}
+        )
+
+        # Should still succeed
+        assert response.status_code == 302
+        assert Review.objects.count() == 1
+```
+
+**Acceptance Criteria:**
+- [ ] Email sent to admin on new review
+- [ ] Email contains review details
+- [ ] Email has links to provider and moderation
+- [ ] Email failure doesn't break submission
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Email notifications work without breaking submission.
+
+---
+
+#### TASK 7.6: Update Average Rating Display
+**Status:** [ ] TODO
+
+**Objective:** Update provider average rating calculation to use new review system.
+
+**Requirements:**
+- Model already has `average_rating()` method
+- Verify it works with new reviews
+- Update provider directory to show ratings
+- Update provider detail to show ratings
+- Add review count next to rating
+- Empty state: "No ratings yet" instead of "0.0"
+
+**Tests:**
+```python
+def test_average_rating_calculation():
+    provider = create_test_provider()
+    Review.objects.create(provider=provider, rating=5, comment='Great!')
+    Review.objects.create(provider=provider, rating=4, comment='Good')
+    Review.objects.create(provider=provider, rating=3, comment='OK')
+
+    avg_rating = provider.average_rating()
+    assert avg_rating == 4.0
+
+def test_average_rating_with_no_reviews():
+    provider = create_test_provider()
+    avg_rating = provider.average_rating()
+    assert avg_rating == 0
+
+def test_provider_list_shows_ratings():
+    provider = create_test_provider()
+    Review.objects.create(provider=provider, rating=5, comment='Great!')
+
+    response = client.get('/providers/')
+    assert b'5.0' in response.content or b'5' in response.content
+```
+
+**Acceptance Criteria:**
+- [ ] Average rating calculates correctly
+- [ ] Displays on provider cards
+- [ ] Displays on provider detail
+- [ ] Shows review count
+- [ ] Empty state for no ratings
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Average ratings display correctly everywhere.
+
+---
+
+#### TASK 7.7: Week 7 Tests & Documentation
+**Status:** [ ] TODO
+
+**Objective:** Comprehensive testing and documentation for reviews system.
+
+**Requirements:**
+- Test coverage > 85% for reviews app
+- Create `docs/REVIEW_FLOWS.md`:
+  - How to submit a review
+  - Review moderation process
+  - Spam prevention details
+  - Admin review management
+- Update `README.md` with review features
+- Create admin guide for review moderation
+
+**Tests:**
+- Run full test suite
+- Verify all review flows work end-to-end
+- Test edge cases (duplicate reviews, invalid data)
+- Test email notifications
+
+**Acceptance Criteria:**
+- [ ] Coverage > 85%
+- [ ] All tests passing
+- [ ] Documentation complete
+- [ ] Admin guide created
+- [ ] Code reviewed
+
+**Mark as [✓ DONE] when:** Week 7 complete and documented.
+
+---
+
+### WEEK 8: Payment Substrate & Crypto Forms
+
+#### TASK 8.1: Update SubscriptionPayment Model
+**Status:** [ ] TODO
+
+**Objective:** Ensure SubscriptionPayment model has all required fields.
+
+**Requirements:**
+- File: `payments/models.py`
+- Verify/add fields:
+  - `provider` (ForeignKey to Provider)
+  - `amount` (DecimalField, default 29.99)
+  - `payment_method` (CharField, choices: 'crypto_btc', 'crypto_eth', 'crypto_usdc', 'bank_transfer')
+  - `transaction_reference` (CharField, for crypto transaction ID or bank reference)
+  - `status` (CharField, choices: 'pending', 'completed', 'failed')
+  - `created_at`, `updated_at`
+- Add methods:
+  - `mark_completed()` - Set status to completed
+  - `mark_failed()` - Set status to failed
+
+**Tests:**
+```python
+def test_subscription_payment_creation():
+    provider = create_test_provider()
+    payment = SubscriptionPayment.objects.create(
+        provider=provider,
+        amount=29.99,
+        payment_method='crypto_btc',
+        status='pending'
+    )
+    assert payment.status == 'pending'
+    assert payment.amount == Decimal('29.99')
+
+def test_mark_payment_completed():
+    payment = create_test_payment()
+    payment.mark_completed()
+    assert payment.status == 'completed'
+```
+
+**Acceptance Criteria:**
+- [ ] All fields present and working
+- [ ] Payment methods include all crypto + bank
+- [ ] Status transitions work
+- [ ] Migration created
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** SubscriptionPayment model is complete.
+
+---
+
+#### TASK 8.2: Create Payment Method Selection Form
+**Status:** [ ] TODO
+
+**Objective:** Allow providers to choose payment method (crypto or bank transfer).
+
+**Requirements:**
+- File: `providers/forms.py`
+- Update or create `SubscriptionSettingsForm`:
+  - Payment method radio buttons:
+    - Bitcoin (BTC)
+    - Ethereum (ETH)
+    - USDC (stablecoin)
+    - Bank Transfer
+  - Each option shows description/instructions
+- Form displays current subscription status
+- Shows renewal date if active
+
+**Tests:**
+```python
+def test_payment_method_form_valid():
+    form_data = {'payment_method': 'crypto_btc'}
+    form = SubscriptionSettingsForm(data=form_data)
+    assert form.is_valid()
+
+def test_payment_method_choices():
+    form = SubscriptionSettingsForm()
+    choices = dict(form.fields['payment_method'].choices)
+    assert 'crypto_btc' in choices
+    assert 'crypto_eth' in choices
+    assert 'bank_transfer' in choices
+```
+
+**Acceptance Criteria:**
+- [ ] Form has payment method selection
+- [ ] All payment options available
+- [ ] Descriptions clear
+- [ ] Form validates
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Payment method form works correctly.
+
+---
+
+#### TASK 8.3: Create Crypto Payment Form
+**Status:** [ ] TODO
+
+**Objective:** Display crypto payment instructions and wallet address.
+
+**Requirements:**
+- File: `templates/providers/subscription.html`
+- For crypto payments, display:
+  - Platform wallet address (read-only)
+  - QR code (optional, use qrcode library)
+  - Payment amount (29.99 USD equivalent in crypto)
+  - Instructions: "Send exactly X BTC/ETH/USDC to this address"
+  - Warning: "Payment may take up to 1 hour to confirm"
+- Store crypto addresses in settings or database
+- Provider can paste their transaction ID for verification
+
+**Tests:**
+```python
+def test_crypto_payment_page_shows_address():
+    provider = create_test_provider()
+    client.force_login(provider.user)
+
+    response = client.get('/provider/subscription/crypto/btc/')
+    assert b'Send payment to:' in response.content
+    assert b'1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2' in response.content  # Example BTC address
+
+def test_transaction_id_submission():
+    provider = create_test_provider()
+    client.force_login(provider.user)
+
+    response = client.post('/provider/subscription/crypto/submit/', {
+        'payment_method': 'crypto_btc',
+        'transaction_id': '0x123456789abcdef'
+    })
+
+    assert response.status_code == 302
+    payment = SubscriptionPayment.objects.filter(provider=provider).first()
+    assert payment.transaction_reference == '0x123456789abcdef'
+```
+
+**Acceptance Criteria:**
+- [ ] Crypto payment page displays address
+- [ ] Shows payment amount
+- [ ] Shows instructions
+- [ ] Provider can submit transaction ID
+- [ ] QR code displays (optional)
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Crypto payment UI is functional.
+
+---
+
+#### TASK 8.4: Create Bank Transfer Payment Form
+**Status:** [ ] TODO
+
+**Objective:** Collect bank transfer details from provider.
+
+**Requirements:**
+- File: `providers/forms.py` and `templates/providers/subscription_bank.html`
+- Form fields:
+  - Bank name
+  - Account holder name
+  - Account number (encrypted before storage)
+  - Routing number / SWIFT code
+  - Reference number (auto-generated)
+- Display platform's bank details:
+  - "Send payment to our bank account:"
+  - Bank name, account number, routing
+  - Reference: [Provider-ID-Date]
+- Store provider's bank details encrypted (use cryptography library or Django's Fernet)
+
+**Tests:**
+```python
+def test_bank_transfer_form_valid():
+    form_data = {
+        'bank_name': 'Chase Bank',
+        'account_holder': 'John Doe',
+        'account_number': '1234567890',
+        'routing_number': '021000021'
+    }
+    form = BankTransferForm(data=form_data)
+    assert form.is_valid()
+
+def test_bank_details_encrypted():
+    provider = create_test_provider()
+    form = BankTransferForm(data={
+        'bank_name': 'Chase',
+        'account_holder': 'John',
+        'account_number': '1234567890',
+        'routing_number': '021000021'
+    })
+    form.instance.provider = provider
+    form.save()
+
+    # Bank account should be encrypted
+    provider.refresh_from_db()
+    assert provider.bank_account_encrypted != '1234567890'
+    assert len(provider.bank_account_encrypted) > 20  # Encrypted is longer
+```
+
+**Acceptance Criteria:**
+- [ ] Bank transfer form collects all details
+- [ ] Platform bank details displayed
+- [ ] Reference number generated
+- [ ] Bank account encrypted before storage
+- [ ] Form validates
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Bank transfer form works and encrypts data.
+
+---
+
+#### TASK 8.5: Create Subscription Activation Logic
+**Status:** [ ] TODO
+
+**Objective:** Activate subscription when payment method is selected.
+
+**Requirements:**
+- File: `providers/models.py` and `providers/views.py`
+- When provider submits payment form:
+  - Create SubscriptionPayment record with status='pending'
+  - Set provider.subscription_status = 'active' (temporary, pending verification)
+  - Set provider.subscription_renewal_date = today + 30 days
+  - Set provider.subscription_payment_method
+  - Send confirmation email to provider
+- Email includes:
+  - Payment instructions
+  - Renewal date
+  - How to check payment status
+
+**Tests:**
+```python
+def test_subscription_activation():
+    provider = create_test_provider()
+    assert provider.subscription_status == 'inactive'
+
+    provider.activate_subscription('crypto_btc')
+    provider.refresh_from_db()
+
+    assert provider.subscription_status == 'active'
+    assert provider.subscription_payment_method == 'crypto_btc'
+    assert provider.subscription_renewal_date is not None
+
+def test_subscription_payment_created():
+    provider = create_test_provider()
+    provider.activate_subscription('crypto_btc')
+
+    payment = SubscriptionPayment.objects.filter(provider=provider).first()
+    assert payment is not None
+    assert payment.status == 'pending'
+    assert payment.payment_method == 'crypto_btc'
+```
+
+**Acceptance Criteria:**
+- [ ] Subscription activates on payment submission
+- [ ] SubscriptionPayment record created
+- [ ] Renewal date set to 30 days
+- [ ] Confirmation email sent
+- [ ] Status set to pending
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Subscription activation works correctly.
+
+---
+
+#### TASK 8.6: Week 8 Tests & Documentation
+**Status:** [ ] TODO
+
+**Objective:** Comprehensive testing and documentation for payment system.
+
+**Requirements:**
+- Test coverage > 85% for payments app
+- Create `docs/PAYMENT_FLOWS.md`:
+  - How to subscribe (crypto and bank)
+  - Payment verification process
+  - Admin payment approval workflow
+  - Troubleshooting payment issues
+- Update `README.md` with payment features
+- Test all payment flows end-to-end
+
+**Acceptance Criteria:**
+- [ ] Coverage > 85%
+- [ ] All tests passing
+- [ ] Documentation complete
+- [ ] Payment flows documented
+- [ ] Code reviewed
+
+**Mark as [✓ DONE] when:** Week 8 complete and documented.
+
+---
+
+## SPRINT 3: Admin Dashboard, Payments, & Launch (Weeks 9-12)
+
+### WEEK 9: Admin Dashboard
+
+#### TASK 9.1: Create Admin Dashboard Landing Page
+**Status:** [ ] TODO
+
+**Objective:** Build admin dashboard with key metrics and navigation.
+
+**Requirements:**
+- File: `templates/admin/dashboard.html`
+- Display:
+  - Total providers (active/inactive counts)
+  - Total services
+  - Total reviews
+  - Pending payments count
+  - Revenue metrics (total, this month)
+- Navigation to:
+  - Provider management
+  - Payment queue
+  - Review moderation
+  - Analytics
+- Use AdminRequiredMixin for access control
+
+**Acceptance Criteria:**
+- [ ] Dashboard displays all metrics
+- [ ] Navigation links work
+- [ ] Only admins can access
+- [ ] Responsive design
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Admin dashboard is functional.
+
+---
+
+#### TASK 9.2: Admin Provider Management
+**Status:** [ ] TODO
+
+**Objective:** Allow admins to manage all providers (search, filter, edit).
+
+**Requirements:**
+- Already exists: `AdminProviderListView`
+- Enhance with:
+  - Advanced search (email, name, city)
+  - Filters: status, payment method, join date
+  - Bulk actions: suspend, activate
+  - Export to CSV
+- Provider detail page for admins:
+  - Edit profile
+  - View services
+  - View payment history
+  - Suspend/unsuspend account
+
+**Acceptance Criteria:**
+- [ ] Admin can search providers
+- [ ] Admin can filter by multiple fields
+- [ ] Admin can edit provider details
+- [ ] Admin can suspend/activate accounts
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Admin provider management is complete.
+
+---
+
+#### TASK 9.3: Admin Analytics Dashboard
+**Status:** [ ] TODO
+
+**Objective:** Display platform analytics for admins.
+
+**Requirements:**
+- File: `templates/admin/analytics.html`
+- Charts (use Chart.js or similar):
+  - Provider signups over time
+  - Revenue over time
+  - Average rating trend
+  - Service type distribution
+- Metrics:
+  - Conversion rate (signups to paid)
+  - Average revenue per provider
+  - Churn rate
+  - Active providers
+
+**Acceptance Criteria:**
+- [ ] Analytics page displays charts
+- [ ] Key metrics calculated correctly
+- [ ] Data updates in real-time
+- [ ] Exports available
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Analytics dashboard is functional.
+
+---
+
+### WEEK 10: Payment Monitoring
+
+#### TASK 10.1: Setup Crypto Payment Monitoring
+**Status:** [ ] TODO
+
+**Objective:** Monitor Bitcoin/Ethereum/USDC wallets for incoming payments.
+
+**Requirements:**
+- Install web3.py and blockchain API libraries
+- Create management command: `python manage.py monitor_crypto_payments`
+- For each pending crypto payment:
+  - Check blockchain for transaction
+  - Match transaction to provider
+  - Update payment status
+  - Send confirmation email
+- APIs to use:
+  - Bitcoin: Blockchain.com API (free)
+  - Ethereum/USDC: Etherscan API (free tier)
+- Run as cron job every hour
+
+**Acceptance Criteria:**
+- [ ] Can query blockchain APIs
+- [ ] Matches transactions to providers
+- [ ] Updates payment status
+- [ ] Sends confirmation emails
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Crypto monitoring works automatically.
+
+---
+
+#### TASK 10.2: Admin Bank Transfer Verification
+**Status:** [ ] TODO
+
+**Objective:** Allow admins to manually verify bank transfers.
+
+**Requirements:**
+- Already exists: `AdminPaymentListView`, `AdminPaymentDetailView`
+- Add actions:
+  - Mark as completed (with confirmation)
+  - Mark as failed (with reason)
+  - Request more info from provider
+- Payment detail page shows:
+  - Provider bank details (decrypted for admin)
+  - Reference number
+  - Amount and date
+  - Approve/reject buttons
+
+**Acceptance Criteria:**
+- [ ] Admin can view pending bank transfers
+- [ ] Admin can approve/reject payments
+- [ ] Confirmation emails sent
+- [ ] Status updates correctly
+- [ ] All tests pass
+
+**Mark as [✓ DONE] when:** Bank transfer verification works.
+
+---
+
+### WEEK 11: Security & Infrastructure
+
+#### TASK 11.1: Security Audit
+**Status:** [ ] TODO
+
+**Objective:** Perform comprehensive security audit and fixes.
+
+**Requirements:**
+- Check all forms for CSRF protection
+- Verify XSS prevention (template escaping)
+- SQL injection prevention (use ORM only)
+- Rate limiting on login/signup
+- Password hashing (verify PBKDF2/Argon2)
+- HTTPS enforcement
+- Secure headers (CSP, HSTS)
+- Environment variable security
+
+**Acceptance Criteria:**
+- [ ] Security checklist complete
+- [ ] All vulnerabilities fixed
+- [ ] Rate limiting implemented
+- [ ] Secure headers configured
+- [ ] Security tests pass
+
+**Mark as [✓ DONE] when:** Security audit passed.
+
+---
+
+#### TASK 11.2: Infrastructure Setup
+**Status:** [ ] TODO
+
+**Objective:** Setup production infrastructure (VPS, database, storage).
+
+**Requirements:**
+- Provision VPS (DigitalOcean/Linode)
+- Install PostgreSQL
+- Setup Minio or S3 for media files
+- Configure Nginx + Gunicorn
+- Setup systemd services
+- Configure domain and DNS
+- Install SSL certificates (Let's Encrypt)
+- Setup backups (daily database, weekly files)
+
+**Acceptance Criteria:**
+- [ ] VPS provisioned and configured
+- [ ] PostgreSQL running
+- [ ] Media storage working
+- [ ] Nginx + Gunicorn configured
+- [ ] SSL certificates installed
+- [ ] Backups automated
+
+**Mark as [✓ DONE] when:** Infrastructure is production-ready.
+
+---
+
+### WEEK 12: Testing & Launch
+
+#### TASK 12.1: Beta Testing
+**Status:** [ ] TODO
+
+**Objective:** Test with real users before public launch.
+
+**Requirements:**
+- Onboard 5-10 beta providers
+- Test full flow: signup → profile → service → payment
+- Test on multiple devices:
+  - Desktop (Chrome, Firefox, Safari, Edge)
+  - Mobile (iOS Safari, Chrome Mobile)
+- Collect feedback
+- Fix critical bugs
+- Test payment flows (testnet for crypto)
+
+**Acceptance Criteria:**
+- [ ] 5+ beta providers onboarded
+- [ ] All flows tested end-to-end
+- [ ] Mobile and desktop testing complete
+- [ ] Critical bugs fixed
+- [ ] Feedback collected
+
+**Mark as [✓ DONE] when:** Beta testing complete.
+
+---
+
+#### TASK 12.2: Legal Documentation
+**Status:** [ ] TODO
+
+**Objective:** Create Terms of Service, Privacy Policy, and Payment Policy.
+
+**Requirements:**
+- Terms of Service
+  - User obligations
+  - Service terms
+  - Liability limitations
+- Privacy Policy
+  - Data collection
+  - Data usage
+  - GDPR compliance
+- Payment Policy
+  - Subscription terms
+  - Refund policy
+  - Payment methods
+- Display links in footer
+- Require acceptance on signup
+
+**Acceptance Criteria:**
+- [ ] Terms of Service created
+- [ ] Privacy Policy created
+- [ ] Payment Policy created
+- [ ] Links in footer
+- [ ] Acceptance required on signup
+
+**Mark as [✓ DONE] when:** Legal documents complete and live.
+
+---
+
+#### TASK 12.3: Production Launch
+**Status:** [ ] TODO
+
+**Objective:** Deploy to production and go live.
+
+**Requirements:**
+- Database migration to production
+- Static files collection
+- Environment variables configured
+- Monitoring and logging active
+- Backups running
+- SSL certificate valid
+- Domain configured
+- Announce launch
+- Monitor for 48 hours
+
+**Acceptance Criteria:**
+- [ ] App live at production URL
+- [ ] All pages load < 2 seconds
+- [ ] SSL certificate valid
+- [ ] Monitoring active
+- [ ] Backups running
+- [ ] Launch announced
+
+**Mark as [✓ DONE] when:** Platform is live and stable.
 
 ---
 
