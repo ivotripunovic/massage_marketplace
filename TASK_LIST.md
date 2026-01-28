@@ -3025,7 +3025,7 @@ def test_provider_list_shows_ratings():
 ### WEEK 8: Payment Substrate & Crypto Forms
 
 #### TASK 8.1: Update SubscriptionPayment Model
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Ensure SubscriptionPayment model has all required fields.
 
@@ -3073,7 +3073,7 @@ def test_mark_payment_completed():
 ---
 
 #### TASK 8.2: Create Payment Method Selection Form
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Allow providers to choose payment method (crypto or bank transfer).
 
@@ -3116,7 +3116,7 @@ def test_payment_method_choices():
 ---
 
 #### TASK 8.3: Create Crypto Payment Form
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Display crypto payment instructions and wallet address.
 
@@ -3168,7 +3168,7 @@ def test_transaction_id_submission():
 ---
 
 #### TASK 8.4: Create Bank Transfer Payment Form
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Collect bank transfer details from provider.
 
@@ -3228,7 +3228,7 @@ def test_bank_details_encrypted():
 ---
 
 #### TASK 8.5: Create Subscription Activation Logic
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Activate subscription when payment method is selected.
 
@@ -3281,7 +3281,7 @@ def test_subscription_payment_created():
 ---
 
 #### TASK 8.6: Week 8 Tests & Documentation
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Comprehensive testing and documentation for payment system.
 

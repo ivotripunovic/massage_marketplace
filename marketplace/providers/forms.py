@@ -171,14 +171,14 @@ class CertificationForm(forms.ModelForm):
 
 class SubscriptionSettingsForm(forms.Form):
     """Form for subscription payment method selection."""
-    
+
     PAYMENT_METHOD_CHOICES = [
         ('crypto_bitcoin', 'Bitcoin'),
         ('crypto_ethereum', 'Ethereum'),
         ('crypto_usdc', 'USDC'),
         ('bank_transfer', 'Bank Transfer'),
     ]
-    
+
     payment_method = forms.ChoiceField(
         label='Payment Method',
         choices=PAYMENT_METHOD_CHOICES,
@@ -186,4 +186,51 @@ class SubscriptionSettingsForm(forms.Form):
             'class': 'radio-button'
         }),
         required=True
+    )
+
+
+class CryptoPaymentForm(forms.Form):
+    """Form for submitting crypto transaction ID."""
+
+    transaction_id = forms.CharField(
+        label='Transaction ID / Hash',
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono',
+            'placeholder': 'e.g., 0x123abc456def...',
+        }),
+        help_text='Paste the transaction hash from your wallet after sending payment.'
+    )
+
+
+class BankTransferForm(forms.Form):
+    """Form for confirming bank transfer details."""
+
+    sender_name = forms.CharField(
+        label='Account Holder Name',
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            'placeholder': 'Name on bank account',
+        })
+    )
+
+    bank_name = forms.CharField(
+        label='Bank Name',
+        max_length=255,
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            'placeholder': 'e.g., Chase Bank',
+        })
+    )
+
+    reference_number = forms.CharField(
+        label='Transfer Reference / Confirmation Number',
+        max_length=255,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            'placeholder': 'Bank transfer reference (if available)',
+        }),
+        help_text='Enter your bank transfer confirmation number if you have one. You can also provide this later.'
     )

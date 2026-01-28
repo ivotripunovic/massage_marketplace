@@ -51,19 +51,32 @@ class SubscriptionPayment(models.Model):
     )
     
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(blank=True, null=True)
-    
+
     notes = models.TextField(
         blank=True,
         null=True,
         help_text='Admin notes'
     )
-    
+
     class Meta:
         db_table = 'payments_subscription_payment'
         verbose_name = 'Subscription Payment'
         verbose_name_plural = 'Subscription Payments'
         ordering = ['-created_at']
-    
+
     def __str__(self):
         return f"{self.provider.user.email} - ${self.amount} - {self.get_status_display()} - {self.created_at.date()}"
+
+    def mark_completed(self):
+        """Mark payment as completed."""
+        from django.utils import timezone
+        self.status = 'completed'
+        self.completed_at = timezone.now()
+        self.save()
+
+    def mark_failed(self):
+        """Mark payment as failed."""
+        self.status = 'failed'
+        self.save()

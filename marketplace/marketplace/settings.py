@@ -142,3 +142,25 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 AUTHENTICATION_BACKENDS = [
     'users.backends.EmailBackend',
 ]
+
+# Subscription Settings
+SUBSCRIPTION_AMOUNT = 29.99
+
+# Platform Crypto Wallet Addresses
+PLATFORM_CRYPTO_ADDRESSES = {
+    'crypto_bitcoin': '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
+    'crypto_ethereum': '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
+    'crypto_usdc': '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
+}
+
+# Platform Bank Details
+PLATFORM_BANK_DETAILS = {
+    'bank_name': 'First National Bank',
+    'account_name': 'Massage Marketplace LLC',
+    'account_number': '****7890',
+    'routing_number': '021000021',
+    'swift_code': 'FNBOUS33',
+}
+
+# Admin notification emails
+ADMIN_EMAILS = ['admin@massagemarketplace.com']

@@ -26,7 +26,8 @@ from providers.views import (
     ProviderDashboardView, ProviderProfileUpdateView,
     CertificationCreateView, CertificationDeleteView,
     ServiceListView, ServiceCreateView, ServiceUpdateView, ServiceDeleteView,
-    AdminProviderListView, ProviderSubscriptionView, SubscriptionConfirmView
+    AdminProviderListView, ProviderSubscriptionView, SubscriptionConfirmView,
+    CryptoPaymentView, BankTransferPaymentView
 )
 from payments.views import AdminPaymentListView, AdminPaymentDetailView
 from clients.views import ProviderDirectoryView, ProviderDetailView
@@ -55,6 +56,8 @@ urlpatterns = [
     path('provider/dashboard/', ProviderDashboardView.as_view(), name='provider_dashboard'),
     path('provider/profile/', ProviderProfileUpdateView.as_view(), name='provider_profile'),
     path('provider/subscription/', ProviderSubscriptionView.as_view(), name='subscription'),
+    path('provider/subscription/crypto/', CryptoPaymentView.as_view(), name='subscription_crypto_payment'),
+    path('provider/subscription/bank/', BankTransferPaymentView.as_view(), name='subscription_bank_payment'),
     path('provider/subscription/confirm/', SubscriptionConfirmView.as_view(), name='subscription_confirm'),
     path('provider/certifications/add/', CertificationCreateView.as_view(), name='add_certification'),
     path('provider/certifications/<int:pk>/delete/', CertificationDeleteView.as_view(), name='delete_certification'),

@@ -158,6 +158,47 @@ class SubscriptionPaymentModelTests(TestCase):
         )
         self.assertEqual(payment.amount, 49.99)
 
+    def test_mark_completed(self):
+        """Test mark_completed() sets status and completed_at."""
+        payment = SubscriptionPayment.objects.create(
+            provider=self.provider,
+            payment_method='crypto_bitcoin'
+        )
+        self.assertEqual(payment.status, 'pending')
+        self.assertIsNone(payment.completed_at)
+
+        payment.mark_completed()
+        payment.refresh_from_db()
+
+        self.assertEqual(payment.status, 'completed')
+        self.assertIsNotNone(payment.completed_at)
+
+    def test_mark_failed(self):
+        """Test mark_failed() sets status to failed."""
+        payment = SubscriptionPayment.objects.create(
+            provider=self.provider,
+            payment_method='bank_transfer'
+        )
+        payment.mark_failed()
+        payment.refresh_from_db()
+
+        self.assertEqual(payment.status, 'failed')
+
+    def test_updated_at_field(self):
+        """Test updated_at is set and changes on save."""
+        payment = SubscriptionPayment.objects.create(
+            provider=self.provider,
+            payment_method='crypto_usdc'
+        )
+        self.assertIsNotNone(payment.updated_at)
+        original_updated = payment.updated_at
+
+        payment.notes = 'Updated note'
+        payment.save()
+        payment.refresh_from_db()
+
+        self.assertGreaterEqual(payment.updated_at, original_updated)
+
 
 class AdminPaymentListViewTests(TestCase):
     """Test AdminPaymentListView for admin payment management."""

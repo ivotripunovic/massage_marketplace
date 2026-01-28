@@ -1919,7 +1919,7 @@ class ProviderSubscriptionViewTests(TestCase):
         self.assertContains(response, 'Subscription Status')
     
     def test_subscription_form_submission(self):
-        """Test that form submission works."""
+        """Test that form submission redirects to payment page."""
         self.client.login(email=self.user.email, password='testpass123')
         response = self.client.post(
             reverse('subscription'),
@@ -1927,8 +1927,8 @@ class ProviderSubscriptionViewTests(TestCase):
             follow=True
         )
         self.assertEqual(response.status_code, 200)
-        # Should redirect to confirmation page
-        self.assertIn(reverse('subscription_confirm'), response.request['PATH_INFO'])
+        # Should redirect to crypto payment page
+        self.assertIn(reverse('subscription_crypto_payment'), response.request['PATH_INFO'])
     
     def test_subscription_form_invalid_choice(self):
         """Test that form validation works."""
@@ -2003,43 +2003,60 @@ class ProviderSubscriptionActivationTests(TestCase):
         self.assertEqual(self.provider.subscription_status, 'inactive')
     
     def test_subscription_form_creates_payment_record(self):
-        """Test that form submission creates a SubscriptionPayment record."""
+        """Test that crypto payment submission creates a SubscriptionPayment record."""
         from payments.models import SubscriptionPayment
-        
+
         self.client.login(email=self.user.email, password='testpass123')
-        response = self.client.post(
+
+        # Step 1: Select payment method
+        self.client.post(
             reverse('subscription'),
-            {'payment_method': 'crypto_bitcoin'},
+            {'payment_method': 'crypto_bitcoin'}
+        )
+
+        # Step 2: Submit transaction ID on crypto payment page
+        response = self.client.post(
+            reverse('subscription_crypto_payment'),
+            {'transaction_id': '0xabc123def456'},
             follow=True
         )
-        
+
         # Should have created a payment record
         payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
         self.assertIsNotNone(payment)
         self.assertEqual(payment.payment_method, 'crypto_bitcoin')
         self.assertEqual(payment.status, 'pending')
         self.assertEqual(float(payment.amount), 29.99)
+        self.assertEqual(payment.reference_id, '0xabc123def456')
     
     def test_subscription_activation_flow(self):
-        """Test complete subscription activation flow."""
+        """Test complete subscription activation flow via crypto payment."""
         from payments.models import SubscriptionPayment
-        
+
         self.client.login(email=self.user.email, password='testpass123')
-        response = self.client.post(
+
+        # Step 1: Select payment method
+        self.client.post(
             reverse('subscription'),
-            {'payment_method': 'crypto_ethereum'},
+            {'payment_method': 'crypto_ethereum'}
+        )
+
+        # Step 2: Submit transaction ID
+        response = self.client.post(
+            reverse('subscription_crypto_payment'),
+            {'transaction_id': '0xethtx123'},
             follow=True
         )
-        
+
         # Should redirect to confirmation page
         self.assertEqual(response.status_code, 200)
         self.assertIn(reverse('subscription_confirm'), response.request['PATH_INFO'])
-        
+
         # Provider should be activated
         self.provider.refresh_from_db()
         self.assertEqual(self.provider.subscription_status, 'active')
         self.assertEqual(self.provider.subscription_payment_method, 'crypto_ethereum')
-        
+
         # Payment record should be created
         payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
         self.assertIsNotNone(payment)
@@ -2070,11 +2087,346 @@ class ProviderSubscriptionActivationTests(TestCase):
         """Test is_subscription_active method."""
         # Initially inactive
         self.assertFalse(self.provider.is_subscription_active())
-        
+
         # After activation
         self.provider.activate_subscription('crypto_bitcoin')
         self.assertTrue(self.provider.is_subscription_active())
-        
+
         # After deactivation
         self.provider.deactivate_subscription()
         self.assertFalse(self.provider.is_subscription_active())
+
+
+class CryptoPaymentViewTests(TestCase):
+    """Test crypto payment view."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='provider@test.com',
+            password='testpass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone='+1234567890',
+            subscription_status='inactive'
+        )
+        self.client = Client()
+
+    def test_crypto_page_requires_login(self):
+        """Test that crypto payment page requires login."""
+        response = self.client.get(reverse('subscription_crypto_payment'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_crypto_page_requires_session(self):
+        """Test that crypto page redirects without session payment method."""
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.get(reverse('subscription_crypto_payment'))
+        self.assertRedirects(response, reverse('subscription'))
+
+    def test_crypto_page_loads_with_session(self):
+        """Test that crypto page loads when session is set."""
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'crypto_bitcoin'
+        session.save()
+        response = self.client.get(reverse('subscription_crypto_payment'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'providers/subscription_crypto.html')
+
+    def test_crypto_page_shows_wallet_address(self):
+        """Test that crypto page displays wallet address."""
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'crypto_bitcoin'
+        session.save()
+        response = self.client.get(reverse('subscription_crypto_payment'))
+        self.assertContains(response, 'Wallet Address')
+        self.assertContains(response, '29.99')
+
+    def test_crypto_page_shows_payment_instructions(self):
+        """Test that crypto page shows payment instructions."""
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'crypto_bitcoin'
+        session.save()
+        response = self.client.get(reverse('subscription_crypto_payment'))
+        self.assertContains(response, 'Payment Instructions')
+        self.assertContains(response, 'Transaction ID')
+
+    def test_crypto_submit_transaction_id(self):
+        """Test submitting a crypto transaction ID."""
+        from payments.models import SubscriptionPayment
+
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'crypto_bitcoin'
+        session.save()
+
+        response = self.client.post(
+            reverse('subscription_crypto_payment'),
+            {'transaction_id': '0xabc123'},
+            follow=True
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
+        self.assertIsNotNone(payment)
+        self.assertEqual(payment.reference_id, '0xabc123')
+        self.assertEqual(payment.payment_method, 'crypto_bitcoin')
+        self.assertEqual(payment.status, 'pending')
+
+    def test_crypto_submit_activates_subscription(self):
+        """Test that crypto submission activates subscription."""
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'crypto_ethereum'
+        session.save()
+
+        self.client.post(
+            reverse('subscription_crypto_payment'),
+            {'transaction_id': '0xeth456'}
+        )
+
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, 'active')
+        self.assertEqual(self.provider.subscription_payment_method, 'crypto_ethereum')
+        self.assertIsNotNone(self.provider.subscription_renewal_date)
+
+    def test_crypto_submit_clears_session(self):
+        """Test that crypto submission clears session."""
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'crypto_bitcoin'
+        session.save()
+
+        self.client.post(
+            reverse('subscription_crypto_payment'),
+            {'transaction_id': '0x123'}
+        )
+
+        session = self.client.session
+        self.assertNotIn('pending_payment_method', session)
+
+    def test_crypto_rejects_bank_transfer_method(self):
+        """Test that crypto page rejects bank_transfer method."""
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'bank_transfer'
+        session.save()
+        response = self.client.get(reverse('subscription_crypto_payment'))
+        self.assertRedirects(response, reverse('subscription'))
+
+
+class BankTransferPaymentViewTests(TestCase):
+    """Test bank transfer payment view."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='provider@test.com',
+            password='testpass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone='+1234567890',
+            subscription_status='inactive'
+        )
+        self.client = Client()
+
+    def test_bank_page_requires_login(self):
+        """Test that bank transfer page requires login."""
+        response = self.client.get(reverse('subscription_bank_payment'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_bank_page_requires_session(self):
+        """Test that bank page redirects without session payment method."""
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.get(reverse('subscription_bank_payment'))
+        self.assertRedirects(response, reverse('subscription'))
+
+    def test_bank_page_loads_with_session(self):
+        """Test that bank page loads when session is set."""
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'bank_transfer'
+        session.save()
+        response = self.client.get(reverse('subscription_bank_payment'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'providers/subscription_bank.html')
+
+    def test_bank_page_shows_platform_details(self):
+        """Test that bank page shows platform bank details."""
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'bank_transfer'
+        session.save()
+        response = self.client.get(reverse('subscription_bank_payment'))
+        self.assertContains(response, 'First National Bank')
+        self.assertContains(response, 'Massage Marketplace LLC')
+        self.assertContains(response, '29.99')
+
+    def test_bank_page_shows_reference_number(self):
+        """Test that bank page generates and shows payment reference."""
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'bank_transfer'
+        session.save()
+        response = self.client.get(reverse('subscription_bank_payment'))
+        self.assertContains(response, 'SUB-')
+        self.assertContains(response, 'Payment Reference')
+
+    def test_bank_submit_creates_payment(self):
+        """Test submitting bank transfer details creates payment record."""
+        from payments.models import SubscriptionPayment
+
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'bank_transfer'
+        session['bank_payment_reference'] = 'SUB-1-ABCD1234'
+        session.save()
+
+        response = self.client.post(
+            reverse('subscription_bank_payment'),
+            {
+                'sender_name': 'John Doe',
+                'bank_name': 'Chase Bank',
+                'reference_number': 'REF123456',
+            },
+            follow=True
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
+        self.assertIsNotNone(payment)
+        self.assertEqual(payment.payment_method, 'bank_transfer')
+        self.assertEqual(payment.reference_id, 'REF123456')
+        self.assertEqual(payment.status, 'pending')
+
+    def test_bank_submit_activates_subscription(self):
+        """Test that bank transfer submission activates subscription."""
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'bank_transfer'
+        session.save()
+
+        self.client.post(
+            reverse('subscription_bank_payment'),
+            {
+                'sender_name': 'Jane Smith',
+                'bank_name': 'Wells Fargo',
+            }
+        )
+
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, 'active')
+        self.assertEqual(self.provider.subscription_payment_method, 'bank_transfer')
+        self.assertIsNotNone(self.provider.subscription_renewal_date)
+
+    def test_bank_submit_stores_bank_info(self):
+        """Test that bank transfer stores sender details."""
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'bank_transfer'
+        session.save()
+
+        self.client.post(
+            reverse('subscription_bank_payment'),
+            {
+                'sender_name': 'John Doe',
+                'bank_name': 'Chase Bank',
+            }
+        )
+
+        self.provider.refresh_from_db()
+        self.assertIn('John Doe', self.provider.bank_account_encrypted)
+        self.assertIn('Chase Bank', self.provider.bank_account_encrypted)
+
+    def test_bank_submit_uses_generated_reference(self):
+        """Test that submission uses generated reference when none provided."""
+        from payments.models import SubscriptionPayment
+
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'bank_transfer'
+        session['bank_payment_reference'] = 'SUB-1-GENERATED'
+        session.save()
+
+        self.client.post(
+            reverse('subscription_bank_payment'),
+            {
+                'sender_name': 'Jane Smith',
+                'bank_name': 'Wells Fargo',
+                'reference_number': '',
+            }
+        )
+
+        payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
+        self.assertEqual(payment.reference_id, 'SUB-1-GENERATED')
+
+    def test_bank_rejects_crypto_method(self):
+        """Test that bank page rejects crypto payment methods."""
+        self.client.login(email=self.user.email, password='testpass123')
+        session = self.client.session
+        session['pending_payment_method'] = 'crypto_bitcoin'
+        session.save()
+        response = self.client.get(reverse('subscription_bank_payment'))
+        self.assertRedirects(response, reverse('subscription'))
+
+
+class PaymentFormTests(TestCase):
+    """Test payment forms."""
+
+    def test_crypto_form_valid(self):
+        """Test CryptoPaymentForm with valid data."""
+        from providers.forms import CryptoPaymentForm
+        form = CryptoPaymentForm(data={'transaction_id': '0xabc123'})
+        self.assertTrue(form.is_valid())
+
+    def test_crypto_form_requires_transaction_id(self):
+        """Test CryptoPaymentForm requires transaction_id."""
+        from providers.forms import CryptoPaymentForm
+        form = CryptoPaymentForm(data={'transaction_id': ''})
+        self.assertFalse(form.is_valid())
+        self.assertIn('transaction_id', form.errors)
+
+    def test_bank_form_valid(self):
+        """Test BankTransferForm with valid data."""
+        from providers.forms import BankTransferForm
+        form = BankTransferForm(data={
+            'sender_name': 'John Doe',
+            'bank_name': 'Chase Bank',
+            'reference_number': 'REF123',
+        })
+        self.assertTrue(form.is_valid())
+
+    def test_bank_form_reference_optional(self):
+        """Test BankTransferForm reference_number is optional."""
+        from providers.forms import BankTransferForm
+        form = BankTransferForm(data={
+            'sender_name': 'John Doe',
+            'bank_name': 'Chase Bank',
+        })
+        self.assertTrue(form.is_valid())
+
+    def test_bank_form_requires_sender_name(self):
+        """Test BankTransferForm requires sender_name."""
+        from providers.forms import BankTransferForm
+        form = BankTransferForm(data={
+            'sender_name': '',
+            'bank_name': 'Chase Bank',
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('sender_name', form.errors)
+
+    def test_bank_form_requires_bank_name(self):
+        """Test BankTransferForm requires bank_name."""
+        from providers.forms import BankTransferForm
+        form = BankTransferForm(data={
+            'sender_name': 'John Doe',
+            'bank_name': '',
+        })
+        self.assertFalse(form.is_valid())
+        self.assertIn('bank_name', form.errors)

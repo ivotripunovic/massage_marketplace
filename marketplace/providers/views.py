@@ -7,7 +7,7 @@ from django import forms
 from django.db.models import Count, Avg
 from django.http import HttpResponseForbidden
 from providers.models import Provider, Service, Certification
-from providers.forms import CertificationForm, ServiceForm, SubscriptionSettingsForm
+from providers.forms import CertificationForm, ServiceForm, SubscriptionSettingsForm, CryptoPaymentForm, BankTransferForm
 from users.models import User
 
 
@@ -525,76 +525,222 @@ class ProviderSubscriptionView(ProviderRequiredMixin, FormView):
         return context
     
     def form_valid(self, form):
-        """Handle form submission and activate subscription."""
-        from payments.models import SubscriptionPayment
-        
+        """Redirect to payment-specific page based on method chosen."""
         payment_method = form.cleaned_data['payment_method']
-        
-        try:
-            provider = Provider.objects.get(user=self.request.user)
-            
-            # Create SubscriptionPayment record
-            subscription_payment = SubscriptionPayment.objects.create(
-                provider=provider,
-                amount=29.99,  # Monthly subscription cost
-                payment_method=payment_method,
-                status='pending'
-            )
-            
-            # Activate subscription
-            provider.activate_subscription(payment_method)
-            
-            # Send confirmation email
-            self._send_subscription_confirmation_email(provider, payment_method)
-            
-            messages.success(
-                self.request,
-                'Subscription activated! Please complete payment to activate your services.'
-            )
-        except Provider.DoesNotExist:
-            messages.error(self.request, 'Provider profile not found.')
-            return redirect('provider_profile')
-        
-        return super().form_valid(form)
-    
-    def _send_subscription_confirmation_email(self, provider, payment_method):
+
+        # Store chosen method in session for the payment page
+        self.request.session['pending_payment_method'] = payment_method
+
+        if payment_method == 'bank_transfer':
+            return redirect('subscription_bank_payment')
+        else:
+            return redirect('subscription_crypto_payment')
+
+
+class CryptoPaymentView(ProviderRequiredMixin, FormView):
+    """View for crypto payment with wallet address and transaction ID submission."""
+
+    form_class = CryptoPaymentForm
+    template_name = 'providers/subscription_crypto.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        """Ensure payment method is in session."""
+        self.payment_method = request.session.get('pending_payment_method')
+        if not self.payment_method or not self.payment_method.startswith('crypto_'):
+            messages.error(request, 'Please select a payment method first.')
+            return redirect('subscription')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        """Add wallet address and payment info to context."""
+        from django.conf import settings as django_settings
+        context = super().get_context_data(**kwargs)
+
+        provider = get_object_or_404(Provider, user=self.request.user)
+        context['provider'] = provider
+        context['payment_method'] = self.payment_method
+        context['payment_method_display'] = dict(SubscriptionSettingsForm.PAYMENT_METHOD_CHOICES).get(
+            self.payment_method, self.payment_method
+        )
+        context['amount'] = getattr(django_settings, 'SUBSCRIPTION_AMOUNT', 29.99)
+        context['wallet_address'] = getattr(
+            django_settings, 'PLATFORM_CRYPTO_ADDRESSES', {}
+        ).get(self.payment_method, '')
+
+        return context
+
+    def form_valid(self, form):
+        """Create payment record and activate subscription."""
+        from payments.models import SubscriptionPayment
+        from django.conf import settings as django_settings
+
+        provider = get_object_or_404(Provider, user=self.request.user)
+        transaction_id = form.cleaned_data['transaction_id']
+        amount = getattr(django_settings, 'SUBSCRIPTION_AMOUNT', 29.99)
+
+        # Create payment record with transaction reference
+        SubscriptionPayment.objects.create(
+            provider=provider,
+            amount=amount,
+            payment_method=self.payment_method,
+            status='pending',
+            reference_id=transaction_id,
+        )
+
+        # Activate subscription
+        provider.activate_subscription(self.payment_method)
+
+        # Send confirmation email
+        self._send_confirmation_email(provider)
+
+        # Clear session
+        self.request.session.pop('pending_payment_method', None)
+
+        messages.success(
+            self.request,
+            'Payment submitted! Your subscription is active while we verify your transaction.'
+        )
+        return redirect('subscription_confirm')
+
+    def _send_confirmation_email(self, provider):
         """Send subscription confirmation email."""
         from django.core.mail import send_mail
         from django.template.loader import render_to_string
-        
+
         try:
             html_message = render_to_string('emails/subscription_confirmation.html', {
                 'provider': provider,
                 'amount': 29.99,
-                'payment_method_display': dict(SubscriptionSettingsForm.PAYMENT_METHOD_CHOICES).get(payment_method, payment_method),
+                'payment_method_display': dict(SubscriptionSettingsForm.PAYMENT_METHOD_CHOICES).get(
+                    self.payment_method, self.payment_method
+                ),
                 'renewal_date': provider.subscription_renewal_date,
             })
-            
+
             send_mail(
                 'Subscription Activated - Massage Marketplace',
                 'Your subscription has been activated.',
                 'noreply@massagemarketplace.com',
                 [provider.user.email],
                 html_message=html_message,
-                fail_silently=True
+                fail_silently=True,
             )
         except Exception:
-            # Silently fail if email cannot be sent
+            pass
+
+
+class BankTransferPaymentView(ProviderRequiredMixin, FormView):
+    """View for bank transfer payment with platform bank details."""
+
+    form_class = BankTransferForm
+    template_name = 'providers/subscription_bank.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        """Ensure bank_transfer payment method is in session."""
+        self.payment_method = request.session.get('pending_payment_method')
+        if self.payment_method != 'bank_transfer':
+            messages.error(request, 'Please select a payment method first.')
+            return redirect('subscription')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        """Add platform bank details and reference number to context."""
+        from django.conf import settings as django_settings
+        import uuid
+        context = super().get_context_data(**kwargs)
+
+        provider = get_object_or_404(Provider, user=self.request.user)
+        context['provider'] = provider
+        context['amount'] = getattr(django_settings, 'SUBSCRIPTION_AMOUNT', 29.99)
+        context['platform_bank'] = getattr(django_settings, 'PLATFORM_BANK_DETAILS', {})
+
+        # Generate a unique reference for this transfer
+        reference = f"SUB-{provider.pk}-{uuid.uuid4().hex[:8].upper()}"
+        context['payment_reference'] = reference
+        # Store in session so it persists to form submission
+        self.request.session['bank_payment_reference'] = reference
+
+        return context
+
+    def form_valid(self, form):
+        """Create payment record and activate subscription."""
+        from payments.models import SubscriptionPayment
+        from django.conf import settings as django_settings
+
+        provider = get_object_or_404(Provider, user=self.request.user)
+        amount = getattr(django_settings, 'SUBSCRIPTION_AMOUNT', 29.99)
+
+        reference = self.request.session.get('bank_payment_reference', '')
+        user_reference = form.cleaned_data.get('reference_number', '')
+        final_reference = user_reference if user_reference else reference
+
+        # Store bank transfer details in provider's encrypted field
+        bank_info = f"{form.cleaned_data['sender_name']} | {form.cleaned_data['bank_name']}"
+        provider.bank_account_encrypted = bank_info
+        provider.save(update_fields=['bank_account_encrypted'])
+
+        # Create payment record
+        SubscriptionPayment.objects.create(
+            provider=provider,
+            amount=amount,
+            payment_method='bank_transfer',
+            status='pending',
+            reference_id=final_reference,
+        )
+
+        # Activate subscription
+        provider.activate_subscription('bank_transfer')
+
+        # Send confirmation email
+        self._send_confirmation_email(provider)
+
+        # Clear session
+        self.request.session.pop('pending_payment_method', None)
+        self.request.session.pop('bank_payment_reference', None)
+
+        messages.success(
+            self.request,
+            'Bank transfer details submitted! Your subscription is active while we verify your payment.'
+        )
+        return redirect('subscription_confirm')
+
+    def _send_confirmation_email(self, provider):
+        """Send subscription confirmation email."""
+        from django.core.mail import send_mail
+        from django.template.loader import render_to_string
+
+        try:
+            html_message = render_to_string('emails/subscription_confirmation.html', {
+                'provider': provider,
+                'amount': 29.99,
+                'payment_method_display': 'Bank Transfer',
+                'renewal_date': provider.subscription_renewal_date,
+            })
+
+            send_mail(
+                'Subscription Activated - Massage Marketplace',
+                'Your subscription has been activated.',
+                'noreply@massagemarketplace.com',
+                [provider.user.email],
+                html_message=html_message,
+                fail_silently=True,
+            )
+        except Exception:
             pass
 
 
 class SubscriptionConfirmView(ProviderRequiredMixin, TemplateView):
     """View to confirm subscription activation."""
-    
+
     template_name = 'providers/subscription_confirm.html'
-    
+
     def get_context_data(self, **kwargs):
         """Add provider and payment info to context."""
         context = super().get_context_data(**kwargs)
         try:
             provider = Provider.objects.get(user=self.request.user)
             context['provider'] = provider
-            
+
             # Get the most recent subscription payment
             from payments.models import SubscriptionPayment
             recent_payment = SubscriptionPayment.objects.filter(
