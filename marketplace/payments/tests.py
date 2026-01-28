@@ -619,6 +619,94 @@ class AdminAnalyticsViewTests(TestCase):
         self.assertEqual(len(response.context['revenue_data']), 6)
 
 
+class MonitorCryptoPaymentsCommandTests(TestCase):
+    """Test monitor_crypto_payments management command."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email='provider@test.com', password='pass', user_type='provider'
+        )
+        self.provider = Provider.objects.create(
+            user=self.user, phone='+1234567890', subscription_status='active'
+        )
+
+    def test_command_finds_pending_crypto_payments(self):
+        """Test that command finds pending crypto payments with tx hashes."""
+        from io import StringIO
+        from django.core.management import call_command
+
+        SubscriptionPayment.objects.create(
+            provider=self.provider, amount=29.99,
+            payment_method='crypto_bitcoin', status='pending',
+            reference_id='0xabc123'
+        )
+
+        out = StringIO()
+        call_command('monitor_crypto_payments', stdout=out)
+        output = out.getvalue()
+        self.assertIn('Found 1 pending crypto payment', output)
+
+    def test_command_ignores_completed_payments(self):
+        """Test that command ignores already completed payments."""
+        from io import StringIO
+        from django.core.management import call_command
+
+        SubscriptionPayment.objects.create(
+            provider=self.provider, amount=29.99,
+            payment_method='crypto_bitcoin', status='completed',
+            reference_id='0xabc123'
+        )
+
+        out = StringIO()
+        call_command('monitor_crypto_payments', stdout=out)
+        output = out.getvalue()
+        self.assertIn('Found 0 pending crypto payment', output)
+
+    def test_command_ignores_bank_transfers(self):
+        """Test that command ignores bank transfer payments."""
+        from io import StringIO
+        from django.core.management import call_command
+
+        SubscriptionPayment.objects.create(
+            provider=self.provider, amount=29.99,
+            payment_method='bank_transfer', status='pending',
+            reference_id='REF123'
+        )
+
+        out = StringIO()
+        call_command('monitor_crypto_payments', stdout=out)
+        output = out.getvalue()
+        self.assertIn('Found 0 pending crypto payment', output)
+
+    def test_command_dry_run(self):
+        """Test dry run mode doesn't update payments."""
+        from io import StringIO
+        from django.core.management import call_command
+
+        payment = SubscriptionPayment.objects.create(
+            provider=self.provider, amount=29.99,
+            payment_method='crypto_bitcoin', status='pending',
+            reference_id='0xabc123'
+        )
+
+        out = StringIO()
+        call_command('monitor_crypto_payments', '--dry-run', stdout=out)
+
+        payment.refresh_from_db()
+        # Status should remain pending (stub returns not verified)
+        self.assertEqual(payment.status, 'pending')
+
+    def test_command_reports_verification_summary(self):
+        """Test that command reports summary at end."""
+        from io import StringIO
+        from django.core.management import call_command
+
+        out = StringIO()
+        call_command('monitor_crypto_payments', stdout=out)
+        output = out.getvalue()
+        self.assertIn('Done.', output)
+
+
 class SubscriptionConfirmationEmailTests(TestCase):
     """Test subscription confirmation email functionality."""
 

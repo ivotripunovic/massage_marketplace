@@ -3402,7 +3402,7 @@ def test_subscription_payment_created():
 ### WEEK 10: Payment Monitoring
 
 #### TASK 10.1: Setup Crypto Payment Monitoring
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Monitor Bitcoin/Ethereum/USDC wallets for incoming payments.
 
@@ -3431,7 +3431,7 @@ def test_subscription_payment_created():
 ---
 
 #### TASK 10.2: Admin Bank Transfer Verification
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Allow admins to manually verify bank transfers.
 

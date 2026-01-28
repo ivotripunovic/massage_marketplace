@@ -100,7 +100,7 @@
                 <p class="font-semibold">{{ payment.provider.services.count }} active</p>
             </div>
             
-            <a href="{% url 'admin_providers' %}" class="inline-block text-blue-600 hover:underline">
+            <a href="{% url 'admin_provider_detail' payment.provider.pk %}" class="inline-block text-blue-600 hover:underline">
                 View Provider Profile →
             </a>
         </div>
@@ -152,15 +152,33 @@
     <a href="{% url 'admin_payments' %}" class="px-6 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400">
         Back to Payments
     </a>
-    
+
     {% if payment.status == 'pending' %}
-    <button class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700" onclick="alert('Payment approval functionality in development')">
-        Mark as Completed
-    </button>
-    <button class="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700" onclick="alert('Payment rejection functionality in development')">
-        Mark as Failed
-    </button>
+    <form method="post" action="{% url 'admin_payment_action' payment.pk %}" class="inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="approve">
+        <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+            Mark as Completed
+        </button>
+    </form>
+    <form method="post" action="{% url 'admin_payment_action' payment.pk %}" class="inline">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="reject">
+        <button type="submit" class="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+            Mark as Failed
+        </button>
+    </form>
     {% endif %}
 </div>
+
+{% if messages %}
+<div class="mb-4">
+    {% for message in messages %}
+    <div class="bg-{% if message.tags == 'error' %}red{% elif message.tags == 'success' %}green{% else %}blue{% endif %}-50 border border-{% if message.tags == 'error' %}red{% elif message.tags == 'success' %}green{% else %}blue{% endif %}-200 rounded-lg p-4 text-{% if message.tags == 'error' %}red{% elif message.tags == 'success' %}green{% else %}blue{% endif %}-800 mb-2">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
 
 {% endblock %}
