@@ -8,6 +8,65 @@
     <p class="text-gray-600">Browse verified massage therapy professionals in your area</p>
 </div>
 
+<!-- Filter Section -->
+<div class="bg-white rounded-lg shadow p-6 mb-8">
+    <h2 class="text-xl font-bold mb-4">Filter Providers</h2>
+    <form method="get" action="{% url 'providers' %}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <!-- Service Type Filter -->
+        <div>
+            <label for="service_type" class="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
+            <select name="service_type" id="service_type" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">All Services</option>
+                {% for value, label in service_types %}
+                <option value="{{ value }}" {% if current_service_type == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Country Filter -->
+        <div>
+            <label for="country" class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+            <select name="country" id="country" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">All Countries</option>
+                {% for country in countries %}
+                <option value="{{ country }}" {% if current_country == country %}selected{% endif %}>{{ country }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- City Filter -->
+        <div>
+            <label for="city" class="block text-sm font-medium text-gray-700 mb-1">City</label>
+            <select name="city" id="city" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">All Cities</option>
+                {% for city in cities %}
+                <option value="{{ city }}" {% if current_city == city %}selected{% endif %}>{{ city }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Price Range Filters -->
+        <div>
+            <label for="price_min" class="block text-sm font-medium text-gray-700 mb-1">Min Price ($)</label>
+            <input type="number" name="price_min" id="price_min" value="{{ current_price_min }}" min="0" step="5" placeholder="Min" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+            <label for="price_max" class="block text-sm font-medium text-gray-700 mb-1">Max Price ($)</label>
+            <input type="number" name="price_max" id="price_max" value="{{ current_price_max }}" min="0" step="5" placeholder="Max" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500">
+        </div>
+
+        <!-- Filter Buttons -->
+        <div class="md:col-span-2 lg:col-span-5 flex gap-4">
+            <button type="submit" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+                Apply Filters
+            </button>
+            <a href="{% url 'providers' %}" class="bg-gray-300 text-gray-800 px-6 py-2 rounded-lg hover:bg-gray-400">
+                Reset Filters
+            </a>
+        </div>
+    </form>
+</div>
+
 {% if providers_with_stats %}
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     {% for item in providers_with_stats %}

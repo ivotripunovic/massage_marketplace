@@ -329,3 +329,173 @@ class ProviderModelHelperTests(TestCase):
         self.user.save()
         name = self.provider.get_name()
         self.assertEqual(name, 'test')
+
+
+class ProviderFilteringTests(TestCase):
+    """Tests for provider filtering functionality."""
+
+    def setUp(self):
+        """Set up test data."""
+        self.client = Client()
+
+        # Create providers with different services and locations
+        self.provider1 = self._create_provider(
+            email='provider1@example.com',
+            country='USA',
+            city='New York'
+        )
+        Service.objects.create(
+            provider=self.provider1,
+            service_type='swedish',
+            price=50.00,
+            duration_minutes=60
+        )
+
+        self.provider2 = self._create_provider(
+            email='provider2@example.com',
+            country='USA',
+            city='Los Angeles'
+        )
+        Service.objects.create(
+            provider=self.provider2,
+            service_type='deep_tissue',
+            price=80.00,
+            duration_minutes=60
+        )
+
+        self.provider3 = self._create_provider(
+            email='provider3@example.com',
+            country='Canada',
+            city='Toronto'
+        )
+        Service.objects.create(
+            provider=self.provider3,
+            service_type='swedish',
+            price=100.00,
+            duration_minutes=90
+        )
+
+    def _create_provider(self, email, country, city):
+        """Helper to create a provider."""
+        user = User.objects.create_user(
+            email=email,
+            password='testpass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        provider = Provider.objects.create(
+            user=user,
+            phone='+1234567890',
+            subscription_status='active',
+            country=country,
+            city=city
+        )
+        return provider
+
+    def test_filter_by_service_type(self):
+        """Test filtering providers by service type."""
+        response = self.client.get(reverse('providers') + '?service_type=swedish')
+        self.assertEqual(response.status_code, 200)
+
+        # Should show providers 1 and 3 (both offer Swedish)
+        self.assertContains(response, 'provider1@example.com')
+        self.assertContains(response, 'provider3@example.com')
+        # Should not show provider 2 (offers deep tissue)
+        self.assertNotContains(response, 'provider2@example.com')
+
+    def test_filter_by_country(self):
+        """Test filtering providers by country."""
+        response = self.client.get(reverse('providers') + '?country=USA')
+        self.assertEqual(response.status_code, 200)
+
+        # Should show USA providers
+        self.assertContains(response, 'provider1@example.com')
+        self.assertContains(response, 'provider2@example.com')
+        # Should not show Canadian provider
+        self.assertNotContains(response, 'provider3@example.com')
+
+    def test_filter_by_city(self):
+        """Test filtering providers by city."""
+        response = self.client.get(reverse('providers') + '?city=New York')
+        self.assertEqual(response.status_code, 200)
+
+        # Should show only New York provider
+        self.assertContains(response, 'provider1@example.com')
+        self.assertNotContains(response, 'provider2@example.com')
+        self.assertNotContains(response, 'provider3@example.com')
+
+    def test_filter_by_price_range(self):
+        """Test filtering providers by price range."""
+        response = self.client.get(reverse('providers') + '?price_min=60&price_max=90')
+        self.assertEqual(response.status_code, 200)
+
+        # Should show providers 2 (80) but not 1 (50) or 3 (100)
+        self.assertContains(response, 'provider2@example.com')
+        self.assertNotContains(response, 'provider1@example.com')
+        self.assertNotContains(response, 'provider3@example.com')
+
+    def test_filter_by_min_price_only(self):
+        """Test filtering by minimum price."""
+        response = self.client.get(reverse('providers') + '?price_min=75')
+        self.assertEqual(response.status_code, 200)
+
+        # Should show providers 2 (80) and 3 (100)
+        self.assertContains(response, 'provider2@example.com')
+        self.assertContains(response, 'provider3@example.com')
+        # Should not show provider 1 (50)
+        self.assertNotContains(response, 'provider1@example.com')
+
+    def test_filter_by_max_price_only(self):
+        """Test filtering by maximum price."""
+        response = self.client.get(reverse('providers') + '?price_max=75')
+        self.assertEqual(response.status_code, 200)
+
+        # Should show provider 1 (50)
+        self.assertContains(response, 'provider1@example.com')
+        # Should not show providers 2 (80) or 3 (100)
+        self.assertNotContains(response, 'provider2@example.com')
+        self.assertNotContains(response, 'provider3@example.com')
+
+    def test_combined_filters(self):
+        """Test combining multiple filters."""
+        response = self.client.get(
+            reverse('providers') + '?service_type=swedish&country=USA&price_max=60'
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Should show only provider 1 (Swedish, USA, $50)
+        self.assertContains(response, 'provider1@example.com')
+        # Should not show provider 2 (not Swedish) or 3 (not USA)
+        self.assertNotContains(response, 'provider2@example.com')
+        self.assertNotContains(response, 'provider3@example.com')
+
+    def test_filter_preserves_url_params(self):
+        """Test that current filter values are preserved in context."""
+        response = self.client.get(
+            reverse('providers') + '?service_type=swedish&country=USA&price_min=40&price_max=60'
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['current_service_type'], 'swedish')
+        self.assertEqual(response.context['current_country'], 'USA')
+        self.assertEqual(response.context['current_price_min'], '40')
+        self.assertEqual(response.context['current_price_max'], '60')
+
+    def test_reset_filters_link(self):
+        """Test that reset link clears all filters."""
+        response = self.client.get(reverse('providers'))
+        self.assertEqual(response.status_code, 200)
+
+        # All providers should be shown
+        self.assertContains(response, 'provider1@example.com')
+        self.assertContains(response, 'provider2@example.com')
+        self.assertContains(response, 'provider3@example.com')
+
+    def test_invalid_price_values(self):
+        """Test that invalid price values are ignored."""
+        response = self.client.get(reverse('providers') + '?price_min=invalid&price_max=abc')
+        self.assertEqual(response.status_code, 200)
+
+        # Should show all providers (invalid filters ignored)
+        self.assertContains(response, 'provider1@example.com')
+        self.assertContains(response, 'provider2@example.com')
+        self.assertContains(response, 'provider3@example.com')

@@ -31,6 +31,20 @@ class Provider(models.Model):
         blank=True,
         null=True
     )
+
+    # Location fields
+    country = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text='Country where services are provided'
+    )
+    city = models.CharField(
+        max_length=100,
+        blank=True,
+        null=True,
+        help_text='City where services are provided'
+    )
     
     subscription_status = models.CharField(
         max_length=20,
