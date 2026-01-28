@@ -1,8 +1,10 @@
-from django.views.generic import ListView, DetailView
+from django.views.generic import ListView, DetailView, TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import redirect
+from django.shortcuts import redirect, get_object_or_404
 from django.http import HttpResponseForbidden
-from django.db.models import Q
+from django.contrib import messages
+from django.db.models import Q, Sum, Count, Avg
+from django.utils import timezone
 from payments.models import SubscriptionPayment
 from providers.models import Provider
 
@@ -85,3 +87,225 @@ class AdminPaymentDetailView(AdminRequiredMixin, DetailView):
     def get_queryset(self):
         """Get payment with related provider info."""
         return SubscriptionPayment.objects.select_related('provider__user')
+
+
+class AdminDashboardView(AdminRequiredMixin, TemplateView):
+    """Admin dashboard with key platform metrics."""
+
+    template_name = 'admin/dashboard.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from reviews.models import Review
+        from users.models import User
+
+        # Provider metrics
+        providers = Provider.objects.all()
+        context['total_providers'] = providers.count()
+        context['active_providers'] = providers.filter(subscription_status='active').count()
+        context['inactive_providers'] = providers.filter(subscription_status='inactive').count()
+        context['suspended_providers'] = providers.filter(subscription_status='suspended').count()
+
+        # Service & review metrics
+        from providers.models import Service
+        context['total_services'] = Service.objects.count()
+        context['total_reviews'] = Review.objects.count()
+
+        # Payment metrics
+        payments = SubscriptionPayment.objects.all()
+        context['pending_payments'] = payments.filter(status='pending').count()
+        context['total_revenue'] = payments.filter(status='completed').aggregate(
+            total=Sum('amount')
+        )['total'] or 0
+
+        # This month's revenue
+        now = timezone.now()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        context['monthly_revenue'] = payments.filter(
+            status='completed', completed_at__gte=month_start
+        ).aggregate(total=Sum('amount'))['total'] or 0
+
+        # Total users
+        context['total_users'] = User.objects.count()
+
+        return context
+
+
+class AdminProviderDetailView(AdminRequiredMixin, DetailView):
+    """Admin view for managing a single provider."""
+
+    model = Provider
+    template_name = 'admin/provider_detail.html'
+    context_object_name = 'provider'
+
+    def get_queryset(self):
+        return Provider.objects.select_related('user').prefetch_related(
+            'services', 'certifications', 'reviews', 'subscription_payments'
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        provider = self.object
+        context['services'] = provider.services.all()
+        context['certifications'] = provider.certifications.all()
+        context['reviews'] = provider.reviews.all().order_by('-created_at')[:10]
+        context['payments'] = provider.subscription_payments.all().order_by('-created_at')[:10]
+        context['avg_rating'] = provider.average_rating()
+        context['total_reviews'] = provider.reviews.count()
+        return context
+
+
+class AdminProviderSuspendView(AdminRequiredMixin, View):
+    """Suspend or activate a provider account."""
+
+    def post(self, request, pk):
+        provider = get_object_or_404(Provider, pk=pk)
+        action = request.POST.get('action')
+
+        if action == 'suspend':
+            provider.subscription_status = 'suspended'
+            provider.save(update_fields=['subscription_status'])
+            messages.success(request, f'Provider {provider.user.email} has been suspended.')
+        elif action == 'activate':
+            provider.subscription_status = 'active'
+            provider.save(update_fields=['subscription_status'])
+            messages.success(request, f'Provider {provider.user.email} has been activated.')
+        elif action == 'deactivate':
+            provider.deactivate_subscription()
+            messages.success(request, f'Provider {provider.user.email} has been deactivated.')
+
+        return redirect('admin_provider_detail', pk=pk)
+
+
+class AdminPaymentApproveView(AdminRequiredMixin, View):
+    """Approve or reject a subscription payment."""
+
+    def post(self, request, pk):
+        payment = get_object_or_404(SubscriptionPayment, pk=pk)
+        action = request.POST.get('action')
+
+        if action == 'approve':
+            payment.mark_completed()
+            messages.success(
+                request,
+                f'Payment #{payment.pk} for {payment.provider.user.email} marked as completed.'
+            )
+            # Send confirmation email
+            self._send_payment_confirmation(payment)
+        elif action == 'reject':
+            payment.mark_failed()
+            notes = request.POST.get('notes', '')
+            if notes:
+                payment.notes = notes
+                payment.save(update_fields=['notes'])
+            messages.success(
+                request,
+                f'Payment #{payment.pk} for {payment.provider.user.email} marked as failed.'
+            )
+
+        return redirect('admin_payment_detail', pk=pk)
+
+    def _send_payment_confirmation(self, payment):
+        from django.core.mail import send_mail
+        try:
+            send_mail(
+                'Payment Confirmed - Massage Marketplace',
+                f'Your payment of ${payment.amount} has been verified and confirmed. '
+                f'Your subscription is active until {payment.provider.subscription_renewal_date}.',
+                'noreply@massagemarketplace.com',
+                [payment.provider.user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+
+class AdminAnalyticsView(AdminRequiredMixin, TemplateView):
+    """Admin analytics dashboard with charts and metrics."""
+
+    template_name = 'admin/analytics.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from reviews.models import Review
+        from providers.models import Service
+        from users.models import User
+        from datetime import timedelta
+
+        now = timezone.now()
+
+        # Provider signups over last 6 months (by month)
+        signup_data = []
+        for i in range(5, -1, -1):
+            month_start = (now - timedelta(days=30 * i)).replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+            if i > 0:
+                month_end = (now - timedelta(days=30 * (i - 1))).replace(
+                    day=1, hour=0, minute=0, second=0, microsecond=0
+                )
+            else:
+                month_end = now
+            count = Provider.objects.filter(
+                created_at__gte=month_start, created_at__lt=month_end
+            ).count()
+            signup_data.append({
+                'month': month_start.strftime('%b %Y'),
+                'count': count,
+            })
+        context['signup_data'] = signup_data
+
+        # Revenue over last 6 months
+        revenue_data = []
+        for i in range(5, -1, -1):
+            month_start = (now - timedelta(days=30 * i)).replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+            if i > 0:
+                month_end = (now - timedelta(days=30 * (i - 1))).replace(
+                    day=1, hour=0, minute=0, second=0, microsecond=0
+                )
+            else:
+                month_end = now
+            total = SubscriptionPayment.objects.filter(
+                status='completed',
+                completed_at__gte=month_start,
+                completed_at__lt=month_end
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            revenue_data.append({
+                'month': month_start.strftime('%b %Y'),
+                'total': float(total),
+            })
+        context['revenue_data'] = revenue_data
+
+        # Service type distribution
+        service_types = Service.objects.values('service_type').annotate(
+            count=Count('id')
+        ).order_by('-count')
+        context['service_type_data'] = list(service_types)
+
+        # Key metrics
+        total_providers = Provider.objects.count()
+        active_providers = Provider.objects.filter(subscription_status='active').count()
+        context['conversion_rate'] = (
+            round(active_providers / total_providers * 100, 1)
+            if total_providers > 0 else 0
+        )
+
+        total_revenue = SubscriptionPayment.objects.filter(
+            status='completed'
+        ).aggregate(total=Sum('amount'))['total'] or 0
+        context['avg_revenue_per_provider'] = (
+            round(float(total_revenue) / active_providers, 2)
+            if active_providers > 0 else 0
+        )
+
+        context['active_providers'] = active_providers
+        context['total_providers'] = total_providers
+        context['total_services'] = Service.objects.count()
+        context['total_reviews'] = Review.objects.count()
+        context['avg_rating'] = Review.objects.aggregate(
+            avg=Avg('rating')
+        )['avg'] or 0
+
+        return context

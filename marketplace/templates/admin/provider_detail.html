@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Provider: {{ provider.user.email }} - Admin{% endblock %}
+
+{% block content %}
+<div class="mb-6">
+    <a href="{% url 'admin_providers' %}" class="text-blue-600 hover:underline text-sm">&larr; Back to Providers</a>
+    <h1 class="text-3xl font-bold mt-2">{{ provider.get_name }}</h1>
+    <p class="text-gray-600">{{ provider.user.email }}</p>
+</div>
+
+{% if messages %}
+<div class="mb-4">
+    {% for message in messages %}
+    <div class="bg-{% if message.tags == 'error' %}red{% elif message.tags == 'success' %}green{% else %}blue{% endif %}-50 border border-{% if message.tags == 'error' %}red{% elif message.tags == 'success' %}green{% else %}blue{% endif %}-200 rounded-lg p-4 text-{% if message.tags == 'error' %}red{% elif message.tags == 'success' %}green{% else %}blue{% endif %}-800 mb-2">
+        {{ message }}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <!-- Profile Info -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-bold mb-4">Profile</h2>
+        <div class="space-y-3 text-sm">
+            <div>
+                <p class="text-gray-500">Email</p>
+                <p class="font-medium">{{ provider.user.email }}</p>
+            </div>
+            <div>
+                <p class="text-gray-500">Phone</p>
+                <p class="font-medium">{{ provider.phone|default:"Not set" }}</p>
+            </div>
+            <div>
+                <p class="text-gray-500">Location</p>
+                <p class="font-medium">{{ provider.city|default:"—" }}{% if provider.country %}, {{ provider.country }}{% endif %}</p>
+            </div>
+            <div>
+                <p class="text-gray-500">Joined</p>
+                <p class="font-medium">{{ provider.created_at|date:"M d, Y" }}</p>
+            </div>
+            {% if provider.bio %}
+            <div>
+                <p class="text-gray-500">Bio</p>
+                <p class="text-gray-700">{{ provider.bio|truncatewords:30 }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Subscription Info -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-bold mb-4">Subscription</h2>
+        <div class="space-y-3 text-sm">
+            <div>
+                <p class="text-gray-500">Status</p>
+                <span class="px-2 py-1 rounded-full text-xs font-semibold
+                    {% if provider.subscription_status == 'active' %}bg-green-100 text-green-800
+                    {% elif provider.subscription_status == 'suspended' %}bg-red-100 text-red-800
+                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                    {{ provider.get_subscription_status_display }}
+                </span>
+            </div>
+            {% if provider.subscription_payment_method %}
+            <div>
+                <p class="text-gray-500">Payment Method</p>
+                <p class="font-medium">{{ provider.get_subscription_payment_method_display }}</p>
+            </div>
+            {% endif %}
+            {% if provider.subscription_renewal_date %}
+            <div>
+                <p class="text-gray-500">Renewal Date</p>
+                <p class="font-medium">{{ provider.subscription_renewal_date|date:"M d, Y" }}</p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Status Actions -->
+        <div class="mt-4 pt-4 border-t space-y-2">
+            <form method="post" action="{% url 'admin_provider_status' provider.pk %}">
+                {% csrf_token %}
+                {% if provider.subscription_status != 'suspended' %}
+                <button type="submit" name="action" value="suspend"
+                    class="w-full text-sm bg-red-100 text-red-700 px-3 py-2 rounded hover:bg-red-200">
+                    Suspend Account
+                </button>
+                {% endif %}
+                {% if provider.subscription_status != 'active' %}
+                <button type="submit" name="action" value="activate"
+                    class="w-full text-sm bg-green-100 text-green-700 px-3 py-2 rounded hover:bg-green-200">
+                    Activate Account
+                </button>
+                {% endif %}
+                {% if provider.subscription_status == 'active' %}
+                <button type="submit" name="action" value="deactivate"
+                    class="w-full text-sm bg-yellow-100 text-yellow-700 px-3 py-2 rounded hover:bg-yellow-200">
+                    Deactivate Subscription
+                </button>
+                {% endif %}
+            </form>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-bold mb-4">Stats</h2>
+        <div class="space-y-3 text-sm">
+            <div class="flex justify-between">
+                <span class="text-gray-500">Services</span>
+                <span class="font-semibold">{{ services|length }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500">Reviews</span>
+                <span class="font-semibold">{{ total_reviews }}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500">Average Rating</span>
+                <span class="font-semibold">{% if avg_rating %}{{ avg_rating }}{% else %}—{% endif %}</span>
+            </div>
+            <div class="flex justify-between">
+                <span class="text-gray-500">Payments</span>
+                <span class="font-semibold">{{ payments|length }}</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Services -->
+<div class="bg-white rounded-lg shadow p-6 mb-6">
+    <h2 class="text-lg font-bold mb-4">Services ({{ services|length }})</h2>
+    {% if services %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-2 text-left">Type</th>
+                    <th class="px-4 py-2 text-left">Description</th>
+                    <th class="px-4 py-2 text-right">Price</th>
+                    <th class="px-4 py-2 text-center">Duration</th>
+                    <th class="px-4 py-2 text-center">Active</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for service in services %}
+                <tr class="border-t">
+                    <td class="px-4 py-2">{{ service.get_service_type_display }}</td>
+                    <td class="px-4 py-2 text-gray-600">{{ service.description|truncatewords:10 }}</td>
+                    <td class="px-4 py-2 text-right">${{ service.price }}</td>
+                    <td class="px-4 py-2 text-center">{{ service.duration_minutes }} min</td>
+                    <td class="px-4 py-2 text-center">
+                        {% if service.is_active %}
+                        <span class="text-green-600">Yes</span>
+                        {% else %}
+                        <span class="text-red-600">No</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-500">No services listed.</p>
+    {% endif %}
+</div>
+
+<!-- Payment History -->
+<div class="bg-white rounded-lg shadow p-6 mb-6">
+    <h2 class="text-lg font-bold mb-4">Payment History</h2>
+    {% if payments %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50">
+                <tr>
+                    <th class="px-4 py-2 text-left">Date</th>
+                    <th class="px-4 py-2 text-right">Amount</th>
+                    <th class="px-4 py-2 text-left">Method</th>
+                    <th class="px-4 py-2 text-center">Status</th>
+                    <th class="px-4 py-2 text-left">Reference</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for payment in payments %}
+                <tr class="border-t">
+                    <td class="px-4 py-2">{{ payment.created_at|date:"M d, Y" }}</td>
+                    <td class="px-4 py-2 text-right">${{ payment.amount }}</td>
+                    <td class="px-4 py-2">{{ payment.get_payment_method_display }}</td>
+                    <td class="px-4 py-2 text-center">
+                        <span class="px-2 py-1 rounded-full text-xs font-semibold
+                            {% if payment.status == 'completed' %}bg-green-100 text-green-800
+                            {% elif payment.status == 'failed' %}bg-red-100 text-red-800
+                            {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ payment.get_status_display }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-2 font-mono text-xs">{{ payment.reference_id|default:"—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="text-gray-500">No payment records.</p>
+    {% endif %}
+</div>
+
+<!-- Recent Reviews -->
+<div class="bg-white rounded-lg shadow p-6 mb-6">
+    <h2 class="text-lg font-bold mb-4">Recent Reviews ({{ total_reviews }})</h2>
+    {% if reviews %}
+    <div class="space-y-4">
+        {% for review in reviews %}
+        <div class="border-b pb-3">
+            <div class="flex justify-between items-center mb-1">
+                <div>
+                    {% for i in "12345" %}
+                        {% if forloop.counter <= review.rating %}
+                            <span class="text-yellow-400">&#9733;</span>
+                        {% else %}
+                            <span class="text-gray-300">&#9734;</span>
+                        {% endif %}
+                    {% endfor %}
+                    <span class="text-sm text-gray-500 ml-2">{{ review.client_name|default:"Anonymous" }}</span>
+                </div>
+                <span class="text-xs text-gray-400">{{ review.created_at|date:"M d, Y" }}</span>
+            </div>
+            <p class="text-sm text-gray-700">{{ review.comment }}</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-500">No reviews yet.</p>
+    {% endif %}
+</div>
+{% endblock %}

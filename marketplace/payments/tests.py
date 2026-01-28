@@ -342,9 +342,286 @@ class AdminPaymentDetailViewTests(TestCase):
         self.assertContains(response, 'Pending')
 
 
+class AdminDashboardViewTests(TestCase):
+    """Test admin dashboard view."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin_user = User.objects.create_user(
+            email='admin@test.com', password='pass', user_type='admin'
+        )
+        self.provider_user = User.objects.create_user(
+            email='provider@test.com', password='pass', user_type='provider'
+        )
+        self.provider = Provider.objects.create(
+            user=self.provider_user, phone='+1234567890', subscription_status='active'
+        )
+
+    def test_dashboard_requires_login(self):
+        response = self.client.get(reverse('admin_dashboard'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_dashboard_requires_admin(self):
+        self.client.login(email='provider@test.com', password='pass')
+        response = self.client.get(reverse('admin_dashboard'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_dashboard_loads_for_admin(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'admin/dashboard.html')
+
+    def test_dashboard_shows_metrics(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_dashboard'))
+        self.assertIn('total_providers', response.context)
+        self.assertIn('active_providers', response.context)
+        self.assertIn('total_revenue', response.context)
+        self.assertIn('pending_payments', response.context)
+        self.assertIn('total_services', response.context)
+        self.assertIn('total_reviews', response.context)
+
+    def test_dashboard_provider_counts(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_dashboard'))
+        self.assertEqual(response.context['total_providers'], 1)
+        self.assertEqual(response.context['active_providers'], 1)
+
+    def test_dashboard_has_navigation_links(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_dashboard'))
+        self.assertContains(response, reverse('admin_providers'))
+        self.assertContains(response, reverse('admin_payments'))
+        self.assertContains(response, reverse('admin_analytics'))
+
+
+class AdminProviderDetailViewTests(TestCase):
+    """Test admin provider detail view."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin_user = User.objects.create_user(
+            email='admin@test.com', password='pass', user_type='admin'
+        )
+        self.provider_user = User.objects.create_user(
+            email='provider@test.com', password='pass', user_type='provider'
+        )
+        self.provider = Provider.objects.create(
+            user=self.provider_user, phone='+1234567890', subscription_status='active'
+        )
+
+    def test_detail_requires_admin(self):
+        self.client.login(email='provider@test.com', password='pass')
+        response = self.client.get(reverse('admin_provider_detail', args=[self.provider.pk]))
+        self.assertEqual(response.status_code, 403)
+
+    def test_detail_loads_for_admin(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_provider_detail', args=[self.provider.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'admin/provider_detail.html')
+
+    def test_detail_shows_provider_info(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_provider_detail', args=[self.provider.pk]))
+        self.assertContains(response, self.provider_user.email)
+        self.assertContains(response, '+1234567890')
+
+    def test_detail_shows_services(self):
+        from providers.models import Service
+        Service.objects.create(
+            provider=self.provider, service_type='swedish',
+            description='Swedish massage', price=60.00, duration_minutes=60
+        )
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_provider_detail', args=[self.provider.pk]))
+        self.assertContains(response, 'Swedish')
+
+    def test_detail_shows_payments(self):
+        SubscriptionPayment.objects.create(
+            provider=self.provider, amount=29.99,
+            payment_method='crypto_bitcoin', status='pending'
+        )
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_provider_detail', args=[self.provider.pk]))
+        self.assertContains(response, '29.99')
+
+
+class AdminProviderSuspendViewTests(TestCase):
+    """Test admin provider suspend/activate actions."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin_user = User.objects.create_user(
+            email='admin@test.com', password='pass', user_type='admin'
+        )
+        self.provider_user = User.objects.create_user(
+            email='provider@test.com', password='pass', user_type='provider'
+        )
+        self.provider = Provider.objects.create(
+            user=self.provider_user, phone='+1234567890', subscription_status='active'
+        )
+
+    def test_suspend_requires_admin(self):
+        self.client.login(email='provider@test.com', password='pass')
+        response = self.client.post(
+            reverse('admin_provider_status', args=[self.provider.pk]),
+            {'action': 'suspend'}
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_suspend_provider(self):
+        self.client.login(email='admin@test.com', password='pass')
+        self.client.post(
+            reverse('admin_provider_status', args=[self.provider.pk]),
+            {'action': 'suspend'}
+        )
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, 'suspended')
+
+    def test_activate_provider(self):
+        self.provider.subscription_status = 'suspended'
+        self.provider.save()
+
+        self.client.login(email='admin@test.com', password='pass')
+        self.client.post(
+            reverse('admin_provider_status', args=[self.provider.pk]),
+            {'action': 'activate'}
+        )
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, 'active')
+
+    def test_deactivate_provider(self):
+        self.client.login(email='admin@test.com', password='pass')
+        self.client.post(
+            reverse('admin_provider_status', args=[self.provider.pk]),
+            {'action': 'deactivate'}
+        )
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, 'inactive')
+
+    def test_suspend_redirects_to_detail(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.post(
+            reverse('admin_provider_status', args=[self.provider.pk]),
+            {'action': 'suspend'}
+        )
+        self.assertRedirects(response, reverse('admin_provider_detail', args=[self.provider.pk]))
+
+
+class AdminPaymentApproveViewTests(TestCase):
+    """Test admin payment approve/reject actions."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin_user = User.objects.create_user(
+            email='admin@test.com', password='pass', user_type='admin'
+        )
+        self.provider_user = User.objects.create_user(
+            email='provider@test.com', password='pass', user_type='provider'
+        )
+        self.provider = Provider.objects.create(
+            user=self.provider_user, phone='+1234567890', subscription_status='active'
+        )
+        self.payment = SubscriptionPayment.objects.create(
+            provider=self.provider, amount=29.99,
+            payment_method='crypto_bitcoin', status='pending'
+        )
+
+    def test_approve_requires_admin(self):
+        self.client.login(email='provider@test.com', password='pass')
+        response = self.client.post(
+            reverse('admin_payment_action', args=[self.payment.pk]),
+            {'action': 'approve'}
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_approve_payment(self):
+        self.client.login(email='admin@test.com', password='pass')
+        self.client.post(
+            reverse('admin_payment_action', args=[self.payment.pk]),
+            {'action': 'approve'}
+        )
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, 'completed')
+        self.assertIsNotNone(self.payment.completed_at)
+
+    def test_reject_payment(self):
+        self.client.login(email='admin@test.com', password='pass')
+        self.client.post(
+            reverse('admin_payment_action', args=[self.payment.pk]),
+            {'action': 'reject', 'notes': 'Invalid transaction'}
+        )
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, 'failed')
+        self.assertEqual(self.payment.notes, 'Invalid transaction')
+
+    def test_approve_redirects_to_detail(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.post(
+            reverse('admin_payment_action', args=[self.payment.pk]),
+            {'action': 'approve'}
+        )
+        self.assertRedirects(response, reverse('admin_payment_detail', args=[self.payment.pk]))
+
+
+class AdminAnalyticsViewTests(TestCase):
+    """Test admin analytics view."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin_user = User.objects.create_user(
+            email='admin@test.com', password='pass', user_type='admin'
+        )
+        self.provider_user = User.objects.create_user(
+            email='provider@test.com', password='pass', user_type='provider'
+        )
+        self.provider = Provider.objects.create(
+            user=self.provider_user, phone='+1234567890', subscription_status='active'
+        )
+
+    def test_analytics_requires_admin(self):
+        self.client.login(email='provider@test.com', password='pass')
+        response = self.client.get(reverse('admin_analytics'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_analytics_loads_for_admin(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_analytics'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'admin/analytics.html')
+
+    def test_analytics_has_metrics(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_analytics'))
+        self.assertIn('total_providers', response.context)
+        self.assertIn('active_providers', response.context)
+        self.assertIn('conversion_rate', response.context)
+        self.assertIn('signup_data', response.context)
+        self.assertIn('revenue_data', response.context)
+        self.assertIn('service_type_data', response.context)
+
+    def test_analytics_conversion_rate(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_analytics'))
+        # 1 active out of 1 total = 100%
+        self.assertEqual(response.context['conversion_rate'], 100.0)
+
+    def test_analytics_signup_data_has_6_months(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_analytics'))
+        self.assertEqual(len(response.context['signup_data']), 6)
+
+    def test_analytics_revenue_data_has_6_months(self):
+        self.client.login(email='admin@test.com', password='pass')
+        response = self.client.get(reverse('admin_analytics'))
+        self.assertEqual(len(response.context['revenue_data']), 6)
+
+
 class SubscriptionConfirmationEmailTests(TestCase):
     """Test subscription confirmation email functionality."""
-    
+
     def setUp(self):
         """Set up test data."""
         self.user = User.objects.create_user(

@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <a href="{% url 'admin_dashboard' %}" class="text-blue-600 hover:underline text-sm">&larr; Back to Dashboard</a>
+    <h1 class="text-3xl font-bold mt-2">Platform Analytics</h1>
+    <p class="text-gray-600">Key metrics and trends</p>
+</div>
+
+<!-- Key Metrics -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+        <p class="text-2xl font-bold text-blue-600">{{ total_providers }}</p>
+        <p class="text-gray-600 text-sm">Total Providers</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+        <p class="text-2xl font-bold text-green-600">{{ active_providers }}</p>
+        <p class="text-gray-600 text-sm">Active Providers</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+        <p class="text-2xl font-bold text-purple-600">{{ conversion_rate }}%</p>
+        <p class="text-gray-600 text-sm">Conversion Rate</p>
+    </div>
+    <div class="bg-white rounded-lg shadow p-4 text-center">
+        <p class="text-2xl font-bold text-green-600">${{ avg_revenue_per_provider }}</p>
+        <p class="text-gray-600 text-sm">Avg Revenue / Provider</p>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <!-- Provider Signups -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-bold mb-4">Provider Signups (Last 6 Months)</h2>
+        <div class="space-y-2">
+            {% for item in signup_data %}
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600 w-20">{{ item.month }}</span>
+                <div class="flex-1 mx-3">
+                    <div class="bg-blue-100 rounded-full h-4">
+                        <div class="bg-blue-500 rounded-full h-4" style="width: {% if item.count > 0 %}{{ item.count }}0%{% else %}2%{% endif %}; max-width: 100%;"></div>
+                    </div>
+                </div>
+                <span class="text-sm font-semibold w-8 text-right">{{ item.count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Revenue Over Time -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-bold mb-4">Revenue (Last 6 Months)</h2>
+        <div class="space-y-2">
+            {% for item in revenue_data %}
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600 w-20">{{ item.month }}</span>
+                <div class="flex-1 mx-3">
+                    <div class="bg-green-100 rounded-full h-4">
+                        <div class="bg-green-500 rounded-full h-4" style="width: {% if item.total > 0 %}{{ item.total }}%{% else %}2%{% endif %}; max-width: 100%;"></div>
+                    </div>
+                </div>
+                <span class="text-sm font-semibold w-16 text-right">${{ item.total }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Service Type Distribution -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-bold mb-4">Service Types</h2>
+        {% if service_type_data %}
+        <div class="space-y-2">
+            {% for item in service_type_data %}
+            <div class="flex items-center justify-between">
+                <span class="text-sm text-gray-600">{{ item.service_type }}</span>
+                <span class="text-sm font-semibold">{{ item.count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 text-sm">No services listed yet.</p>
+        {% endif %}
+    </div>
+
+    <!-- Platform Overview -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-bold mb-4">Platform Overview</h2>
+        <div class="space-y-3">
+            <div class="flex justify-between items-center">
+                <span class="text-gray-600">Total Services</span>
+                <span class="font-semibold">{{ total_services }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-gray-600">Total Reviews</span>
+                <span class="font-semibold">{{ total_reviews }}</span>
+            </div>
+            <div class="flex justify-between items-center">
+                <span class="text-gray-600">Average Rating</span>
+                <span class="font-semibold">{% if avg_rating %}{{ avg_rating|floatformat:1 }}{% else %}—{% endif %}</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

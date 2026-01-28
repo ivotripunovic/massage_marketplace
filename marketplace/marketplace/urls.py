@@ -29,7 +29,11 @@ from providers.views import (
     AdminProviderListView, ProviderSubscriptionView, SubscriptionConfirmView,
     CryptoPaymentView, BankTransferPaymentView
 )
-from payments.views import AdminPaymentListView, AdminPaymentDetailView
+from payments.views import (
+    AdminPaymentListView, AdminPaymentDetailView, AdminDashboardView,
+    AdminProviderDetailView, AdminProviderSuspendView,
+    AdminPaymentApproveView, AdminAnalyticsView
+)
 from clients.views import ProviderDirectoryView, ProviderDetailView
 from reviews.views import ReviewSubmitView
 
@@ -67,9 +71,14 @@ urlpatterns = [
     path('provider/services/<int:pk>/delete/', ServiceDeleteView.as_view(), name='service_delete'),
     
     # Admin URLs
+    path('internal/admin/', AdminDashboardView.as_view(), name='admin_dashboard'),
     path('internal/admin/providers/', AdminProviderListView.as_view(), name='admin_providers'),
+    path('internal/admin/providers/<int:pk>/', AdminProviderDetailView.as_view(), name='admin_provider_detail'),
+    path('internal/admin/providers/<int:pk>/status/', AdminProviderSuspendView.as_view(), name='admin_provider_status'),
     path('internal/admin/payments/', AdminPaymentListView.as_view(), name='admin_payments'),
     path('internal/admin/payments/<int:pk>/', AdminPaymentDetailView.as_view(), name='admin_payment_detail'),
+    path('internal/admin/payments/<int:pk>/action/', AdminPaymentApproveView.as_view(), name='admin_payment_action'),
+    path('internal/admin/analytics/', AdminAnalyticsView.as_view(), name='admin_analytics'),
 ]
 
 # Serve media files in development
