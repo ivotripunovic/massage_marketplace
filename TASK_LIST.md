@@ -12,7 +12,7 @@
 ### WEEK 1: Project Bootstrap & Database Schema
 
 #### TASK 1.1: Initialize Django 5.0 Project Structure
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Create Django project with proper structure, dependencies, and local development setup.
 
@@ -48,7 +48,7 @@
 ---
 
 #### TASK 1.2: Create Custom User Model (Extended AbstractUser)
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Implement custom Django User model with email-based authentication.
 
@@ -94,7 +94,7 @@ def test_user_type_choices():
 ---
 
 #### TASK 1.3: Create Provider Model & Admin Registration
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Build Provider profile model with required fields and register in Django admin.
 
@@ -140,7 +140,7 @@ def test_provider_admin_registered():
 ---
 
 #### TASK 1.4: Create Service Model & Certification Model
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Build Service and Certification models for provider offerings.
 
@@ -207,7 +207,7 @@ def test_certification_creation():
 ---
 
 #### TASK 1.5: Create Review & SubscriptionPayment Models
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Build models for client reviews and provider payment tracking.
 
@@ -277,7 +277,7 @@ def test_payment_methods():
 ---
 
 #### TASK 1.6: Create & Register All Models in Django Admin
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Configure Django admin interface for all models with proper display, search, and filters.
 
