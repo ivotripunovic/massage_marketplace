@@ -4,8 +4,10 @@ from django.shortcuts import redirect, get_object_or_404
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django import forms
+from django.db.models import Count, Avg
+from django.http import HttpResponseForbidden
 from providers.models import Provider, Service, Certification
-from providers.forms import CertificationForm, ServiceForm
+from providers.forms import CertificationForm, ServiceForm, SubscriptionSettingsForm
 from users.models import User
 
 
@@ -432,3 +434,100 @@ class ServiceDeleteView(ProviderRequiredMixin, DeleteView):
         context = super().get_context_data(**kwargs)
         context['provider'] = Provider.objects.get(user=self.request.user)
         return context
+
+
+class AdminRequiredMixin(LoginRequiredMixin):
+    """Mixin to require admin user type."""
+    
+    def dispatch(self, request, *args, **kwargs):
+        """Check if user is authenticated and is an admin."""
+        if not request.user.is_authenticated:
+            return redirect('login')
+        
+        if request.user.user_type != 'admin':
+            return HttpResponseForbidden('You do not have permission to access this page.')
+        
+        return super().dispatch(request, *args, **kwargs)
+
+
+class AdminProviderListView(AdminRequiredMixin, ListView):
+    """View for listing all providers (admin only)."""
+    
+    model = Provider
+    template_name = 'admin/provider_list.html'
+    context_object_name = 'providers'
+    paginate_by = 50
+    
+    def get_queryset(self):
+        """Get all providers with annotations."""
+        from reviews.models import Review
+        
+        queryset = Provider.objects.select_related('user').all()
+        
+        # Add service count
+        queryset = queryset.annotate(service_count=Count('services', distinct=True))
+        
+        # Search by email
+        search = self.request.GET.get('search', '').strip()
+        if search:
+            queryset = queryset.filter(user__email__icontains=search)
+        
+        # Filter by status
+        status = self.request.GET.get('status', '').strip()
+        if status and status in ['active', 'inactive', 'suspended']:
+            queryset = queryset.filter(subscription_status=status)
+        
+        # Order by email
+        queryset = queryset.order_by('user__email')
+        
+        return queryset
+    
+    def get_context_data(self, **kwargs):
+        """Add search/filter info to context."""
+        context = super().get_context_data(**kwargs)
+        
+        # Add search and filter values
+        context['search'] = self.request.GET.get('search', '')
+        context['status'] = self.request.GET.get('status', '')
+        context['status_choices'] = ['active', 'inactive', 'suspended']
+        
+        # Calculate statistics for each provider
+        from reviews.models import Review
+        providers_with_stats = []
+        for provider in context['providers']:
+            reviews = Review.objects.filter(provider=provider)
+            avg_rating = reviews.aggregate(Avg('rating'))['rating__avg'] if reviews.exists() else 0
+            providers_with_stats.append({
+                'provider': provider,
+                'review_count': reviews.count(),
+                'avg_rating': avg_rating
+            })
+        context['providers_with_stats'] = providers_with_stats
+        
+        return context
+
+
+class ProviderSubscriptionView(ProviderRequiredMixin, FormView):
+    """View for managing provider subscriptions."""
+    
+    form_class = SubscriptionSettingsForm
+    template_name = 'providers/subscription.html'
+    success_url = reverse_lazy('provider_dashboard')
+    
+    def get_context_data(self, **kwargs):
+        """Add provider to context."""
+        context = super().get_context_data(**kwargs)
+        try:
+            provider = Provider.objects.get(user=self.request.user)
+            context['provider'] = provider
+        except Provider.DoesNotExist:
+            context['provider'] = None
+        return context
+    
+    def form_valid(self, form):
+        """Handle form submission."""
+        # Payment logic will be implemented in Week 10
+        # For now, just display a success message
+        payment_method = form.cleaned_data['payment_method']
+        messages.info(self.request, f'Payment method selected: {payment_method}. Payment processing will be enabled in Week 10.')
+        return super().form_valid(form)

@@ -66,11 +66,38 @@ class ProviderAdmin(admin.ModelAdmin):
         }),
     )
     
+    actions = ['deactivate_subscriptions', 'suspend_accounts', 'activate_subscriptions']
+    
     def user_email(self, obj):
         """Display user email in list view."""
         return obj.user.email
     user_email.short_description = 'Email'
     user_email.admin_order_field = 'user__email'
+    
+    def deactivate_subscriptions(self, request, queryset):
+        """Bulk action to deactivate subscriptions."""
+        count = queryset.update(subscription_status='inactive')
+        self.message_user(request, f'{count} provider(s) subscription(s) deactivated.')
+    deactivate_subscriptions.short_description = 'Deactivate selected subscriptions'
+    
+    def suspend_accounts(self, request, queryset):
+        """Bulk action to suspend provider accounts."""
+        count = queryset.update(subscription_status='suspended')
+        self.message_user(request, f'{count} provider account(s) suspended.')
+    suspend_accounts.short_description = 'Suspend selected accounts'
+    
+    def activate_subscriptions(self, request, queryset):
+        """Bulk action to activate subscriptions."""
+        from datetime import timedelta, date
+        count = 0
+        for provider in queryset:
+            if provider.subscription_status != 'active':
+                provider.subscription_status = 'active'
+                provider.subscription_renewal_date = date.today() + timedelta(days=30)
+                provider.save()
+                count += 1
+        self.message_user(request, f'{count} provider subscription(s) activated.')
+    activate_subscriptions.short_description = 'Activate selected subscriptions'
 
 
 @admin.register(Service)

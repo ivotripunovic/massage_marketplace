@@ -1716,7 +1716,7 @@ def test_dashboard_stats():
 ### WEEK 4: Django Admin Extensions & Subscription Basics
 
 #### TASK 4.1: Extend Django Admin with Custom Filters
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build advanced admin interface for provider management.
 
@@ -1809,7 +1809,7 @@ def test_admin_actions():
 ---
 
 #### TASK 4.2: Create Provider List View (Internal)
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build internal provider management page (precursor to payment management).
 
@@ -1865,7 +1865,7 @@ def test_non_admin_cannot_access():
 ---
 
 #### TASK 4.3: Create Subscription Settings Page (UI Only)
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build provider subscription management interface (payment logic in Week 10).
 

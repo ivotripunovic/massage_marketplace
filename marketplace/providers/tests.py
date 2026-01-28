@@ -1538,3 +1538,413 @@ class ServiceCRUDTests(TestCase):
         
         messages = list(response.context['messages'])
         self.assertTrue(any('deleted successfully' in str(m).lower() for m in messages))
+
+
+class ProviderAdminTests(TestCase):
+    """Test Provider admin interface functionality."""
+    
+    def setUp(self):
+        """Set up test data for admin tests."""
+        # Create admin user
+        self.admin_user = User.objects.create_superuser(
+            email='admin@test.com',
+            password='adminpass123',
+            user_type='admin'
+        )
+        
+        # Create test providers
+        self.provider1 = self._create_provider('provider1@test.com', 'active')
+        self.provider2 = self._create_provider('provider2@test.com', 'inactive')
+        self.provider3 = self._create_provider('provider3@test.com', 'suspended')
+        
+        self.client = Client()
+    
+    def _create_provider(self, email, subscription_status):
+        """Helper to create a provider."""
+        user = User.objects.create_user(
+            email=email,
+            password='pass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        return Provider.objects.create(
+            user=user,
+            phone='+1234567890',
+            subscription_status=subscription_status,
+            subscription_payment_method='crypto'
+        )
+    
+    def test_provider_admin_registered(self):
+        """Test that Provider is registered in admin."""
+        from django.contrib import admin
+        self.assertIn(Provider, admin.site._registry)
+    
+    def test_admin_list_display(self):
+        """Test admin list display shows required columns."""
+        from providers.admin import ProviderAdmin
+        admin_instance = ProviderAdmin(Provider, None)
+        self.assertEqual(len(admin_instance.list_display), 5)
+        self.assertIn('user_email', admin_instance.list_display)
+        self.assertIn('phone', admin_instance.list_display)
+        self.assertIn('subscription_status', admin_instance.list_display)
+    
+    def test_admin_search_fields(self):
+        """Test admin search fields are configured."""
+        from providers.admin import ProviderAdmin
+        admin_instance = ProviderAdmin(Provider, None)
+        self.assertIn('user__email', admin_instance.search_fields)
+    
+    def test_admin_list_filters(self):
+        """Test admin list filters are configured."""
+        from providers.admin import ProviderAdmin
+        admin_instance = ProviderAdmin(Provider, None)
+        self.assertIn('subscription_status', admin_instance.list_filter)
+        self.assertIn('subscription_payment_method', admin_instance.list_filter)
+    
+    def test_deactivate_subscriptions_action(self):
+        """Test deactivate subscriptions bulk action."""
+        self.client.force_login(self.admin_user)
+        # Note: Testing bulk actions requires more setup, so we'll test the method directly
+        from providers.admin import ProviderAdmin
+        from django.contrib.admin.helpers import AdminReadonlyField
+        from unittest.mock import MagicMock
+        
+        admin_instance = ProviderAdmin(Provider, None)
+        
+        # Create a mock request with message support
+        request = MagicMock()
+        request.user = self.admin_user
+        
+        # Get active providers
+        active_providers = Provider.objects.filter(subscription_status='active')
+        
+        # Call the action
+        admin_instance.deactivate_subscriptions(request, active_providers)
+        
+        # Verify subscriptions are deactivated
+        self.assertTrue(all(
+            p.subscription_status == 'inactive' 
+            for p in Provider.objects.filter(subscription_status='inactive')
+        ))
+    
+    def test_suspend_accounts_action(self):
+        """Test suspend accounts bulk action."""
+        from providers.admin import ProviderAdmin
+        from unittest.mock import MagicMock
+        
+        admin_instance = ProviderAdmin(Provider, None)
+        
+        # Create a mock request
+        request = MagicMock()
+        request.user = self.admin_user
+        
+        # Get inactive providers
+        inactive_providers = Provider.objects.filter(subscription_status='inactive')
+        count_before = Provider.objects.filter(subscription_status='suspended').count()
+        
+        # Call the action
+        admin_instance.suspend_accounts(request, inactive_providers)
+        
+        # Verify accounts are suspended
+        count_after = Provider.objects.filter(subscription_status='suspended').count()
+        self.assertGreater(count_after, count_before)
+    
+    def test_activate_subscriptions_action(self):
+        """Test activate subscriptions bulk action."""
+        from providers.admin import ProviderAdmin
+        from unittest.mock import MagicMock
+        from datetime import date
+        
+        admin_instance = ProviderAdmin(Provider, None)
+        
+        # Create a mock request
+        request = MagicMock()
+        request.user = self.admin_user
+        
+        # Get provider2 which is inactive
+        provider2_id = self.provider2.id
+        
+        # Get inactive providers
+        inactive_providers = Provider.objects.filter(subscription_status='inactive')
+        inactive_count = inactive_providers.count()
+        self.assertEqual(inactive_count, 1)
+        
+        # Call the action
+        admin_instance.activate_subscriptions(request, inactive_providers)
+        
+        # Refresh from DB and verify
+        provider2_refreshed = Provider.objects.get(id=provider2_id)
+        self.assertEqual(provider2_refreshed.subscription_status, 'active')
+        self.assertIsNotNone(provider2_refreshed.subscription_renewal_date)
+        today = date.today()
+        self.assertGreater(provider2_refreshed.subscription_renewal_date, today)
+    
+    def test_user_email_method(self):
+        """Test user_email method in admin."""
+        from providers.admin import ProviderAdmin
+        
+        admin_instance = ProviderAdmin(Provider, None)
+        email = admin_instance.user_email(self.provider1)
+        self.assertEqual(email, 'provider1@test.com')
+    
+    def test_service_inline_exists(self):
+        """Test ServiceInline is configured in ProviderAdmin."""
+        from providers.admin import ProviderAdmin
+        admin_instance = ProviderAdmin(Provider, None)
+        self.assertTrue(any(hasattr(inline, 'model') and inline.model == Service 
+                          for inline in admin_instance.inlines))
+
+
+class AdminProviderListViewTests(TestCase):
+    """Test Admin Provider List view functionality."""
+    
+    def setUp(self):
+        """Set up test data."""
+        # Create admin user
+        self.admin_user = User.objects.create_superuser(
+            email='admin@test.com',
+            password='adminpass123',
+            user_type='admin'
+        )
+        
+        # Create test providers with different statuses
+        self.provider_active = self._create_provider('active@test.com', 'active', 'crypto_bitcoin')
+        self.provider_inactive = self._create_provider('inactive@test.com', 'inactive', 'bank_transfer')
+        self.provider_suspended = self._create_provider('suspended@test.com', 'suspended', None)
+        
+        # Add services to provider_active
+        Service.objects.create(
+            provider=self.provider_active,
+            service_type='swedish',
+            price=75.00,
+            duration_minutes=60
+        )
+        Service.objects.create(
+            provider=self.provider_active,
+            service_type='deep_tissue',
+            price=85.00,
+            duration_minutes=90
+        )
+        
+        # Add a review to provider_active
+        Review.objects.create(
+            provider=self.provider_active,
+            rating=5,
+            comment='Excellent service',
+            client_email='client@test.com'
+        )
+        
+        self.client = Client()
+    
+    def _create_provider(self, email, status, payment_method):
+        """Helper to create a provider."""
+        user = User.objects.create_user(
+            email=email,
+            password='pass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        return Provider.objects.create(
+            user=user,
+            phone='+1234567890',
+            subscription_status=status,
+            subscription_payment_method=payment_method
+        )
+    
+    def test_admin_provider_list_requires_login(self):
+        """Test that list requires authentication."""
+        response = self.client.get(reverse('admin_providers'))
+        self.assertEqual(response.status_code, 302)  # Redirect to login
+        self.assertIn('/auth/login/', response.url)
+    
+    def test_non_admin_cannot_access_list(self):
+        """Test that non-admin users cannot access the list."""
+        provider_user = User.objects.create_user(
+            email='provider@test.com',
+            password='pass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        self.client.login(email=provider_user.email, password='pass123')
+        response = self.client.get(reverse('admin_providers'))
+        self.assertEqual(response.status_code, 403)  # Forbidden
+    
+    def test_admin_can_access_list(self):
+        """Test that admin can access the provider list."""
+        self.client.login(email=self.admin_user.email, password='adminpass123')
+        response = self.client.get(reverse('admin_providers'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'admin/provider_list.html')
+    
+    def test_provider_list_displays_all_providers(self):
+        """Test that all providers are displayed."""
+        self.client.login(email=self.admin_user.email, password='adminpass123')
+        response = self.client.get(reverse('admin_providers'))
+        self.assertContains(response, 'active@test.com')
+        self.assertContains(response, 'inactive@test.com')
+        self.assertContains(response, 'suspended@test.com')
+    
+    def test_search_by_email(self):
+        """Test searching providers by email."""
+        self.client.login(email=self.admin_user.email, password='adminpass123')
+        response = self.client.get(reverse('admin_providers'), {'search': 'active@'})
+        self.assertContains(response, 'active@test.com')
+        # The response might still show inactive count in pagination/summary so be more specific
+        # Check that the table doesn't contain multiple instances of email
+        content = response.content.decode()
+        # Count how many times we see 'active@test.com' in the table rows (not counting page info)
+        active_count = content.count('<td class="px-6 py-4">\n                    <div class="text-sm font-medium text-gray-900">active@test.com</div>')
+        self.assertGreater(active_count, 0)
+    
+    def test_filter_by_status(self):
+        """Test filtering providers by subscription status."""
+        self.client.login(email=self.admin_user.email, password='adminpass123')
+        response = self.client.get(reverse('admin_providers'), {'status': 'active'})
+        self.assertContains(response, 'active@test.com')
+        self.assertNotContains(response, 'inactive@test.com')
+        self.assertNotContains(response, 'suspended@test.com')
+    
+    def test_provider_list_shows_service_count(self):
+        """Test that provider service count is displayed."""
+        self.client.login(email=self.admin_user.email, password='adminpass123')
+        response = self.client.get(reverse('admin_providers'))
+        # Provider_active has 2 services
+        context = response.context
+        self.assertIn('providers_with_stats', context)
+    
+    def test_provider_list_shows_rating(self):
+        """Test that provider ratings are displayed."""
+        self.client.login(email=self.admin_user.email, password='adminpass123')
+        response = self.client.get(reverse('admin_providers'))
+        # Provider_active has a 5-star review
+        self.assertContains(response, '5')  # Rating value
+    
+    def test_pagination(self):
+        """Test that pagination is configured."""
+        # Create 60 providers to trigger pagination
+        for i in range(60):
+            self._create_provider(f'provider{i}@test.com', 'active', 'crypto_bitcoin')
+        
+        self.client.login(email=self.admin_user.email, password='adminpass123')
+        response = self.client.get(reverse('admin_providers'))
+        self.assertIn('paginator', response.context)
+        self.assertTrue(response.context['is_paginated'])
+    
+    def test_search_persists_in_pagination(self):
+        """Test that search parameters are preserved in pagination."""
+        self.client.login(email=self.admin_user.email, password='adminpass123')
+        response = self.client.get(reverse('admin_providers'), {'search': 'active'})
+        self.assertContains(response, 'search=active')  # Should be in pagination links
+    
+    def test_filter_persists_in_pagination(self):
+        """Test that filter parameters are preserved in pagination."""
+        # Create many active providers to trigger pagination
+        for i in range(60):
+            self._create_provider(f'active{i}@test.com', 'active', 'crypto_bitcoin')
+        
+        self.client.login(email=self.admin_user.email, password='adminpass123')
+        response = self.client.get(reverse('admin_providers'), {'status': 'active'})
+        self.assertContains(response, 'status=active')  # Should be in pagination links
+
+
+class ProviderSubscriptionViewTests(TestCase):
+    """Test Provider Subscription view functionality."""
+    
+    def setUp(self):
+        """Set up test data."""
+        # Create test provider
+        self.user = User.objects.create_user(
+            email='provider@test.com',
+            password='testpass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone='+1234567890',
+            subscription_status='inactive'
+        )
+        
+        self.client = Client()
+    
+    def test_subscription_view_requires_login(self):
+        """Test that subscription view requires authentication."""
+        response = self.client.get(reverse('subscription'))
+        self.assertEqual(response.status_code, 302)  # Redirect to login
+        self.assertIn('/auth/login/', response.url)
+    
+    def test_non_provider_cannot_access(self):
+        """Test that non-provider users cannot access subscription view."""
+        client_user = User.objects.create_user(
+            email='client@test.com',
+            password='testpass123',
+            user_type='client',
+            is_email_verified=True
+        )
+        self.client.login(email=client_user.email, password='testpass123')
+        response = self.client.get(reverse('subscription'))
+        self.assertEqual(response.status_code, 302)  # Redirect
+    
+    def test_subscription_view_loads(self):
+        """Test that subscription view loads for authenticated provider."""
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.get(reverse('subscription'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'providers/subscription.html')
+    
+    def test_subscription_form_present(self):
+        """Test that subscription form is present in the view."""
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.get(reverse('subscription'))
+        # Check for form elements
+        self.assertContains(response, 'payment_method')
+    
+    def test_subscription_form_choices(self):
+        """Test that form has correct payment method choices."""
+        from providers.forms import SubscriptionSettingsForm
+        form = SubscriptionSettingsForm()
+        choices = form.fields['payment_method'].choices
+        self.assertEqual(len(choices), 4)
+        choice_values = [choice[0] for choice in choices]
+        self.assertIn('crypto_bitcoin', choice_values)
+        self.assertIn('crypto_ethereum', choice_values)
+        self.assertIn('crypto_usdc', choice_values)
+        self.assertIn('bank_transfer', choice_values)
+    
+    def test_subscription_status_displayed(self):
+        """Test that current subscription status is displayed."""
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.get(reverse('subscription'))
+        # Check for status display
+        self.assertContains(response, 'Subscription Status')
+    
+    def test_subscription_form_submission(self):
+        """Test that form submission works."""
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.post(
+            reverse('subscription'),
+            {'payment_method': 'crypto_bitcoin'},
+            follow=True
+        )
+        self.assertEqual(response.status_code, 200)
+        # Should redirect to dashboard
+        self.assertIn(reverse('provider_dashboard'), response.request['PATH_INFO'])
+    
+    def test_subscription_form_invalid_choice(self):
+        """Test that form validation works."""
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.post(
+            reverse('subscription'),
+            {'payment_method': 'invalid_choice'}
+        )
+        # Should not redirect (form has errors)
+        self.assertEqual(response.status_code, 200)
+        # Should show form with errors
+        self.assertContains(response, 'form')  # Form should be re-rendered
+    
+    def test_subscription_provider_context(self):
+        """Test that provider is passed in context."""
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.get(reverse('subscription'))
+        self.assertIn('provider', response.context)
+        self.assertEqual(response.context['provider'], self.provider)

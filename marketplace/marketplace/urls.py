@@ -25,7 +25,8 @@ from users.views import (
 from providers.views import (
     ProviderDashboardView, ProviderProfileUpdateView,
     CertificationCreateView, CertificationDeleteView,
-    ServiceListView, ServiceCreateView, ServiceUpdateView, ServiceDeleteView
+    ServiceListView, ServiceCreateView, ServiceUpdateView, ServiceDeleteView,
+    AdminProviderListView, ProviderSubscriptionView
 )
 
 urlpatterns = [
@@ -44,12 +45,16 @@ urlpatterns = [
     # Provider URLs
     path('provider/dashboard/', ProviderDashboardView.as_view(), name='provider_dashboard'),
     path('provider/profile/', ProviderProfileUpdateView.as_view(), name='provider_profile'),
+    path('provider/subscription/', ProviderSubscriptionView.as_view(), name='subscription'),
     path('provider/certifications/add/', CertificationCreateView.as_view(), name='add_certification'),
     path('provider/certifications/<int:pk>/delete/', CertificationDeleteView.as_view(), name='delete_certification'),
     path('provider/services/', ServiceListView.as_view(), name='services_list'),
     path('provider/services/create/', ServiceCreateView.as_view(), name='service_create'),
     path('provider/services/<int:pk>/edit/', ServiceUpdateView.as_view(), name='service_edit'),
     path('provider/services/<int:pk>/delete/', ServiceDeleteView.as_view(), name='service_delete'),
+    
+    # Admin URLs
+    path('internal/admin/providers/', AdminProviderListView.as_view(), name='admin_providers'),
 ]
 
 # Serve media files in development

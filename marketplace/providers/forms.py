@@ -167,3 +167,23 @@ class CertificationForm(forms.ModelForm):
                 raise ValidationError('The uploaded file is not a valid image')
         
         return image
+
+
+class SubscriptionSettingsForm(forms.Form):
+    """Form for subscription payment method selection."""
+    
+    PAYMENT_METHOD_CHOICES = [
+        ('crypto_bitcoin', 'Bitcoin'),
+        ('crypto_ethereum', 'Ethereum'),
+        ('crypto_usdc', 'USDC'),
+        ('bank_transfer', 'Bank Transfer'),
+    ]
+    
+    payment_method = forms.ChoiceField(
+        label='Payment Method',
+        choices=PAYMENT_METHOD_CHOICES,
+        widget=forms.RadioSelect(attrs={
+            'class': 'radio-button'
+        }),
+        required=True
+    )
