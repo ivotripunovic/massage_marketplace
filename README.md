@@ -84,10 +84,25 @@ marketplace/
 
 ## Testing
 
-Run tests with pytest:
+Run tests (84 tests in ~0.24 seconds):
+
 ```bash
-pytest
+# Quick test with optimized settings
+./test.sh
+
+# Or specific app
+./test.sh users
+
+# Manual command
+python manage.py test users providers reviews payments --settings=marketplace.test_settings
 ```
+
+Tests use optimized settings for speed:
+- MD5 password hashing (196x faster than production)
+- In-memory SQLite database
+- No password validators
+
+See [TESTING.md](TESTING.md) for detailed testing guide.
 
 ## Documentation
 
