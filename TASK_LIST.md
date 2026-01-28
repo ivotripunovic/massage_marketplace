@@ -2273,7 +2273,7 @@ def test_email_contains_crypto_address():
 ### WEEK 5: Client Marketplace - Provider Directory
 
 #### TASK 5.1: Create Public Provider List View (No Auth Required)
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build public provider directory accessible to anyone.
 
@@ -2368,7 +2368,7 @@ def test_pagination_works():
 ---
 
 #### TASK 5.2: Create Provider Detail View (Public Profile)
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build public provider profile page.
 
@@ -2475,7 +2475,7 @@ def test_provider_detail_shows_certifications():
 ---
 
 #### TASK 5.3: Create Service Display Component
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build reusable service card component.
 

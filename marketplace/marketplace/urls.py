@@ -29,10 +29,16 @@ from providers.views import (
     AdminProviderListView, ProviderSubscriptionView, SubscriptionConfirmView
 )
 from payments.views import AdminPaymentListView, AdminPaymentDetailView
+from clients.views import ProviderDirectoryView, ProviderDetailView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    
+
+    # Public URLs
+    path('', ProviderDirectoryView.as_view(), name='home'),
+    path('providers/', ProviderDirectoryView.as_view(), name='providers'),
+    path('providers/<str:slug>/', ProviderDetailView.as_view(), name='provider_detail'),
+
     # Authentication URLs
     path('auth/signup/', SignupView.as_view(), name='signup'),
     path('auth/check-email/', CheckEmailView.as_view(), name='check_email'),

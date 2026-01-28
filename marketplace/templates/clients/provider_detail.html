@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}{{ provider.get_name }} - Massage Marketplace{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav class="text-sm mb-6">
+    <a href="{% url 'home' %}" class="text-blue-600 hover:underline">Home</a>
+    <span class="text-gray-500 mx-2">›</span>
+    <a href="{% url 'providers' %}" class="text-blue-600 hover:underline">Providers</a>
+    <span class="text-gray-500 mx-2">›</span>
+    <span class="text-gray-700">{{ provider.get_name }}</span>
+</nav>
+
+<!-- Provider Header -->
+<div class="bg-white rounded-lg shadow p-8 mb-8">
+    <div class="flex flex-col md:flex-row items-start gap-8">
+        <!-- Photo -->
+        <div class="flex-shrink-0">
+            {% if provider.photo %}
+            <img src="{{ provider.photo.url }}" alt="{{ provider.get_name }}" class="w-32 h-32 rounded-full object-cover">
+            {% else %}
+            <div class="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center">
+                <svg class="w-16 h-16 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path>
+                </svg>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Info -->
+        <div class="flex-grow">
+            <h1 class="text-3xl font-bold mb-2">{{ provider.get_name }}</h1>
+
+            <!-- Rating -->
+            {% if avg_rating > 0 %}
+            <div class="flex items-center mb-4">
+                <span class="text-yellow-500 text-2xl mr-2">★</span>
+                <span class="text-xl font-semibold">{{ avg_rating }}</span>
+                <span class="text-gray-500 ml-2">({{ total_reviews }} review{{ total_reviews|pluralize }})</span>
+            </div>
+            {% else %}
+            <p class="text-gray-500 mb-4">No reviews yet</p>
+            {% endif %}
+
+            <!-- Contact Info -->
+            <div class="space-y-2 mb-4">
+                <p class="text-gray-700">
+                    <span class="font-semibold">Email:</span> {{ provider.user.email }}
+                </p>
+                {% if provider.phone %}
+                <p class="text-gray-700">
+                    <span class="font-semibold">Phone:</span> {{ provider.phone }}
+                </p>
+                {% endif %}
+            </div>
+
+            <!-- Contact Button -->
+            <a href="mailto:{{ provider.user.email }}" class="inline-block bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700">
+                Contact Provider
+            </a>
+        </div>
+    </div>
+
+    <!-- Bio -->
+    {% if provider.bio %}
+    <div class="mt-6 pt-6 border-t">
+        <h2 class="text-xl font-bold mb-3">About</h2>
+        <p class="text-gray-700 whitespace-pre-line">{{ provider.bio }}</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Services Section -->
+<div class="bg-white rounded-lg shadow p-8 mb-8">
+    <h2 class="text-2xl font-bold mb-6">Services</h2>
+
+    {% if services %}
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {% for service in services %}
+        <div class="border rounded-lg p-4">
+            <div class="flex justify-between items-start mb-2">
+                <div>
+                    <h3 class="font-bold text-lg">{{ service.get_service_type_display }}</h3>
+                    <p class="text-gray-600 text-sm">{{ service.duration_minutes }} minutes</p>
+                </div>
+                <p class="text-2xl font-bold text-green-600">${{ service.price }}</p>
+            </div>
+            {% if service.description %}
+            <p class="text-gray-700 text-sm mt-3">{{ service.description }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-600">No services listed yet.</p>
+    {% endif %}
+</div>
+
+<!-- Certifications Section -->
+{% if certifications %}
+<div class="bg-white rounded-lg shadow p-8 mb-8">
+    <h2 class="text-2xl font-bold mb-6">Certifications</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {% for cert in certifications %}
+        <div>
+            {% if cert.image %}
+            <img src="{{ cert.image.url }}" alt="{{ cert.name }}" class="w-full h-32 object-cover rounded mb-2">
+            {% else %}
+            <div class="w-full h-32 bg-gray-200 rounded flex items-center justify-center mb-2">
+                <span class="text-gray-600 text-sm text-center px-2">{{ cert.name }}</span>
+            </div>
+            {% endif %}
+            <p class="text-sm font-semibold text-center">{{ cert.name }}</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Reviews Section -->
+<div class="bg-white rounded-lg shadow p-8">
+    <h2 class="text-2xl font-bold mb-6">Reviews</h2>
+
+    {% if reviews %}
+    <div class="space-y-6">
+        {% for review in reviews %}
+        <div class="border-b pb-6 last:border-b-0">
+            <div class="flex items-center mb-2">
+                <span class="text-yellow-500 text-xl mr-2">
+                    {% for i in "12345" %}
+                        {% if forloop.counter <= review.rating %}★{% else %}☆{% endif %}
+                    {% endfor %}
+                </span>
+                <span class="text-gray-600 text-sm">{{ review.created_at|date:"M d, Y" }}</span>
+            </div>
+            {% if review.client_name %}
+            <p class="font-semibold mb-2">{{ review.client_name }}</p>
+            {% endif %}
+            {% if review.comment %}
+            <p class="text-gray-700">{{ review.comment }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-gray-600">No reviews yet. Be the first to review this provider!</p>
+    {% endif %}
+</div>
+{% endblock %}

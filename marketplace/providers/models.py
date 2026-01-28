@@ -88,6 +88,20 @@ class Provider(models.Model):
         self.subscription_status = 'inactive'
         self.save()
 
+    def average_rating(self):
+        """Calculate average rating from reviews."""
+        from django.db.models import Avg
+        from reviews.models import Review
+
+        avg = Review.objects.filter(provider=self).aggregate(Avg('rating'))['rating__avg']
+        return round(avg, 1) if avg else 0
+
+    def get_name(self):
+        """Get provider display name."""
+        if self.user.first_name or self.user.last_name:
+            return f"{self.user.first_name} {self.user.last_name}".strip()
+        return self.user.email.split('@')[0]
+
 
 class Service(models.Model):
     """Service offered by a provider."""
