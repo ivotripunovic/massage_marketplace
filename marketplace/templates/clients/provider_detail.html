@@ -119,8 +119,8 @@
 {% endif %}
 
 <!-- Reviews Section -->
-<div class="bg-white rounded-lg shadow p-8">
-    <h2 class="text-2xl font-bold mb-6">Reviews</h2>
+<div class="bg-white rounded-lg shadow p-8 mb-8">
+    <h2 class="text-2xl font-bold mb-6">Reviews ({{ total_reviews }})</h2>
 
     {% if reviews %}
     <div class="space-y-6">
@@ -136,6 +136,8 @@
             </div>
             {% if review.client_name %}
             <p class="font-semibold mb-2">{{ review.client_name }}</p>
+            {% else %}
+            <p class="font-semibold mb-2 text-gray-500">Anonymous</p>
             {% endif %}
             {% if review.comment %}
             <p class="text-gray-700">{{ review.comment }}</p>
@@ -144,7 +146,80 @@
         {% endfor %}
     </div>
     {% else %}
-    <p class="text-gray-600">No reviews yet. Be the first to review this provider!</p>
+    <p class="text-gray-600 mb-6">No reviews yet. Be the first to review this provider!</p>
     {% endif %}
+</div>
+
+<!-- Submit Review Section -->
+<div class="bg-white rounded-lg shadow p-8">
+    <h2 class="text-2xl font-bold mb-6">Write a Review</h2>
+
+    {% include "includes/_messages.html" %}
+
+    <form method="post" action="{% url 'review_submit' provider.user.email %}" class="space-y-6">
+        {% csrf_token %}
+
+        <!-- Rating -->
+        <div class="form-group">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+                Rating <span class="text-red-600">*</span>
+            </label>
+            <div class="flex gap-2">
+                {% for value, label in form.rating.field.choices %}
+                <label class="flex items-center cursor-pointer">
+                    <input type="radio" name="rating" value="{{ value }}" class="sr-only peer" required>
+                    <div class="w-12 h-12 flex items-center justify-center text-2xl border-2 border-gray-300 rounded-lg peer-checked:border-yellow-500 peer-checked:bg-yellow-50 hover:border-yellow-400 transition">
+                        <span class="peer-checked:text-yellow-500">{{ value }}★</span>
+                    </div>
+                </label>
+                {% endfor %}
+            </div>
+            {% if form.rating.errors %}
+            <p class="mt-2 text-red-600 text-sm">{{ form.rating.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Comment -->
+        <div class="form-group">
+            <label for="{{ form.comment.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                {{ form.comment.label }} <span class="text-red-600">*</span>
+            </label>
+            {{ form.comment }}
+            <p class="mt-1 text-sm text-gray-500">{{ form.comment.help_text }}</p>
+            {% if form.comment.errors %}
+            <p class="mt-2 text-red-600 text-sm">{{ form.comment.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Client Name (Optional) -->
+        <div class="form-group">
+            <label for="{{ form.client_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                {{ form.client_name.label }}
+            </label>
+            {{ form.client_name }}
+            {% if form.client_name.errors %}
+            <p class="mt-2 text-red-600 text-sm">{{ form.client_name.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Client Email -->
+        <div class="form-group">
+            <label for="{{ form.client_email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
+                {{ form.client_email.label }} <span class="text-red-600">*</span>
+            </label>
+            {{ form.client_email }}
+            <p class="mt-1 text-sm text-gray-500">{{ form.client_email.help_text }}</p>
+            {% if form.client_email.errors %}
+            <p class="mt-2 text-red-600 text-sm">{{ form.client_email.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <!-- Submit Button -->
+        <div>
+            <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
+                Submit Review
+            </button>
+        </div>
+    </form>
 </div>
 {% endblock %}

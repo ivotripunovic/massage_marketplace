@@ -30,6 +30,7 @@ from providers.views import (
 )
 from payments.views import AdminPaymentListView, AdminPaymentDetailView
 from clients.views import ProviderDirectoryView, ProviderDetailView
+from reviews.views import ReviewSubmitView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -38,6 +39,7 @@ urlpatterns = [
     path('', ProviderDirectoryView.as_view(), name='home'),
     path('providers/', ProviderDirectoryView.as_view(), name='providers'),
     path('providers/<str:slug>/', ProviderDetailView.as_view(), name='provider_detail'),
+    path('providers/<str:slug>/review/', ReviewSubmitView.as_view(), name='review_submit'),
 
     # Authentication URLs
     path('auth/signup/', SignupView.as_view(), name='signup'),

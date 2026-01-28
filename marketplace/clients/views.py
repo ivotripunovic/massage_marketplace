@@ -137,4 +137,8 @@ class ProviderDetailView(DetailView):
         context['avg_rating'] = provider.average_rating()
         context['total_reviews'] = context['reviews'].count()
 
+        # Add review form
+        from reviews.forms import ReviewForm
+        context['form'] = ReviewForm()
+
         return context

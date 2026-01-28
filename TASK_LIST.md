@@ -2684,7 +2684,7 @@ def test_provider_detail_query_count():
 ### WEEK 7: Reviews System
 
 #### TASK 7.1: Create Review Submission Form
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Build form for clients to submit reviews (5-star rating + comment).
 
@@ -2730,7 +2730,7 @@ def test_review_form_comment_max_length():
 ---
 
 #### TASK 7.2: Create Review Submission View
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Handle POST request for review submission.
 
@@ -2782,7 +2782,7 @@ def test_submit_review_duplicate_prevention():
 ---
 
 #### TASK 7.3: Display Reviews on Provider Detail Page
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Show all reviews on provider profile page.
 
@@ -2831,7 +2831,7 @@ def test_provider_detail_no_reviews():
 ---
 
 #### TASK 7.4: Admin Review Moderation
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Allow admins to moderate reviews (approve/flag/delete).
 
@@ -2883,7 +2883,7 @@ def test_admin_can_approve_review():
 ---
 
 #### TASK 7.5: Email Notifications for New Reviews
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Send email to admin when new review is submitted.
 
@@ -2942,7 +2942,7 @@ def test_review_submission_works_if_email_fails():
 ---
 
 #### TASK 7.6: Update Average Rating Display
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Update provider average rating calculation to use new review system.
 
@@ -2991,7 +2991,7 @@ def test_provider_list_shows_ratings():
 ---
 
 #### TASK 7.7: Week 7 Tests & Documentation
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Comprehensive testing and documentation for reviews system.
 
