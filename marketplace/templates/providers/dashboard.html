@@ -3,6 +3,7 @@
 {% block title %}Provider Dashboard - Massage Marketplace{% endblock %}
 
 {% block content %}
+{% include "includes/_messages.html" %}
 <div class="mb-8">
     <h1 class="text-3xl font-bold mb-2">Provider Dashboard</h1>
     <p class="text-gray-600">Manage your profile, services, and bookings</p>
@@ -11,7 +12,7 @@
 {% if not provider %}
 <div class="bg-yellow-50 border border-yellow-200 rounded-md p-6 mb-8">
     <p class="text-yellow-800">{{ message }}</p>
-    <a href="/provider/profile/edit/" class="text-blue-600 hover:underline mt-4 inline-block">Complete your profile →</a>
+    <a href="{% url 'provider_profile' %}" class="text-blue-600 hover:underline mt-4 inline-block">Complete your profile →</a>
 </div>
 {% else %}
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -34,7 +35,7 @@
                 {{ provider.get_subscription_status_display }}
             </span>
         </p>
-        <a href="/provider/profile/edit/" class="block text-center bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Edit Profile</a>
+        <a href="{% url 'provider_profile' %}" class="block text-center bg-blue-600 text-white py-2 rounded hover:bg-blue-700">Edit Profile</a>
     </div>
     
     <!-- Stats Card -->
@@ -80,7 +81,7 @@
             </div>
             {% endif %}
         </div>
-        <a href="/provider/subscription/" class="block text-center bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+        <a href="{% url 'subscription' %}" class="block text-center bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
             {% if provider.subscription_status == 'active' %}Manage Subscription{% else %}Activate Subscription{% endif %}
         </a>
     </div>
@@ -90,34 +91,19 @@
 <div class="bg-white rounded-lg shadow p-6 mb-8">
     <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold">Your Services</h2>
-        <a href="/provider/services/new/" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">+ Add Service</a>
+        <a href="{% url 'service_create' %}" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">+ Add Service</a>
     </div>
     
     {% if services %}
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         {% for service in services %}
-        <div class="border rounded-lg p-4 hover:shadow-lg transition">
-            <div class="flex justify-between items-start mb-2">
-                <div>
-                    <h3 class="font-bold text-lg">{{ service.get_service_type_display }}</h3>
-                    <p class="text-gray-600 text-sm">{{ service.duration_minutes }} minutes</p>
-                </div>
-                <p class="text-2xl font-bold text-green-600">${{ service.price }}</p>
-            </div>
-            {% if service.description %}
-            <p class="text-gray-700 text-sm mb-3">{{ service.description }}</p>
-            {% endif %}
-            <div class="flex gap-2">
-                <a href="/provider/services/{{ service.id }}/edit/" class="flex-1 text-center text-blue-600 hover:underline">Edit</a>
-                <a href="/provider/services/{{ service.id }}/delete/" class="flex-1 text-center text-red-600 hover:underline">Delete</a>
-            </div>
-        </div>
+            {% include "includes/_service_card.html" with service=service %}
         {% endfor %}
     </div>
     {% else %}
     <div class="bg-gray-50 rounded-lg p-8 text-center">
         <p class="text-gray-600 mb-4">You haven't added any services yet.</p>
-        <a href="/provider/services/new/" class="inline-block bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Add Your First Service</a>
+        <a href="{% url 'service_create' %}" class="inline-block bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Add Your First Service</a>
     </div>
     {% endif %}
 </div>
@@ -126,31 +112,19 @@
 <div class="bg-white rounded-lg shadow p-6">
     <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold">Your Certifications</h2>
-        <a href="/provider/certifications/new/" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">+ Add Certification</a>
+        <a href="{% url 'add_certification' %}" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">+ Add Certification</a>
     </div>
     
     {% if certifications %}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         {% for cert in certifications %}
-        <div class="relative group">
-            {% if cert.image %}
-            <img src="{{ cert.image.url }}" alt="{{ cert.name }}" class="w-full h-32 object-cover rounded">
-            {% else %}
-            <div class="w-full h-32 bg-gray-200 rounded flex items-center justify-center">
-                <span class="text-gray-600 text-sm text-center px-2">{{ cert.name }}</span>
-            </div>
-            {% endif %}
-            <p class="text-sm mt-2 font-semibold">{{ cert.name }}</p>
-            <div class="mt-2 flex gap-2">
-                <a href="/provider/certifications/{{ cert.id }}/delete/" class="text-sm text-red-600 hover:underline">Remove</a>
-            </div>
-        </div>
+            {% include "includes/_certification_card.html" with certification=cert %}
         {% endfor %}
     </div>
     {% else %}
     <div class="bg-gray-50 rounded-lg p-8 text-center">
         <p class="text-gray-600 mb-4">Add certifications to build trust with clients.</p>
-        <a href="/provider/certifications/new/" class="inline-block bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Add Certification</a>
+        <a href="{% url 'add_certification' %}" class="inline-block bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Add Certification</a>
     </div>
     {% endif %}
 </div>

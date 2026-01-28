@@ -63,19 +63,27 @@ def create_user(email: str, password: str) -> User:
 
 **All code must be tested before committing.**
 
-Run tests locally:
+Run tests locally (with optimized test database):
 ```bash
-# Run all tests
-python manage.py test users providers reviews payments
+# Run all tests (uses test_settings.py for faster execution)
+python manage.py test --settings=marketplace.test_settings
+
+# Run all tests with verbosity
+python manage.py test --settings=marketplace.test_settings -v 2
 
 # Run specific app tests
-python manage.py test users
+python manage.py test --settings=marketplace.test_settings users
 
 # Run with verbosity
-python manage.py test users -v 2
+python manage.py test --settings=marketplace.test_settings users -v 2
 
 # Run specific test class
-python manage.py test users.tests.CustomUserModelTests
+python manage.py test --settings=marketplace.test_settings users.tests.CustomUserModelTests
+
+# Run tests with coverage (if coverage.py is installed)
+coverage run --source='.' manage.py test --settings=marketplace.test_settings
+coverage report
+coverage html  # Generate HTML report
 ```
 
 **Test Coverage Requirements:**

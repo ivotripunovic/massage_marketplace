@@ -1,0 +1,18 @@
+<div class="relative group">
+    {% if certification.image %}
+    <img src="{{ certification.image.url }}" alt="{{ certification.name }}" class="w-full h-32 object-cover rounded">
+    {% else %}
+    <div class="w-full h-32 bg-gray-200 rounded flex items-center justify-center">
+        <span class="text-gray-600 text-sm text-center px-2">{{ certification.name }}</span>
+    </div>
+    {% endif %}
+    <p class="text-sm mt-2 font-semibold">{{ certification.name }}</p>
+    <div class="mt-2 flex gap-2">
+        {% block cert_actions %}
+        <form method="post" action="{% url 'delete_certification' certification.id %}" style="display:inline;" onsubmit="return confirm('Remove this certification?');">
+            {% csrf_token %}
+            <button type="submit" class="text-sm text-red-600 hover:underline">Remove</button>
+        </form>
+        {% endblock %}
+    </div>
+</div>

@@ -27,8 +27,8 @@
                         
                         {% if user.user_type == 'provider' %}
                             <a href="{% url 'provider_dashboard' %}" class="nav-link">Dashboard</a>
-                            <a href="/provider/profile/" class="nav-link">Profile</a>
-                            <a href="/provider/services/" class="nav-link">Services</a>
+                            <a href="{% url 'provider_profile' %}" class="nav-link">Profile</a>
+                            <a href="{% url 'services_list' %}" class="nav-link">Services</a>
                         {% elif user.user_type == 'client' %}
                             <a href="/client/dashboard/" class="nav-link">Find Services</a>
                             <a href="/client/bookings/" class="nav-link">My Bookings</a>
@@ -60,8 +60,8 @@
                     <span class="block text-gray-700 px-2 py-2">{{ user.email }}</span>
                     {% if user.user_type == 'provider' %}
                         <a href="{% url 'provider_dashboard' %}" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">Dashboard</a>
-                        <a href="/provider/profile/" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">Profile</a>
-                        <a href="/provider/services/" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">Services</a>
+                        <a href="{% url 'provider_profile' %}" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">Profile</a>
+                        <a href="{% url 'services_list' %}" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">Services</a>
                     {% elif user.user_type == 'client' %}
                         <a href="/client/dashboard/" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">Find Services</a>
                         <a href="/client/bookings/" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">My Bookings</a>
