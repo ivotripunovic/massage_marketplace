@@ -1506,7 +1506,7 @@ def test_service_ownership():
 ---
 
 #### TASK 3.5: Create Provider Dashboard Display
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Populate dashboard with profile and services overview.
 
@@ -1603,7 +1603,7 @@ def test_dashboard_stats():
 ---
 
 #### TASK 3.6: Update Migrations & Run Locally
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Create and apply all database migrations.
 
@@ -1642,7 +1642,7 @@ def test_dashboard_stats():
 ---
 
 #### TASK 3.7: Refactor & DRY Templates
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Improve template consistency and reduce duplication.
 
@@ -1680,7 +1680,7 @@ def test_dashboard_stats():
 ---
 
 #### TASK 3.8: Create Comprehensive Tests & Documentation
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Full test coverage for Week 3 work, update documentation.
 
@@ -2687,7 +2687,8 @@ def test_provider_detail_query_count():
 [Due to token limits, I'm creating a more concise task list for remaining sprints]
 
 #### TASK 6.1-6.N: Week 6 (Search & Filtering)
-[Search filters by service type, location, price]
+**Status:** [✓ DONE] ✓
+[Search filters by service type, location, price - COMPLETED]
 
 #### TASK 7.1-7.N: Week 7 (Reviews System)
 [Review submission, display, moderation]
