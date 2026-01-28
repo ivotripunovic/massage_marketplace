@@ -68,6 +68,10 @@ class Provider(models.Model):
         verbose_name = 'Provider'
         verbose_name_plural = 'Providers'
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['subscription_status']),
+            models.Index(fields=['subscription_status', 'created_at']),
+        ]
     
     def __str__(self):
         return f"{self.user.email} - {self.get_subscription_status_display()}"
