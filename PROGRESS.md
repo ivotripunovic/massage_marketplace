@@ -1,8 +1,8 @@
 # Massage Marketplace - Implementation Progress
 
-**Status:** WEEK 1 COMPLETE ✓ | WEEK 2 COMPLETE ✓  
-**Test Coverage:** 42 tests passing (Week 2 auth & signup)
-**Total Tests:** 84+ (all models and auth tests)
+**Status:** WEEK 1 COMPLETE ✓ | WEEK 2 COMPLETE ✓ | WEEK 3 IN PROGRESS  
+**Test Coverage:** 169 tests passing (all models, auth, forms, CRUD operations)
+**Total Tests:** 169 (models, auth, forms, views, CRUD, certifications, services)
 
 ## Completed Tasks
 
@@ -315,18 +315,153 @@
 
 **Features:**
 - 42 comprehensive authentication tests covering:
-  - User creation and validation
-  - Email backend authentication
-  - Token generation and verification
-  - Signup flow end-to-end
-  - Login/logout flow
-  - Password reset
+   - User creation and validation
+   - Email backend authentication
+   - Token generation and verification
+   - Signup flow end-to-end
+   - Login/logout flow
+   - Password reset
 - Email backend configured for console output (development-friendly)
 - All tests passing with 100% success rate
 
 **Total Tests:** 42/42 passing ✓ (including all auth tests)
 
-## Completed Weeks
+### ✓ TASK 3.1: Provider Profile Update View & Form
+**Status:** DONE
+
+**Features:**
+- ProviderProfileForm: Custom form for updating provider profile
+  - Fields: first_name, last_name (from User model), phone, bio (from Provider)
+  - Tailwind CSS styling with proper input classes
+  - Form validation: phone field is required
+  - Custom save method: Updates both User and Provider models
+- ProviderProfileUpdateView: FormView for handling profile updates
+  - Decorator: @ProviderRequiredMixin (ensures provider user type)
+  - GET: Displays form pre-filled with current data
+  - POST: Validates and saves profile changes
+  - Auto-creates provider if missing
+  - Redirects to dashboard on success with success message
+- Template: profile_edit.html with Bootstrap/Tailwind styling
+  - Form fields with proper labels and error display
+  - Profile completion tips section
+  - Cancel button to return to dashboard
+- URL: `/provider/profile/` (route added to marketplace/urls.py)
+
+**Tests:** 22/22 passing ✓
+- Form field display and validation
+- Form initialization with existing data
+- Form saves to both User and Provider models
+- View access control (login required, provider only)
+- View loads and displays form correctly
+- Profile update changes all fields
+- Success redirect and message
+- Auto-creation of missing provider
+
+### ✓ TASK 3.2: Provider Photo Upload & Storage
+**Status:** DONE
+
+**Features:**
+- Photo field integrated into ProviderProfileForm
+- Image validation:
+  - File size check: < 5MB
+  - Format validation: JPEG, PNG, GIF only
+  - PIL image verification to ensure it's a real image
+- Image processing:
+  - Automatic resizing to max 800x800 pixels
+  - Format detection and preservation
+  - Thumbnail generation with LANCZOS resampling
+- Media configuration:
+  - MEDIA_URL = '/media/'
+  - MEDIA_ROOT = BASE_DIR / 'media'
+  - Development serving via django.conf.urls.static
+- Photo display:
+  - Profile edit template shows current photo
+  - New photo upload replaces old one
+  - Optional field - users can skip upload
+- Forms.py created with:
+  - ProviderPhotoForm: Standalone photo upload form
+  - ServiceForm: For service CRUD (prepared for next task)
+  - CertificationForm: For certification uploads (prepared for next task)
+
+**Tests:** 8/8 passing ✓
+- Photo field exists in form
+- Valid JPEG/PNG upload
+- Invalid format rejection
+- Oversized image rejection
+- Automatic image resizing
+- Photo display on profile page
+- Optional field handling
+
+### ✓ TASK 3.3: Certification Upload View
+**Status:** DONE
+
+**Features:**
+- CertificationCreateView: Add certifications with image upload
+  - Form validation: name (required), image (required, < 5MB, JPEG/PNG/GIF)
+  - Auto-assigns to current provider
+  - Redirect to profile on success
+  - Success messages
+- CertificationDeleteView: Delete certifications
+  - Ownership verification (only own certifications)
+  - Confirmation on delete
+  - Success messages
+- Template: certification_form.html
+  - Upload form with file input
+  - Shows current certifications
+  - Delete buttons for each certification
+  - Current cert count
+- URL routes: `/provider/certifications/add/` and `/provider/certifications/{id}/delete/`
+
+**Tests:** 17/17 passing ✓
+- Login and authorization checks
+- Page loading and form display
+- Image upload with various formats
+- Multiple certifications per provider
+- Form validation and error handling
+- Ownership verification
+- Success messages
+- Non-existent certification handling
+
+### ✓ TASK 3.4: Service CRUD Views
+**Status:** DONE
+
+**Features:**
+- ServiceListView: List all provider's services
+  - Paginated list (20 per page)
+  - Sort by creation date
+  - Shows service details (type, price, duration)
+  - Edit/Delete buttons for each service
+- ServiceCreateView: Add new service
+  - Form for: service_type, description, price, duration
+  - Price validation: >= $5.00
+  - Duration validation: 30, 60, or 90 minutes
+  - Auto-assigns to current provider
+  - Tailwind-styled form
+- ServiceUpdateView: Edit existing service
+  - Ownership verification
+  - Pre-fills current values
+  - Price and duration validation
+  - Success redirect and message
+- ServiceDeleteView: Delete service
+  - Ownership verification
+  - Confirmation before delete
+  - Success message
+- Templates:
+  - service_form.html: Create/Edit form with tips
+  - service_list.html: List with grid layout, empty state
+- URL routes: `/provider/services/`, `/provider/services/create/`, `/provider/services/{id}/edit/`, `/provider/services/{id}/delete/`
+
+**Tests:** 16/16 passing ✓
+- Login and authorization checks
+- All CRUD operations (Create, Read, Update, Delete)
+- Price validation (minimum $5.00)
+- Ownership verification (can't edit/delete others' services)
+- Form validation and error handling
+- Success messages
+- Multiple services per provider
+- All service types
+
+ ## Completed Weeks
 
 ### ✓ WEEK 1: Foundation & Database Schema (5/5 tasks)
 - Task 1.1: Django project setup

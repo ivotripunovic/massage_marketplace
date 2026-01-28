@@ -12,7 +12,7 @@
 ### WEEK 1: Project Bootstrap & Database Schema
 
 #### TASK 1.1: Initialize Django 5.0 Project Structure
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Create Django project with proper structure, dependencies, and local development setup.
 
@@ -48,7 +48,7 @@
 ---
 
 #### TASK 1.2: Create Custom User Model (Extended AbstractUser)
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Implement custom Django User model with email-based authentication.
 
@@ -94,7 +94,7 @@ def test_user_type_choices():
 ---
 
 #### TASK 1.3: Create Provider Model & Admin Registration
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build Provider profile model with required fields and register in Django admin.
 
@@ -140,7 +140,7 @@ def test_provider_admin_registered():
 ---
 
 #### TASK 1.4: Create Service Model & Certification Model
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build Service and Certification models for provider offerings.
 
@@ -207,7 +207,7 @@ def test_certification_creation():
 ---
 
 #### TASK 1.5: Create Review & SubscriptionPayment Models
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build models for client reviews and provider payment tracking.
 
@@ -497,7 +497,7 @@ def test_fixtures_work(test_user, test_provider, test_service):
 ### WEEK 2: Authentication & Provider Signup Flow
 
 #### TASK 2.1: Create Custom Authentication Backend (Email-Based Login)
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Implement email-based authentication instead of username.
 
@@ -550,7 +550,7 @@ def test_case_insensitive_email():
 ---
 
 #### TASK 2.2: Create Email Verification Token & Utility Functions
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Implement email verification token generation and validation.
 
@@ -612,7 +612,7 @@ def test_send_verification_email():
 ---
 
 #### TASK 2.3: Create Signup View & Form
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Implement provider signup view with form handling.
 
@@ -700,7 +700,7 @@ def test_signup_duplicate_email():
 ---
 
 #### TASK 2.4: Create Email Verification View
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Implement email verification endpoint.
 
@@ -763,7 +763,7 @@ def test_check_email_page_loads():
 ---
 
 #### TASK 2.5: Create Login View & Form
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Implement user login with email/password.
 
@@ -846,7 +846,7 @@ def test_login_invalid_credentials():
 ---
 
 #### TASK 2.6: Create Logout View & Password Reset
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Implement logout and password reset flows.
 
@@ -932,7 +932,7 @@ def test_password_reset_confirm():
 ---
 
 #### TASK 2.7: Create Base Templates & Navigation
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build HTML template structure with navigation.
 
@@ -1032,7 +1032,7 @@ def test_password_reset_confirm():
 ---
 
 #### TASK 2.8: Create Provider Dashboard Skeleton
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build dashboard view and template (populated in Week 3).
 
@@ -1115,7 +1115,7 @@ def test_provider_required_decorator():
 ---
 
 #### TASK 2.9: Create Authentication Tests & Email Configuration
-**Status:** [✓ DONE]
+**Status:** [✓ DONE] ✓
 
 **Objective:** Complete authentication testing and setup email in development.
 
@@ -1165,7 +1165,7 @@ def test_provider_required_decorator():
 ### WEEK 3: Provider Profile & Service Management
 
 #### TASK 3.1: Create Provider Profile Update View & Form
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build form to edit provider profile (name, bio, phone, photo).
 
@@ -1235,7 +1235,7 @@ def test_profile_photo_upload():
 ---
 
 #### TASK 3.2: Create Provider Photo Upload & Storage
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Implement image upload with validation and local storage.
 
@@ -1329,7 +1329,7 @@ def test_photo_format_validation():
 ---
 
 #### TASK 3.3: Create Certification Upload View
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build form to upload and manage certifications.
 
@@ -1404,7 +1404,7 @@ def test_certification_ownership():
 ---
 
 #### TASK 3.4: Create Service CRUD Views
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build complete Create, Read, Update, Delete for services.
 

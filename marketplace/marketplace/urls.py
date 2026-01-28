@@ -16,11 +16,17 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.conf import settings
+from django.conf.urls.static import static
 from users.views import (
     SignupView, CheckEmailView, VerifyEmailView, LoginView, LogoutView,
     PasswordResetView, PasswordResetSentView, PasswordResetConfirmView
 )
-from providers.views import ProviderDashboardView
+from providers.views import (
+    ProviderDashboardView, ProviderProfileUpdateView,
+    CertificationCreateView, CertificationDeleteView,
+    ServiceListView, ServiceCreateView, ServiceUpdateView, ServiceDeleteView
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -37,4 +43,15 @@ urlpatterns = [
     
     # Provider URLs
     path('provider/dashboard/', ProviderDashboardView.as_view(), name='provider_dashboard'),
+    path('provider/profile/', ProviderProfileUpdateView.as_view(), name='provider_profile'),
+    path('provider/certifications/add/', CertificationCreateView.as_view(), name='add_certification'),
+    path('provider/certifications/<int:pk>/delete/', CertificationDeleteView.as_view(), name='delete_certification'),
+    path('provider/services/', ServiceListView.as_view(), name='services_list'),
+    path('provider/services/create/', ServiceCreateView.as_view(), name='service_create'),
+    path('provider/services/<int:pk>/edit/', ServiceUpdateView.as_view(), name='service_edit'),
+    path('provider/services/<int:pk>/delete/', ServiceDeleteView.as_view(), name='service_delete'),
 ]
+
+# Serve media files in development
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

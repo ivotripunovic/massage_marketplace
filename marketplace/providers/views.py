@@ -1,9 +1,11 @@
-from django.views.generic import TemplateView, FormView
+from django.views.generic import TemplateView, FormView, UpdateView, CreateView, DeleteView, ListView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import redirect
+from django.shortcuts import redirect, get_object_or_404
 from django.urls import reverse_lazy
 from django.contrib import messages
+from django import forms
 from providers.models import Provider, Service, Certification
+from providers.forms import CertificationForm, ServiceForm
 from users.models import User
 
 
@@ -52,4 +54,381 @@ class ProviderDashboardView(ProviderRequiredMixin, TemplateView):
             context['provider'] = None
             context['message'] = 'Please complete your profile to get started.'
         
+        return context
+
+
+class ProviderProfileForm(forms.ModelForm):
+    """Form for updating provider profile."""
+    
+    first_name = forms.CharField(
+        max_length=150,
+        required=False,
+        label='First Name',
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+            'placeholder': 'First Name'
+        })
+    )
+    
+    last_name = forms.CharField(
+        max_length=150,
+        required=False,
+        label='Last Name',
+        widget=forms.TextInput(attrs={
+            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+            'placeholder': 'Last Name'
+        })
+    )
+    
+    class Meta:
+        model = Provider
+        fields = ('bio', 'phone', 'photo')
+        labels = {
+            'bio': 'Bio / About',
+            'phone': 'Phone Number',
+            'photo': 'Profile Photo',
+        }
+        widgets = {
+            'bio': forms.Textarea(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+                'placeholder': 'Tell clients about your experience and specialties',
+                'rows': 4
+            }),
+            'phone': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+                'placeholder': '+1 (555) 123-4567',
+                'type': 'tel'
+            }),
+            'photo': forms.FileInput(attrs={
+                'class': 'block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700',
+                'accept': 'image/jpeg,image/png,image/gif',
+            }),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        """Initialize form with user data."""
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.user:
+            self.fields['first_name'].initial = self.instance.user.first_name
+            self.fields['last_name'].initial = self.instance.user.last_name
+    
+    def clean_photo(self):
+        """Validate photo file."""
+        photo = self.cleaned_data.get('photo')
+        
+        if photo:
+            # Check file size (< 5MB)
+            if photo.size > 5 * 1024 * 1024:
+                raise forms.ValidationError('Image must be smaller than 5MB')
+            
+            # Check file format
+            valid_formats = ['image/jpeg', 'image/png', 'image/gif']
+            if photo.content_type not in valid_formats:
+                raise forms.ValidationError('Only JPEG, PNG, and GIF images are allowed')
+            
+            # Validate that it's a real image
+            try:
+                from PIL import Image
+                img = Image.open(photo)
+                img.verify()
+                # Reset file pointer after verification
+                photo.seek(0)
+            except Exception:
+                raise forms.ValidationError('The uploaded file is not a valid image')
+        
+        return photo
+    
+    def save(self, commit=True):
+        """Save form and update user fields."""
+        provider = super().save(commit=False)
+        
+        # Update user first and last name
+        user = provider.user
+        user.first_name = self.cleaned_data.get('first_name', '')
+        user.last_name = self.cleaned_data.get('last_name', '')
+        
+        # Resize image if provided
+        if provider.photo:
+            self._resize_image(provider)
+        
+        if commit:
+            user.save()
+            provider.save()
+        
+        return provider
+    
+    def _resize_image(self, provider):
+        """Resize image to maximum 800x800 pixels."""
+        from PIL import Image
+        import io
+        
+        if not provider.photo:
+            return
+        
+        # Read the image
+        img = Image.open(provider.photo)
+        original_format = img.format
+        
+        # Check if resizing is needed
+        if img.height > 800 or img.width > 800:
+            # Create thumbnail
+            img.thumbnail((800, 800), Image.Resampling.LANCZOS)
+            
+            # Save the resized image back to the field
+            img_io = io.BytesIO()
+            
+            # Determine format from filename or image format
+            filename_lower = provider.photo.name.lower()
+            if filename_lower.endswith('.png'):
+                save_format = 'PNG'
+            elif filename_lower.endswith('.gif'):
+                save_format = 'GIF'
+            else:  # Default to JPEG
+                save_format = 'JPEG'
+            
+            # If original image had a format, use that
+            if original_format:
+                save_format = original_format
+            
+            img.save(img_io, format=save_format)
+            img_io.seek(0)
+            provider.photo.save(provider.photo.name, img_io, save=False)
+
+
+class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
+    """View for updating provider profile."""
+    
+    template_name = 'providers/profile_edit.html'
+    form_class = ProviderProfileForm
+    success_url = reverse_lazy('provider_dashboard')
+    
+    def get_form_kwargs(self):
+        """Pass provider instance to form."""
+        kwargs = super().get_form_kwargs()
+        try:
+            provider = Provider.objects.get(user=self.request.user)
+            kwargs['instance'] = provider
+        except Provider.DoesNotExist:
+            # Create new provider if doesn't exist
+            provider = Provider.objects.create(user=self.request.user, phone='')
+            kwargs['instance'] = provider
+        return kwargs
+    
+    def form_valid(self, form):
+        """Handle valid form."""
+        form.save()
+        messages.success(self.request, 'Your profile has been updated successfully.')
+        return super().form_valid(form)
+    
+    def get_context_data(self, **kwargs):
+        """Add provider data to context."""
+        context = super().get_context_data(**kwargs)
+        context['provider'] = Provider.objects.get(user=self.request.user)
+        return context
+
+
+class CertificationCreateView(ProviderRequiredMixin, CreateView):
+    """View for adding new certification."""
+    
+    model = Certification
+    form_class = CertificationForm
+    template_name = 'providers/certification_form.html'
+    success_url = reverse_lazy('provider_profile')
+    
+    def form_valid(self, form):
+        """Handle valid form - assign to current provider."""
+        try:
+            provider = Provider.objects.get(user=self.request.user)
+            form.instance.provider = provider
+            messages.success(self.request, 'Certification added successfully.')
+        except Provider.DoesNotExist:
+            messages.error(self.request, 'Provider profile not found.')
+            return redirect('provider_profile')
+        
+        return super().form_valid(form)
+    
+    def get_context_data(self, **kwargs):
+        """Add provider to context."""
+        context = super().get_context_data(**kwargs)
+        context['provider'] = Provider.objects.get(user=self.request.user)
+        return context
+
+
+class CertificationDeleteView(ProviderRequiredMixin, DeleteView):
+    """View for deleting certification."""
+    
+    model = Certification
+    success_url = reverse_lazy('provider_profile')
+    pk_url_kwarg = 'pk'
+    http_method_names = ['post']
+    
+    def get_object(self, queryset=None):
+        """Get certification and verify ownership."""
+        cert = super().get_object(queryset)
+        
+        # Verify the certification belongs to the current provider
+        try:
+            provider = Provider.objects.get(user=self.request.user)
+            if cert.provider != provider:
+                messages.error(self.request, 'You do not have permission to delete this certification.')
+                redirect_response = redirect('provider_profile')
+                redirect_response.status_code = 403
+                raise PermissionError('Certification does not belong to this provider')
+        except Provider.DoesNotExist:
+            messages.error(self.request, 'Provider profile not found.')
+            raise PermissionError('Provider profile not found')
+        
+        return cert
+    
+    def post(self, request, *args, **kwargs):
+        """Handle deletion with message."""
+        try:
+            messages.success(request, 'Certification deleted successfully.')
+            return super().post(request, *args, **kwargs)
+        except (PermissionError, Certification.DoesNotExist):
+            return redirect('provider_profile')
+    
+    def get_context_data(self, **kwargs):
+        """Add provider to context for certification delete."""
+        context = super().get_context_data(**kwargs)
+        context['provider'] = Provider.objects.get(user=self.request.user)
+        return context
+
+
+class ServiceListView(ProviderRequiredMixin, ListView):
+    """View for listing provider's services."""
+    
+    model = Service
+    template_name = 'providers/service_list.html'
+    context_object_name = 'services'
+    paginate_by = 20
+    
+    def get_queryset(self):
+        """Get services for current provider."""
+        try:
+            provider = Provider.objects.get(user=self.request.user)
+            return Service.objects.filter(provider=provider).order_by('-created_at')
+        except Provider.DoesNotExist:
+            return Service.objects.none()
+    
+    def get_context_data(self, **kwargs):
+        """Add provider to context."""
+        context = super().get_context_data(**kwargs)
+        context['provider'] = Provider.objects.get(user=self.request.user)
+        return context
+
+
+class ServiceCreateView(ProviderRequiredMixin, CreateView):
+    """View for creating a new service."""
+    
+    model = Service
+    form_class = ServiceForm
+    template_name = 'providers/service_form.html'
+    success_url = reverse_lazy('provider_dashboard')
+    
+    def form_valid(self, form):
+        """Handle valid form - assign to current provider."""
+        try:
+            provider = Provider.objects.get(user=self.request.user)
+            form.instance.provider = provider
+            messages.success(self.request, 'Service created successfully.')
+        except Provider.DoesNotExist:
+            messages.error(self.request, 'Provider profile not found.')
+            return redirect('provider_dashboard')
+        
+        return super().form_valid(form)
+    
+    def get_context_data(self, **kwargs):
+        """Add provider to context."""
+        context = super().get_context_data(**kwargs)
+        context['provider'] = Provider.objects.get(user=self.request.user)
+        context['action'] = 'Create Service'
+        return context
+
+
+class ServiceUpdateView(ProviderRequiredMixin, UpdateView):
+    """View for updating a service."""
+    
+    model = Service
+    form_class = ServiceForm
+    template_name = 'providers/service_form.html'
+    success_url = reverse_lazy('provider_dashboard')
+    pk_url_kwarg = 'pk'
+    
+    def get_object(self, queryset=None):
+        """Get service and verify ownership."""
+        service = super().get_object(queryset)
+        
+        # Verify the service belongs to the current provider
+        try:
+            provider = Provider.objects.get(user=self.request.user)
+            if service.provider != provider:
+                messages.error(self.request, 'You do not have permission to edit this service.')
+                raise PermissionError('Service does not belong to this provider')
+        except Provider.DoesNotExist:
+            messages.error(self.request, 'Provider profile not found.')
+            raise PermissionError('Provider profile not found')
+        
+        return service
+    
+    def form_valid(self, form):
+        """Handle valid form."""
+        try:
+            messages.success(self.request, 'Service updated successfully.')
+        except Exception:
+            pass
+        
+        return super().form_valid(form)
+    
+    def post(self, request, *args, **kwargs):
+        """Handle POST with error handling."""
+        try:
+            return super().post(request, *args, **kwargs)
+        except (PermissionError, Service.DoesNotExist):
+            return redirect('provider_dashboard')
+    
+    def get_context_data(self, **kwargs):
+        """Add provider to context for service update."""
+        context = super().get_context_data(**kwargs)
+        context['provider'] = Provider.objects.get(user=self.request.user)
+        context['action'] = 'Edit Service'
+        return context
+
+
+class ServiceDeleteView(ProviderRequiredMixin, DeleteView):
+    """View for deleting a service."""
+    
+    model = Service
+    success_url = reverse_lazy('provider_dashboard')
+    pk_url_kwarg = 'pk'
+    http_method_names = ['post']
+    
+    def get_object(self, queryset=None):
+        """Get service and verify ownership."""
+        service = super().get_object(queryset)
+        
+        # Verify the service belongs to the current provider
+        try:
+            provider = Provider.objects.get(user=self.request.user)
+            if service.provider != provider:
+                messages.error(self.request, 'You do not have permission to delete this service.')
+                raise PermissionError('Service does not belong to this provider')
+        except Provider.DoesNotExist:
+            messages.error(self.request, 'Provider profile not found.')
+            raise PermissionError('Provider profile not found')
+        
+        return service
+    
+    def post(self, request, *args, **kwargs):
+        """Handle deletion with message."""
+        try:
+            messages.success(request, 'Service deleted successfully.')
+            return super().post(request, *args, **kwargs)
+        except (PermissionError, Service.DoesNotExist):
+            return redirect('provider_dashboard')
+    
+    def get_context_data(self, **kwargs):
+        """Add provider to context for service delete."""
+        context = super().get_context_data(**kwargs)
+        context['provider'] = Provider.objects.get(user=self.request.user)
         return context

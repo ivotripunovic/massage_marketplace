@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ action }} - Massage Marketplace{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">{{ action }}</h1>
+        <p class="text-gray-600">Set up your professional massage services</p>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-md p-8">
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            
+            <!-- Service Type -->
+            <div>
+                <label for="{{ form.service_type.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ form.service_type.label }}
+                    <span class="text-red-500">*</span>
+                </label>
+                {{ form.service_type }}
+                {% if form.service_type.errors %}
+                    <div class="text-red-500 text-sm mt-1">
+                        {% for error in form.service_type.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+            
+            <!-- Service Description -->
+            <div>
+                <label for="{{ form.description.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ form.description.label }}
+                </label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                    <div class="text-red-500 text-sm mt-1">
+                        {% for error in form.description.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <p class="text-gray-500 text-sm mt-1">Describe what clients can expect from this service</p>
+            </div>
+            
+            <!-- Price and Duration -->
+            <div class="grid grid-cols-2 gap-6">
+                <div>
+                    <label for="{{ form.price.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ form.price.label }}
+                        <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.price }}
+                    {% if form.price.errors %}
+                        <div class="text-red-500 text-sm mt-1">
+                            {% for error in form.price.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                    <p class="text-gray-500 text-sm mt-1">Minimum $5.00</p>
+                </div>
+                
+                <div>
+                    <label for="{{ form.duration_minutes.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ form.duration_minutes.label }}
+                        <span class="text-red-500">*</span>
+                    </label>
+                    {{ form.duration_minutes }}
+                    {% if form.duration_minutes.errors %}
+                        <div class="text-red-500 text-sm mt-1">
+                            {% for error in form.duration_minutes.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Form Actions -->
+            <div class="flex gap-4 pt-6 border-t">
+                <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition">
+                    {% if form.instance.pk %}
+                        Save Changes
+                    {% else %}
+                        Create Service
+                    {% endif %}
+                </button>
+                <a href="{% url 'provider_dashboard' %}" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg text-center transition">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Pricing Tips -->
+    <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 class="font-semibold text-blue-900 mb-3">Pricing Tips</h3>
+        <ul class="text-blue-800 text-sm space-y-2">
+            <li>• Research local market rates for similar services</li>
+            <li>• Factor in your experience and qualifications</li>
+            <li>• Consider offering package deals for returning clients</li>
+            <li>• Review and adjust prices regularly</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

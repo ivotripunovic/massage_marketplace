@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Profile - Massage Marketplace{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">Edit Your Profile</h1>
+        <p class="text-gray-600">Update your professional information and bio</p>
+    </div>
+    
+    <div class="bg-white rounded-lg shadow-md p-8">
+        <form method="post" enctype="multipart/form-data" class="space-y-6">
+            {% csrf_token %}
+            
+            <!-- Current Photo Display -->
+            {% if provider.photo %}
+            <div class="flex items-center gap-6">
+                <div>
+                    <img src="{{ provider.photo.url }}" alt="Profile Photo" class="w-24 h-24 rounded-full object-cover">
+                </div>
+                <div>
+                    <p class="text-sm text-gray-600">Current profile photo</p>
+                    <p class="text-xs text-gray-500">Upload a new photo to replace it</p>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Photo Upload -->
+            <div>
+                <label for="{{ form.photo.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ form.photo.label }}
+                </label>
+                {{ form.photo }}
+                {% if form.photo.errors %}
+                    <div class="text-red-500 text-sm mt-1">
+                        {% for error in form.photo.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <p class="text-gray-500 text-sm mt-1">JPEG, PNG or GIF. Max 5MB. Image will be resized to 800×800.</p>
+            </div>
+            
+            <!-- Name Fields -->
+            <div class="grid grid-cols-2 gap-6">
+                <div>
+                    <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ form.first_name.label }}
+                    </label>
+                    {{ form.first_name }}
+                    {% if form.first_name.errors %}
+                        <div class="text-red-500 text-sm mt-1">
+                            {% for error in form.first_name.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                
+                <div>
+                    <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                        {{ form.last_name.label }}
+                    </label>
+                    {{ form.last_name }}
+                    {% if form.last_name.errors %}
+                        <div class="text-red-500 text-sm mt-1">
+                            {% for error in form.last_name.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Phone Number -->
+            <div>
+                <label for="{{ form.phone.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ form.phone.label }}
+                    <span class="text-red-500">*</span>
+                </label>
+                {{ form.phone }}
+                {% if form.phone.errors %}
+                    <div class="text-red-500 text-sm mt-1">
+                        {% for error in form.phone.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <p class="text-gray-500 text-sm mt-1">Clients will use this to contact you</p>
+            </div>
+            
+            <!-- Bio -->
+            <div>
+                <label for="{{ form.bio.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                    {{ form.bio.label }}
+                </label>
+                {{ form.bio }}
+                {% if form.bio.errors %}
+                    <div class="text-red-500 text-sm mt-1">
+                        {% for error in form.bio.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <p class="text-gray-500 text-sm mt-1">Max 500 characters</p>
+            </div>
+            
+            <!-- Form Actions -->
+            <div class="flex gap-4 pt-6 border-t">
+                <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition">
+                    Save Changes
+                </button>
+                <a href="{% url 'provider_dashboard' %}" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg text-center transition">
+                    Cancel
+                </a>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Profile Completion Tips -->
+    <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 class="font-semibold text-blue-900 mb-3">Complete Your Profile</h3>
+        <ul class="text-blue-800 text-sm space-y-2">
+            <li>✓ Add a professional name and phone number</li>
+            <li>✓ Write a compelling bio to attract clients</li>
+            <li>✓ Add a profile photo to build trust</li>
+            <li>✓ Upload certifications to show expertise</li>
+            <li>✓ Create your services and set pricing</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}
