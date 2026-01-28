@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Management - Massage Marketplace Admin{% endblock %}
+
+{% block content %}
+{% include "includes/_messages.html" %}
+
+<div class="mb-8">
+    <h1 class="text-3xl font-bold mb-2">Payment Management</h1>
+    <p class="text-gray-600">Monitor and manage subscription payments</p>
+</div>
+
+<!-- Filters Section -->
+<div class="bg-white rounded-lg shadow p-6 mb-8">
+    <h3 class="text-lg font-bold mb-4">Filter Payments</h3>
+    <form method="get" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Search by Email or Reference ID</label>
+            <input type="text" name="search" value="{{ search }}" placeholder="Provider email or tx hash..." 
+                   class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+        </div>
+        
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+            <select name="status" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                <option value="">All Statuses</option>
+                {% for choice in status_choices %}
+                    <option value="{{ choice }}" {% if status == choice %}selected{% endif %}>{{ choice|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+            <select name="method" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+                <option value="">All Methods</option>
+                {% for value, label in method_choices %}
+                    <option value="{{ value }}" {% if method == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <div class="flex items-end gap-2">
+            <button type="submit" class="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">Filter</button>
+            <a href="{% url 'admin_payments' %}" class="flex-1 bg-gray-300 text-gray-800 px-4 py-2 rounded-lg text-center hover:bg-gray-400">Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- Payments Table -->
+<div class="bg-white rounded-lg shadow overflow-hidden">
+    {% if payments %}
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead class="bg-gray-100 border-b">
+                <tr>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Provider Email</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Amount</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Method</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Status</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Created</th>
+                    <th class="px-6 py-3 text-left text-sm font-semibold text-gray-700">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y">
+                {% for payment in payments %}
+                <tr class="hover:bg-gray-50">
+                    <td class="px-6 py-4 text-sm">
+                        <a href="{% url 'admin_providers' %}" class="text-blue-600 hover:underline">
+                            {{ payment.provider.user.email }}
+                        </a>
+                    </td>
+                    <td class="px-6 py-4 text-sm font-medium">${{ payment.amount }}</td>
+                    <td class="px-6 py-4 text-sm">
+                        {% if 'crypto' in payment.payment_method %}
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800">
+                                {{ payment.get_payment_method_display }}
+                            </span>
+                        {% else %}
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">
+                                {{ payment.get_payment_method_display }}
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm">
+                        {% if payment.status == 'pending' %}
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-800">Pending</span>
+                        {% elif payment.status == 'completed' %}
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">Completed</span>
+                        {% else %}
+                            <span class="inline-block px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800">Failed</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600">{{ payment.created_at|date:"M d, Y H:i" }}</td>
+                    <td class="px-6 py-4 text-sm">
+                        <a href="{% url 'admin_payment_detail' payment.id %}" class="text-blue-600 hover:underline">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="px-6 py-4 border-t bg-gray-50 flex justify-between items-center">
+        <div class="text-sm text-gray-600">
+            Page <strong>{{ page_obj.number }}</strong> of <strong>{{ page_obj.paginator.num_pages }}</strong>
+        </div>
+        <div class="space-x-2">
+            {% if page_obj.has_previous %}
+                <a href="?page=1{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if method %}&method={{ method }}{% endif %}" class="px-4 py-2 border rounded hover:bg-gray-100">First</a>
+                <a href="?page={{ page_obj.previous_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if method %}&method={{ method }}{% endif %}" class="px-4 py-2 border rounded hover:bg-gray-100">Previous</a>
+            {% endif %}
+            {% if page_obj.has_next %}
+                <a href="?page={{ page_obj.next_page_number }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if method %}&method={{ method }}{% endif %}" class="px-4 py-2 border rounded hover:bg-gray-100">Next</a>
+                <a href="?page={{ page_obj.paginator.num_pages }}{% if search %}&search={{ search }}{% endif %}{% if status %}&status={{ status }}{% endif %}{% if method %}&method={{ method }}{% endif %}" class="px-4 py-2 border rounded hover:bg-gray-100">Last</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="px-6 py-12 text-center">
+        <p class="text-gray-600">No payments found.</p>
+    </div>
+    {% endif %}
+</div>
+
+<div class="mt-8">
+    <a href="{% url 'admin_providers' %}" class="text-blue-600 hover:underline">← Back to Provider Management</a>
+</div>
+{% endblock %}

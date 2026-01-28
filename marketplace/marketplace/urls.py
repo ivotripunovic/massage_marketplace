@@ -28,6 +28,7 @@ from providers.views import (
     ServiceListView, ServiceCreateView, ServiceUpdateView, ServiceDeleteView,
     AdminProviderListView, ProviderSubscriptionView, SubscriptionConfirmView
 )
+from payments.views import AdminPaymentListView, AdminPaymentDetailView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -56,6 +57,8 @@ urlpatterns = [
     
     # Admin URLs
     path('internal/admin/providers/', AdminProviderListView.as_view(), name='admin_providers'),
+    path('internal/admin/payments/', AdminPaymentListView.as_view(), name='admin_payments'),
+    path('internal/admin/payments/<int:pk>/', AdminPaymentDetailView.as_view(), name='admin_payment_detail'),
 ]
 
 # Serve media files in development

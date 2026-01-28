@@ -2039,7 +2039,7 @@ def test_subscription_activation_flow():
 ---
 
 #### TASK 4.5: Create Payment Admin View (Crypto & Bank)
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build admin interface for payment verification queue.
 
@@ -2106,7 +2106,7 @@ def test_payment_detail_loads():
 ---
 
 #### TASK 4.6: Create Payment Confirmation Email
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Build email templates for subscription confirmations.
 
@@ -2192,7 +2192,7 @@ def test_email_contains_crypto_address():
 ---
 
 #### TASK 4.7: Create Comprehensive Admin Testing
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Full test coverage for admin features.
 
@@ -2223,7 +2223,7 @@ def test_email_contains_crypto_address():
 ---
 
 #### TASK 4.8: Sprint 1 Completion & Documentation
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Finalize Sprint 1, document progress, prepare for Sprint 2.
 

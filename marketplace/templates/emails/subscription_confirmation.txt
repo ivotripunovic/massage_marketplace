@@ -1,0 +1,48 @@
+SUBSCRIPTION ACTIVATED!
+
+Hi {{ provider.user.get_full_name|default:provider.user.email }},
+
+Your subscription to Massage Marketplace has been successfully activated! Your services are now visible to clients on our platform.
+
+SUBSCRIPTION DETAILS
+====================
+Monthly Subscription Cost: ${{ amount }}/month
+Payment Method: {{ payment_method_display }}
+Renewal Date: {{ renewal_date|date:"F d, Y" }}
+
+{% if 'crypto' in payment_method %}
+CRYPTOCURRENCY PAYMENT
+======================
+To activate your subscription, please send {{ amount }} {{ payment_method_display|slice:"-3:" }} to the address below:
+
+{{ crypto_address }}
+
+Important: Copy the address exactly. Payment must be received by {{ renewal_date|date:"F d, Y" }} to keep your subscription active.
+
+Once we detect your payment on the blockchain, your subscription will be automatically activated and your services will be visible to clients.
+{% endif %}
+
+{% if payment_method == 'bank_transfer' %}
+BANK TRANSFER PAYMENT
+=====================
+Thank you for choosing bank transfer payment. Our team will contact you shortly with bank transfer instructions and payment details.
+
+Expected payment amount: ${{ amount }}
+{% endif %}
+
+WHAT'S NEXT?
+============
+• Your provider profile is now active on Massage Marketplace
+• Clients can view your services and reviews
+• Your subscription will automatically renew on {{ renewal_date|date:"F d, Y" }}
+• You can manage your subscription and services in your dashboard
+
+VIEW YOUR DASHBOARD: https://massagemarketplace.com/provider/dashboard/
+
+QUESTIONS?
+==========
+If you have any questions about your subscription or payment, please don't hesitate to contact our support team at support@massagemarketplace.com.
+
+---
+© 2024 Massage Marketplace. All rights reserved.
+This is an automated message. Please do not reply to this email.
