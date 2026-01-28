@@ -1,10 +1,13 @@
-from django.views.generic import FormView, TemplateView
+from django.views.generic import FormView, TemplateView, View
 from django.urls import reverse_lazy
-from django.contrib import messages
-from django.shortcuts import redirect
-from users.forms import SignupForm
+from django.contrib import messages, auth
+from django.shortcuts import redirect, render
+from django.http import HttpResponseRedirect
+from django.contrib.auth.decorators import login_required
+from django.utils.decorators import method_decorator
+from users.forms import SignupForm, LoginForm, PasswordResetForm, PasswordResetConfirmForm
 from users.models import User
-from users.utils import send_verification_email
+from users.utils import send_verification_email, verify_email_token, send_password_reset_email, verify_password_reset_token
 
 
 class SignupView(FormView):
@@ -55,3 +58,168 @@ class CheckEmailView(TemplateView):
     """Page to check email for verification link."""
     
     template_name = 'users/check_email.html'
+
+
+class VerifyEmailView(View):
+    """Verify email token and activate user account."""
+    
+    def get(self, request, token):
+        """Verify email token."""
+        try:
+            user = verify_email_token(token)
+            messages.success(
+                request,
+                'Email verified successfully! You can now log in.'
+            )
+            return HttpResponseRedirect(reverse_lazy('login'))
+        except Exception as e:
+            # Token is invalid or expired
+            context = {
+                'error': 'Token expired or invalid',
+                'error_message': str(e),
+            }
+            return render(request, 'users/verify_email_error.html', context, status=400)
+
+
+class LoginView(FormView):
+    """User login view."""
+    
+    form_class = LoginForm
+    template_name = 'users/login.html'
+    success_url = reverse_lazy('provider_dashboard')
+    
+    def dispatch(self, request, *args, **kwargs):
+        """Redirect logged-in users to dashboard."""
+        if request.user.is_authenticated:
+            return redirect(self.success_url)
+        return super().dispatch(request, *args, **kwargs)
+    
+    def form_valid(self, form):
+        """Authenticate and login user."""
+        email = form.cleaned_data['email'].lower()
+        password = form.cleaned_data['password']
+        
+        user = auth.authenticate(email=email, password=password)
+        if user is not None:
+            auth.login(self.request, user)
+            messages.success(self.request, f'Welcome back, {user.email}!')
+        
+        return super().form_valid(form)
+    
+    def form_invalid(self, form):
+        """Handle form errors."""
+        for field, errors in form.errors.items():
+            for error in errors:
+                if field == '__all__':
+                    messages.error(self.request, str(error))
+                else:
+                    messages.error(self.request, f'{field}: {error}')
+        
+        return super().form_invalid(form)
+
+
+class LogoutView(View):
+    """User logout view."""
+    
+    def post(self, request):
+        """Logout user and redirect."""
+        auth.logout(request)
+        messages.success(request, 'You have been logged out.')
+        return redirect('login')
+    
+    def get(self, request):
+        """Handle GET request - redirect to login."""
+        auth.logout(request)
+        messages.success(request, 'You have been logged out.')
+        return redirect('login')
+
+
+class PasswordResetView(FormView):
+    """Password reset request view."""
+    
+    form_class = PasswordResetForm
+    template_name = 'users/password_reset.html'
+    success_url = reverse_lazy('password_reset_sent')
+    
+    def form_valid(self, form):
+        """Send password reset email."""
+        email = form.cleaned_data['email'].lower()
+        
+        try:
+            user = User.objects.get(email__iexact=email)
+            send_password_reset_email(user, self.request)
+            messages.success(
+                self.request,
+                'If an account exists with this email, you will receive a password reset link.'
+            )
+        except User.DoesNotExist:
+            # Don't reveal if email exists or not (security best practice)
+            messages.success(
+                self.request,
+                'If an account exists with this email, you will receive a password reset link.'
+            )
+        
+        return super().form_valid(form)
+    
+    def form_invalid(self, form):
+        """Handle form errors."""
+        for field, errors in form.errors.items():
+            for error in errors:
+                messages.error(self.request, f'{field}: {error}')
+        
+        return super().form_invalid(form)
+
+
+class PasswordResetSentView(TemplateView):
+    """Page shown after password reset email is sent."""
+    
+    template_name = 'users/password_reset_sent.html'
+
+
+class PasswordResetConfirmView(FormView):
+    """Password reset confirmation view."""
+    
+    form_class = PasswordResetConfirmForm
+    template_name = 'users/password_reset_confirm.html'
+    success_url = reverse_lazy('login')
+    
+    def dispatch(self, request, token, *args, **kwargs):
+        """Check if token is valid before displaying form."""
+        self.user = verify_password_reset_token(token)
+        if self.user is None:
+            messages.error(request, 'Password reset link is invalid or expired.')
+            return redirect('password_reset')
+        return super().dispatch(request, token, *args, **kwargs)
+    
+    def get_context_data(self, **kwargs):
+        """Add token to context."""
+        context = super().get_context_data(**kwargs)
+        context['token'] = self.kwargs['token']
+        return context
+    
+    def form_valid(self, form):
+        """Set new password."""
+        password = form.cleaned_data['password']
+        
+        # Update password
+        self.user.set_password(password)
+        self.user.email_verification_token = None  # Clear reset token
+        self.user.save()
+        
+        messages.success(
+            self.request,
+            'Password reset successfully! You can now log in with your new password.'
+        )
+        
+        return super().form_valid(form)
+    
+    def form_invalid(self, form):
+        """Handle form errors."""
+        for field, errors in form.errors.items():
+            for error in errors:
+                if field == '__all__':
+                    messages.error(self.request, str(error))
+                else:
+                    messages.error(self.request, f'{field}: {error}')
+        
+        return super().form_invalid(form)

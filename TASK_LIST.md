@@ -700,7 +700,7 @@ def test_signup_duplicate_email():
 ---
 
 #### TASK 2.4: Create Email Verification View
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Implement email verification endpoint.
 
@@ -763,7 +763,7 @@ def test_check_email_page_loads():
 ---
 
 #### TASK 2.5: Create Login View & Form
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Implement user login with email/password.
 
@@ -846,7 +846,7 @@ def test_login_invalid_credentials():
 ---
 
 #### TASK 2.6: Create Logout View & Password Reset
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Implement logout and password reset flows.
 
@@ -932,7 +932,7 @@ def test_password_reset_confirm():
 ---
 
 #### TASK 2.7: Create Base Templates & Navigation
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Build HTML template structure with navigation.
 
@@ -1032,7 +1032,7 @@ def test_password_reset_confirm():
 ---
 
 #### TASK 2.8: Create Provider Dashboard Skeleton
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Build dashboard view and template (populated in Week 3).
 
@@ -1115,7 +1115,7 @@ def test_provider_required_decorator():
 ---
 
 #### TASK 2.9: Create Authentication Tests & Email Configuration
-**Status:** [ ] TODO
+**Status:** [✓ DONE]
 
 **Objective:** Complete authentication testing and setup email in development.
 

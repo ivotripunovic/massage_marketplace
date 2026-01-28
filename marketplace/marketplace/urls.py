@@ -16,7 +16,11 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
-from users.views import SignupView, CheckEmailView
+from users.views import (
+    SignupView, CheckEmailView, VerifyEmailView, LoginView, LogoutView,
+    PasswordResetView, PasswordResetSentView, PasswordResetConfirmView
+)
+from providers.views import ProviderDashboardView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -24,4 +28,13 @@ urlpatterns = [
     # Authentication URLs
     path('auth/signup/', SignupView.as_view(), name='signup'),
     path('auth/check-email/', CheckEmailView.as_view(), name='check_email'),
+    path('auth/verify-email/<str:token>/', VerifyEmailView.as_view(), name='verify_email'),
+    path('auth/login/', LoginView.as_view(), name='login'),
+    path('auth/logout/', LogoutView.as_view(), name='logout'),
+    path('auth/password-reset/', PasswordResetView.as_view(), name='password_reset'),
+    path('auth/password-reset-sent/', PasswordResetSentView.as_view(), name='password_reset_sent'),
+    path('auth/password-reset-confirm/<str:token>/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
+    
+    # Provider URLs
+    path('provider/dashboard/', ProviderDashboardView.as_view(), name='provider_dashboard'),
 ]
