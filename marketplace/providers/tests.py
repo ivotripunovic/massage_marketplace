@@ -1927,8 +1927,8 @@ class ProviderSubscriptionViewTests(TestCase):
             follow=True
         )
         self.assertEqual(response.status_code, 200)
-        # Should redirect to dashboard
-        self.assertIn(reverse('provider_dashboard'), response.request['PATH_INFO'])
+        # Should redirect to confirmation page
+        self.assertIn(reverse('subscription_confirm'), response.request['PATH_INFO'])
     
     def test_subscription_form_invalid_choice(self):
         """Test that form validation works."""
@@ -1948,3 +1948,133 @@ class ProviderSubscriptionViewTests(TestCase):
         response = self.client.get(reverse('subscription'))
         self.assertIn('provider', response.context)
         self.assertEqual(response.context['provider'], self.provider)
+
+
+class ProviderSubscriptionActivationTests(TestCase):
+    """Test subscription activation/deactivation functionality."""
+    
+    def setUp(self):
+        """Set up test data."""
+        self.user = User.objects.create_user(
+            email='provider@test.com',
+            password='testpass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone='+1234567890',
+            subscription_status='inactive'
+        )
+        
+        self.client = Client()
+    
+    def test_activate_subscription_method(self):
+        """Test activate_subscription method on Provider model."""
+        self.provider.activate_subscription('crypto_bitcoin')
+        
+        # Refresh from database
+        self.provider.refresh_from_db()
+        
+        self.assertEqual(self.provider.subscription_status, 'active')
+        self.assertEqual(self.provider.subscription_payment_method, 'crypto_bitcoin')
+        self.assertIsNotNone(self.provider.subscription_renewal_date)
+    
+    def test_activate_subscription_sets_renewal_date(self):
+        """Test that renewal date is set 30 days from today."""
+        from datetime import date, timedelta
+        
+        self.provider.activate_subscription('crypto_bitcoin')
+        expected_date = date.today() + timedelta(days=30)
+        
+        self.assertEqual(self.provider.subscription_renewal_date, expected_date)
+    
+    def test_deactivate_subscription_method(self):
+        """Test deactivate_subscription method on Provider model."""
+        # First activate
+        self.provider.activate_subscription('crypto_bitcoin')
+        
+        # Then deactivate
+        self.provider.deactivate_subscription()
+        
+        # Refresh from database
+        self.provider.refresh_from_db()
+        
+        self.assertEqual(self.provider.subscription_status, 'inactive')
+    
+    def test_subscription_form_creates_payment_record(self):
+        """Test that form submission creates a SubscriptionPayment record."""
+        from payments.models import SubscriptionPayment
+        
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.post(
+            reverse('subscription'),
+            {'payment_method': 'crypto_bitcoin'},
+            follow=True
+        )
+        
+        # Should have created a payment record
+        payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
+        self.assertIsNotNone(payment)
+        self.assertEqual(payment.payment_method, 'crypto_bitcoin')
+        self.assertEqual(payment.status, 'pending')
+        self.assertEqual(float(payment.amount), 29.99)
+    
+    def test_subscription_activation_flow(self):
+        """Test complete subscription activation flow."""
+        from payments.models import SubscriptionPayment
+        
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.post(
+            reverse('subscription'),
+            {'payment_method': 'crypto_ethereum'},
+            follow=True
+        )
+        
+        # Should redirect to confirmation page
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(reverse('subscription_confirm'), response.request['PATH_INFO'])
+        
+        # Provider should be activated
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, 'active')
+        self.assertEqual(self.provider.subscription_payment_method, 'crypto_ethereum')
+        
+        # Payment record should be created
+        payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
+        self.assertIsNotNone(payment)
+        self.assertEqual(payment.status, 'pending')
+    
+    def test_subscription_confirm_view_loads(self):
+        """Test that subscription confirmation view loads."""
+        self.provider.activate_subscription('crypto_bitcoin')
+        
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.get(reverse('subscription_confirm'))
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'providers/subscription_confirm.html')
+    
+    def test_subscription_confirm_displays_details(self):
+        """Test that confirmation page displays subscription details."""
+        self.provider.activate_subscription('crypto_bitcoin')
+        
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.get(reverse('subscription_confirm'))
+        
+        # Check that context contains provider
+        self.assertIn('provider', response.context)
+        self.assertEqual(response.context['provider'], self.provider)
+    
+    def test_is_subscription_active_method(self):
+        """Test is_subscription_active method."""
+        # Initially inactive
+        self.assertFalse(self.provider.is_subscription_active())
+        
+        # After activation
+        self.provider.activate_subscription('crypto_bitcoin')
+        self.assertTrue(self.provider.is_subscription_active())
+        
+        # After deactivation
+        self.provider.deactivate_subscription()
+        self.assertFalse(self.provider.is_subscription_active())

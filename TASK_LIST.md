@@ -1963,7 +1963,7 @@ def test_requires_provider_login():
 ---
 
 #### TASK 4.4: Create Subscribe/Unsubscribe Logic
-**Status:** [ ] TODO
+**Status:** [✓ DONE] ✓
 
 **Objective:** Implement subscription activation/deactivation.
 

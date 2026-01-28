@@ -26,7 +26,7 @@ from providers.views import (
     ProviderDashboardView, ProviderProfileUpdateView,
     CertificationCreateView, CertificationDeleteView,
     ServiceListView, ServiceCreateView, ServiceUpdateView, ServiceDeleteView,
-    AdminProviderListView, ProviderSubscriptionView
+    AdminProviderListView, ProviderSubscriptionView, SubscriptionConfirmView
 )
 
 urlpatterns = [
@@ -46,6 +46,7 @@ urlpatterns = [
     path('provider/dashboard/', ProviderDashboardView.as_view(), name='provider_dashboard'),
     path('provider/profile/', ProviderProfileUpdateView.as_view(), name='provider_profile'),
     path('provider/subscription/', ProviderSubscriptionView.as_view(), name='subscription'),
+    path('provider/subscription/confirm/', SubscriptionConfirmView.as_view(), name='subscription_confirm'),
     path('provider/certifications/add/', CertificationCreateView.as_view(), name='add_certification'),
     path('provider/certifications/<int:pk>/delete/', CertificationDeleteView.as_view(), name='delete_certification'),
     path('provider/services/', ServiceListView.as_view(), name='services_list'),

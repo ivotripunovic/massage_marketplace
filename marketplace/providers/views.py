@@ -512,7 +512,7 @@ class ProviderSubscriptionView(ProviderRequiredMixin, FormView):
     
     form_class = SubscriptionSettingsForm
     template_name = 'providers/subscription.html'
-    success_url = reverse_lazy('provider_dashboard')
+    success_url = reverse_lazy('subscription_confirm')
     
     def get_context_data(self, **kwargs):
         """Add provider to context."""
@@ -525,9 +525,82 @@ class ProviderSubscriptionView(ProviderRequiredMixin, FormView):
         return context
     
     def form_valid(self, form):
-        """Handle form submission."""
-        # Payment logic will be implemented in Week 10
-        # For now, just display a success message
+        """Handle form submission and activate subscription."""
+        from payments.models import SubscriptionPayment
+        
         payment_method = form.cleaned_data['payment_method']
-        messages.info(self.request, f'Payment method selected: {payment_method}. Payment processing will be enabled in Week 10.')
+        
+        try:
+            provider = Provider.objects.get(user=self.request.user)
+            
+            # Create SubscriptionPayment record
+            subscription_payment = SubscriptionPayment.objects.create(
+                provider=provider,
+                amount=29.99,  # Monthly subscription cost
+                payment_method=payment_method,
+                status='pending'
+            )
+            
+            # Activate subscription
+            provider.activate_subscription(payment_method)
+            
+            # Send confirmation email
+            self._send_subscription_confirmation_email(provider, payment_method)
+            
+            messages.success(
+                self.request,
+                'Subscription activated! Please complete payment to activate your services.'
+            )
+        except Provider.DoesNotExist:
+            messages.error(self.request, 'Provider profile not found.')
+            return redirect('provider_profile')
+        
         return super().form_valid(form)
+    
+    def _send_subscription_confirmation_email(self, provider, payment_method):
+        """Send subscription confirmation email."""
+        from django.core.mail import send_mail
+        from django.template.loader import render_to_string
+        
+        try:
+            html_message = render_to_string('emails/subscription_confirmation.html', {
+                'provider': provider,
+                'amount': 29.99,
+                'payment_method_display': dict(SubscriptionSettingsForm.PAYMENT_METHOD_CHOICES).get(payment_method, payment_method),
+                'renewal_date': provider.subscription_renewal_date,
+            })
+            
+            send_mail(
+                'Subscription Activated - Massage Marketplace',
+                'Your subscription has been activated.',
+                'noreply@massagemarketplace.com',
+                [provider.user.email],
+                html_message=html_message,
+                fail_silently=True
+            )
+        except Exception:
+            # Silently fail if email cannot be sent
+            pass
+
+
+class SubscriptionConfirmView(ProviderRequiredMixin, TemplateView):
+    """View to confirm subscription activation."""
+    
+    template_name = 'providers/subscription_confirm.html'
+    
+    def get_context_data(self, **kwargs):
+        """Add provider and payment info to context."""
+        context = super().get_context_data(**kwargs)
+        try:
+            provider = Provider.objects.get(user=self.request.user)
+            context['provider'] = provider
+            
+            # Get the most recent subscription payment
+            from payments.models import SubscriptionPayment
+            recent_payment = SubscriptionPayment.objects.filter(
+                provider=provider
+            ).order_by('-created_at').first()
+            context['recent_payment'] = recent_payment
+        except Provider.DoesNotExist:
+            context['provider'] = None
+        return context

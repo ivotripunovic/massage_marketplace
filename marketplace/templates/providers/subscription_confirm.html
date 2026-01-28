@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block title %}Subscription Confirmed - Massage Marketplace{% endblock %}
+
+{% block content %}
+<div class="mb-8">
+    <h1 class="text-3xl font-bold mb-2">Subscription Activated!</h1>
+    <p class="text-gray-600">Your subscription is now active</p>
+</div>
+
+<div class="max-w-2xl mx-auto">
+    <!-- Success Message -->
+    <div class="bg-green-50 border border-green-200 rounded-lg p-8 mb-6 text-center">
+        <div class="text-4xl mb-4">✓</div>
+        <h2 class="text-2xl font-bold text-green-800 mb-2">Subscription Activated</h2>
+        <p class="text-green-700">Your subscription is now active and your services are visible to clients!</p>
+    </div>
+    
+    <!-- Subscription Details -->
+    {% if provider %}
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-lg font-bold mb-4">Subscription Details</h2>
+        
+        <div class="space-y-4">
+            <div class="flex justify-between border-b pb-2">
+                <span class="text-gray-600">Monthly Cost:</span>
+                <span class="font-semibold">$29.99</span>
+            </div>
+            
+            <div class="flex justify-between border-b pb-2">
+                <span class="text-gray-600">Payment Method:</span>
+                <span class="font-semibold">{{ provider.get_subscription_payment_method_display }}</span>
+            </div>
+            
+            <div class="flex justify-between border-b pb-2">
+                <span class="text-gray-600">Renewal Date:</span>
+                <span class="font-semibold">{{ provider.subscription_renewal_date|date:"F d, Y" }}</span>
+            </div>
+            
+            <div class="flex justify-between pb-2">
+                <span class="text-gray-600">Status:</span>
+                <span class="px-3 py-1 rounded-full text-sm font-semibold bg-green-100 text-green-800">
+                    {{ provider.get_subscription_status_display }}
+                </span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Payment Instructions -->
+    {% if provider.subscription_payment_method %}
+    <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+        <h2 class="text-lg font-bold text-blue-900 mb-4">Next Steps</h2>
+        
+        {% if provider.subscription_payment_method == 'crypto_bitcoin' %}
+        <div class="space-y-3 text-sm text-blue-800">
+            <p><strong>Bitcoin Payment Instructions:</strong></p>
+            <ol class="list-decimal list-inside space-y-2 ml-2">
+                <li>Open your Bitcoin wallet</li>
+                <li>Send <strong>$29.99 USD worth of BTC</strong> to the address below</li>
+                <li>We'll verify payment and activate your services</li>
+            </ol>
+            {% if provider.crypto_address %}
+            <div class="mt-4 p-3 bg-white rounded border border-blue-300">
+                <p class="text-gray-600 text-xs mb-1">Bitcoin Address:</p>
+                <p class="font-mono text-sm break-all">{{ provider.crypto_address }}</p>
+            </div>
+            {% endif %}
+        </div>
+        
+        {% elif provider.subscription_payment_method == 'crypto_ethereum' %}
+        <div class="space-y-3 text-sm text-blue-800">
+            <p><strong>Ethereum Payment Instructions:</strong></p>
+            <ol class="list-decimal list-inside space-y-2 ml-2">
+                <li>Open your Ethereum wallet</li>
+                <li>Send <strong>$29.99 USD worth of ETH</strong> to the address below</li>
+                <li>We'll verify payment and activate your services</li>
+            </ol>
+            {% if provider.crypto_address %}
+            <div class="mt-4 p-3 bg-white rounded border border-blue-300">
+                <p class="text-gray-600 text-xs mb-1">Ethereum Address:</p>
+                <p class="font-mono text-sm break-all">{{ provider.crypto_address }}</p>
+            </div>
+            {% endif %}
+        </div>
+        
+        {% elif provider.subscription_payment_method == 'crypto_usdc' %}
+        <div class="space-y-3 text-sm text-blue-800">
+            <p><strong>USDC Stablecoin Payment Instructions:</strong></p>
+            <ol class="list-decimal list-inside space-y-2 ml-2">
+                <li>Open your Ethereum wallet with USDC support</li>
+                <li>Send <strong>$29.99 USDC</strong> to the address below</li>
+                <li>We'll verify payment and activate your services</li>
+            </ol>
+            {% if provider.crypto_address %}
+            <div class="mt-4 p-3 bg-white rounded border border-blue-300">
+                <p class="text-gray-600 text-xs mb-1">Ethereum Address:</p>
+                <p class="font-mono text-sm break-all">{{ provider.crypto_address }}</p>
+            </div>
+            {% endif %}
+        </div>
+        
+        {% elif provider.subscription_payment_method == 'bank_transfer' %}
+        <div class="space-y-3 text-sm text-blue-800">
+            <p><strong>Bank Transfer Instructions:</strong></p>
+            <ol class="list-decimal list-inside space-y-2 ml-2">
+                <li>Our team will send you bank transfer details via email</li>
+                <li>Complete the transfer with payment amount: <strong>$29.99</strong></li>
+                <li>Once verified, we'll activate your full access</li>
+            </ol>
+            <div class="mt-4 p-3 bg-white rounded border border-blue-300">
+                <p class="text-gray-600 text-sm">Check your email for detailed bank transfer instructions.</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    <!-- What You Get Section -->
+    <div class="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 class="text-lg font-bold mb-4">What's Included</h2>
+        
+        <ul class="space-y-2">
+            <li class="flex items-start">
+                <svg class="w-5 h-5 text-green-600 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
+                <span>Services visible to all clients</span>
+            </li>
+            <li class="flex items-start">
+                <svg class="w-5 h-5 text-green-600 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
+                <span>Client reviews and ratings</span>
+            </li>
+            <li class="flex items-start">
+                <svg class="w-5 h-5 text-green-600 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
+                <span>Full provider dashboard access</span>
+            </li>
+            <li class="flex items-start">
+                <svg class="w-5 h-5 text-green-600 mr-3 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path>
+                </svg>
+                <span>Auto-renewal on {{ provider.subscription_renewal_date|date:"F d" }} each month</span>
+            </li>
+        </ul>
+    </div>
+    
+    <!-- Action Buttons -->
+    <div class="flex gap-4 justify-center">
+        <a href="{% url 'provider_dashboard' %}" class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 font-medium">
+            Go to Dashboard
+        </a>
+        <a href="{% url 'services_list' %}" class="bg-gray-300 text-gray-700 px-8 py-3 rounded-lg hover:bg-gray-400 font-medium">
+            Manage Services
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+{% endblock %}

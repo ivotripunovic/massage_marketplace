@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from datetime import timedelta, date
 
 
 class Provider(models.Model):
@@ -74,6 +75,18 @@ class Provider(models.Model):
     def is_subscription_active(self):
         """Check if subscription is active."""
         return self.subscription_status == 'active'
+    
+    def activate_subscription(self, payment_method):
+        """Activate subscription for 30 days from today."""
+        self.subscription_status = 'active'
+        self.subscription_payment_method = payment_method
+        self.subscription_renewal_date = date.today() + timedelta(days=30)
+        self.save()
+    
+    def deactivate_subscription(self):
+        """Deactivate subscription."""
+        self.subscription_status = 'inactive'
+        self.save()
 
 
 class Service(models.Model):
