@@ -79,23 +79,23 @@
                 
                 {% for radio in form.payment_method %}
                 <label class="flex items-center p-4 border rounded-lg hover:bg-gray-50 cursor-pointer
-                    {% if radio.data == form.payment_method.value %}
+                    {% if radio.data.value == form.payment_method.value %}
                         bg-blue-50 border-blue-300
                     {% else %}
                         border-gray-300
                     {% endif %}">
-                    <input type="radio" name="payment_method" value="{{ radio.data }}" 
-                           {% if radio.data == form.payment_method.value %}checked{% endif %}
+                    <input type="radio" name="payment_method" value="{{ radio.data.value }}"
+                           {% if radio.data.value == form.payment_method.value %}checked{% endif %}
                            class="w-4 h-4 text-blue-600">
                     <div class="ml-3">
-                        <p class="font-medium text-gray-900">{{ radio.label }}</p>
-                        {% if radio.data == 'crypto_bitcoin' %}
+                        <p class="font-medium text-gray-900">{{ radio.choice_label }}</p>
+                        {% if radio.data.value == 'crypto_bitcoin' %}
                             <p class="text-sm text-gray-600">Pay with Bitcoin (BTC)</p>
-                        {% elif radio.data == 'crypto_ethereum' %}
+                        {% elif radio.data.value == 'crypto_ethereum' %}
                             <p class="text-sm text-gray-600">Pay with Ethereum (ETH)</p>
-                        {% elif radio.data == 'crypto_usdc' %}
+                        {% elif radio.data.value == 'crypto_usdc' %}
                             <p class="text-sm text-gray-600">Pay with USDC stablecoin</p>
-                        {% elif radio.data == 'bank_transfer' %}
+                        {% elif radio.data.value == 'bank_transfer' %}
                             <p class="text-sm text-gray-600">Bank transfer (wire, ACH, etc.)</p>
                         {% endif %}
                     </div>
