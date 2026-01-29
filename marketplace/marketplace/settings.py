@@ -10,7 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,13 +24,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-o8-@8*q)qqzrymf)ol9box6j=ca6ez@j=ld&e_q5)9u7d$4-6('
+SECRET_KEY = os.getenv(
+    'SECRET_KEY',
+    'django-insecure-o8-@8*q)qqzrymf)ol9box6j=ca6ez@j=ld&e_q5)9u7d$4-6('
+)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    if h.strip()
+]
 
 
 # Application definition
@@ -37,7 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+
     # Local apps
     'users',
     'providers',
@@ -54,6 +64,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'marketplace.middleware.RateLimitMiddleware',
 ]
 
 ROOT_URLCONF = 'marketplace.urls'
@@ -82,8 +93,12 @@ WSGI_APPLICATION = 'marketplace.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.sqlite3'),
+        'NAME': os.getenv('DB_NAME', str(BASE_DIR / 'db.sqlite3')),
+        'USER': os.getenv('DB_USER', ''),
+        'PASSWORD': os.getenv('DB_PASSWORD', ''),
+        'HOST': os.getenv('DB_HOST', ''),
+        'PORT': os.getenv('DB_PORT', ''),
     }
 }
 
@@ -136,7 +151,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'users.User'
 
 # Email Configuration
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = os.getenv(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend'
+)
 
 # Authentication
 AUTHENTICATION_BACKENDS = [
@@ -148,19 +166,72 @@ SUBSCRIPTION_AMOUNT = 29.99
 
 # Platform Crypto Wallet Addresses
 PLATFORM_CRYPTO_ADDRESSES = {
-    'crypto_bitcoin': '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa',
-    'crypto_ethereum': '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
-    'crypto_usdc': '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18',
+    'crypto_bitcoin': os.getenv(
+        'CRYPTO_BITCOIN_ADDRESS',
+        '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
+    ),
+    'crypto_ethereum': os.getenv(
+        'CRYPTO_ETHEREUM_ADDRESS',
+        '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18'
+    ),
+    'crypto_usdc': os.getenv(
+        'CRYPTO_USDC_ADDRESS',
+        '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18'
+    ),
 }
 
 # Platform Bank Details
 PLATFORM_BANK_DETAILS = {
-    'bank_name': 'First National Bank',
-    'account_name': 'Massage Marketplace LLC',
-    'account_number': '****7890',
-    'routing_number': '021000021',
-    'swift_code': 'FNBOUS33',
+    'bank_name': os.getenv('BANK_NAME', 'First National Bank'),
+    'account_name': os.getenv('BANK_ACCOUNT_NAME', 'Massage Marketplace LLC'),
+    'account_number': os.getenv('BANK_ACCOUNT_NUMBER', '****7890'),
+    'routing_number': os.getenv('BANK_ROUTING_NUMBER', '021000021'),
+    'swift_code': os.getenv('BANK_SWIFT_CODE', 'FNBOUS33'),
 }
 
 # Admin notification emails
-ADMIN_EMAILS = ['admin@massagemarketplace.com']
+ADMIN_EMAILS = [
+    e.strip()
+    for e in os.getenv('ADMIN_EMAILS', 'admin@massagemarketplace.com').split(',')
+    if e.strip()
+]
+
+# ---------------------------------------------------------------------------
+# Security Settings
+# ---------------------------------------------------------------------------
+
+# Clickjacking protection
+X_FRAME_OPTIONS = 'DENY'
+
+# Session security
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 1 week
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+
+# CSRF security
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SAMESITE = 'Lax'
+
+# Production-only security settings (activated when DEBUG=False)
+if not DEBUG:
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_BROWSER_XSS_FILTER = True
+
+# ---------------------------------------------------------------------------
+# Rate Limiting Configuration
+# ---------------------------------------------------------------------------
+
+# Format: {url_name: (max_requests, window_seconds)}
+RATE_LIMIT_RULES = {
+    'login': (5, 60),           # 5 attempts per minute
+    'signup': (5, 3600),        # 5 signups per hour
+    'password_reset': (3, 3600),  # 3 reset requests per hour
+}

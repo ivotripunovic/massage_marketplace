@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from django.views.generic import TemplateView
 from django.conf import settings
 from django.conf.urls.static import static
 from users.views import (
@@ -79,6 +80,11 @@ urlpatterns = [
     path('internal/admin/payments/<int:pk>/', AdminPaymentDetailView.as_view(), name='admin_payment_detail'),
     path('internal/admin/payments/<int:pk>/action/', AdminPaymentApproveView.as_view(), name='admin_payment_action'),
     path('internal/admin/analytics/', AdminAnalyticsView.as_view(), name='admin_analytics'),
+
+    # Legal pages
+    path('terms/', TemplateView.as_view(template_name='legal/terms.html'), name='terms'),
+    path('privacy/', TemplateView.as_view(template_name='legal/privacy.html'), name='privacy'),
+    path('payment-policy/', TemplateView.as_view(template_name='legal/payment_policy.html'), name='payment_policy'),
 ]
 
 # Serve media files in development

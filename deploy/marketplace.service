@@ -1,0 +1,31 @@
+# Systemd service file for the Massage Marketplace application.
+# Copy to /etc/systemd/system/marketplace.service
+#
+# Usage:
+#   sudo systemctl enable marketplace
+#   sudo systemctl start marketplace
+#   sudo systemctl status marketplace
+#   sudo journalctl -u marketplace -f
+
+[Unit]
+Description=Massage Marketplace Gunicorn Application Server
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=notify
+User=marketplace
+Group=www-data
+RuntimeDirectory=marketplace
+WorkingDirectory=/opt/marketplace
+EnvironmentFile=/opt/marketplace/.env
+ExecStart=/opt/marketplace/venv/bin/gunicorn \
+    --config /opt/marketplace/deploy/gunicorn.conf.py
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

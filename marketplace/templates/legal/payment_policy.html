@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Policy - Massage Marketplace{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold mb-6">Payment Policy</h1>
+    <p class="text-gray-500 mb-8">Last updated: January 2025</p>
+
+    <div class="bg-white rounded-lg shadow p-8 space-y-6 text-gray-700 leading-relaxed">
+
+        <section>
+            <h2 class="text-xl font-semibold mb-3">1. Subscription Overview</h2>
+            <p>Massage Marketplace operates on a subscription-based model for service providers. Clients can browse the directory and contact providers for free.</p>
+            <ul class="list-disc pl-6 space-y-2 mt-3">
+                <li><strong>Subscription fee:</strong> $29.99 per month</li>
+                <li><strong>Billing cycle:</strong> Monthly (30 days from activation)</li>
+                <li><strong>Listing visibility:</strong> Your profile appears in the directory only while your subscription is active.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold mb-3">2. Accepted Payment Methods</h2>
+            <h3 class="font-semibold mb-2">Cryptocurrency</h3>
+            <ul class="list-disc pl-6 space-y-1 mb-3">
+                <li>Bitcoin (BTC)</li>
+                <li>Ethereum (ETH)</li>
+                <li>USD Coin (USDC)</li>
+            </ul>
+            <p class="mb-3">Cryptocurrency payments are monitored automatically. Your subscription will be activated once the transaction is confirmed on the blockchain.</p>
+
+            <h3 class="font-semibold mb-2">Bank Transfer</h3>
+            <p>Bank transfers are verified manually by our administration team. Processing may take 1-3 business days.</p>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold mb-3">3. Payment Verification</h2>
+            <ul class="list-disc pl-6 space-y-2">
+                <li><strong>Crypto payments:</strong> Verified automatically via blockchain monitoring. Confirmation typically occurs within 1 hour of the transaction being broadcast.</li>
+                <li><strong>Bank transfers:</strong> Verified manually by our team. You will receive an email confirmation once your payment has been processed.</li>
+                <li>If payment verification fails, you will be notified by email with instructions on how to resolve the issue.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold mb-3">4. Subscription Renewal</h2>
+            <p>Subscriptions do not auto-renew. You will need to submit a new payment before your current subscription period ends to maintain your listing. We will send a reminder email 7 days before your subscription expires.</p>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold mb-3">5. Cancellation</h2>
+            <ul class="list-disc pl-6 space-y-2">
+                <li>You may cancel your subscription at any time from your account settings.</li>
+                <li>Your listing will remain active until the end of your current billing period.</li>
+                <li>After cancellation, your profile will be hidden from the directory but your account and data will be preserved.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold mb-3">6. Refund Policy</h2>
+            <ul class="list-disc pl-6 space-y-2">
+                <li>Refund requests must be submitted within 7 days of payment.</li>
+                <li>Refunds are issued at our discretion and may be prorated based on usage.</li>
+                <li>Cryptocurrency refunds will be returned to the original sending address.</li>
+                <li>Bank transfer refunds will be returned to the originating bank account.</li>
+                <li>Processing fees (if any) are non-refundable.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold mb-3">7. Failed Payments</h2>
+            <p>If a payment fails or is rejected:</p>
+            <ul class="list-disc pl-6 space-y-2 mt-2">
+                <li>Your subscription will not be activated or renewed.</li>
+                <li>You will be notified by email with details about the failure.</li>
+                <li>You may submit a new payment at any time.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold mb-3">8. Disputes</h2>
+            <p>For payment disputes, please contact our support team at <a href="mailto:payments@massagemarketplace.com" class="text-blue-600 hover:underline">payments@massagemarketplace.com</a> with your transaction reference and account email.</p>
+        </section>
+
+        <section>
+            <h2 class="text-xl font-semibold mb-3">9. Changes to This Policy</h2>
+            <p>We may update this Payment Policy from time to time. Active subscribers will be notified of material changes via email at least 14 days before they take effect.</p>
+        </section>
+
+    </div>
+</div>
+{% endblock %}

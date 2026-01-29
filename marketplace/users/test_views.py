@@ -25,6 +25,7 @@ class SignupViewTests(TestCase):
             'password': 'testpass123',
             'password_confirm': 'testpass123',
             'user_type': 'provider',
+            'accept_terms': True,
         })
         
         # User should be created
@@ -40,6 +41,7 @@ class SignupViewTests(TestCase):
             'password': 'testpass123',
             'password_confirm': 'testpass123',
             'user_type': 'provider',
+            'accept_terms': True,
         }, follow=False)
         
         self.assertEqual(response.status_code, 302)
@@ -57,8 +59,9 @@ class SignupViewTests(TestCase):
             'password': 'testpass123',
             'password_confirm': 'testpass123',
             'user_type': 'provider',
+            'accept_terms': True,
         })
-        
+
         self.assertEqual(response.status_code, 200)
         # Check form has errors
         self.assertTrue(response.context['form'].has_error('email'))
@@ -71,6 +74,7 @@ class SignupViewTests(TestCase):
             'password': 'testpass123',
             'password_confirm': 'different123',
             'user_type': 'provider',
+            'accept_terms': True,
         })
         
         self.assertEqual(response.status_code, 200)
@@ -85,6 +89,7 @@ class SignupViewTests(TestCase):
             'password': 'short',
             'password_confirm': 'short',
             'user_type': 'provider',
+            'accept_terms': True,
         })
         
         self.assertEqual(response.status_code, 200)

@@ -42,6 +42,14 @@ class SignupForm(forms.Form):
         choices=[('provider', 'I am a Service Provider')],
         widget=forms.RadioSelect()
     )
+
+    accept_terms = forms.BooleanField(
+        label='I agree to the Terms of Service and Privacy Policy',
+        required=True,
+        error_messages={
+            'required': 'You must accept the Terms of Service and Privacy Policy to create an account.'
+        }
+    )
     
     def clean_email(self):
         """Validate email is unique."""

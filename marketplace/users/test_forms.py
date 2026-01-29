@@ -13,6 +13,7 @@ class SignupFormTests(TestCase):
             'password': 'testpass123',
             'password_confirm': 'testpass123',
             'user_type': 'provider',
+            'accept_terms': True,
         })
         self.assertTrue(form.is_valid(), form.errors)
     

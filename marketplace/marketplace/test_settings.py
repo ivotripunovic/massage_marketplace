@@ -24,6 +24,9 @@ DATABASES = {
     }
 }
 
+# Disable rate limiting by default in tests (security tests override this)
+RATE_LIMIT_RULES = {}
+
 # Disable migrations for faster test setup
 # (comment out if you need migration testing)
 # MIGRATION_MODULES = {app: None for app in INSTALLED_APPS if 'django' not in app}
