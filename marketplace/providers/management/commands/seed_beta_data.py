@@ -8,6 +8,7 @@ Usage:
 from datetime import timedelta
 from decimal import Decimal
 
+from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
@@ -192,6 +193,11 @@ class Command(BaseCommand):
             f'{sum(len(p["services"]) for p in PROVIDERS_DATA)} services, '
             f'{len(REVIEWS_DATA)} reviews'
         ))
+        # Seed gallery photos for providers
+        self.stdout.write('')
+        self.stdout.write('Seeding gallery photos...')
+        call_command('seed_gallery_photos')
+
         self.stdout.write('')
         self.stdout.write('  Beta login credentials:')
         self.stdout.write(f'    Provider: {PROVIDERS_DATA[0]["email"]} / BetaTest123!')
