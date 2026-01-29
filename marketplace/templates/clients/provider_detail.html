@@ -44,21 +44,18 @@
             {% endif %}
 
             <!-- Contact Info -->
+            {% if provider.phone %}
             <div class="space-y-2 mb-4">
-                <p class="text-gray-700">
-                    <span class="font-semibold">Email:</span> {{ provider.user.email }}
-                </p>
-                {% if provider.phone %}
                 <p class="text-gray-700">
                     <span class="font-semibold">Phone:</span> {{ provider.phone }}
                 </p>
-                {% endif %}
             </div>
 
             <!-- Contact Button -->
-            <a href="mailto:{{ provider.user.email }}" class="inline-block bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700">
+            <a href="tel:{{ provider.phone }}" class="inline-block bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700">
                 Contact Provider
             </a>
+            {% endif %}
         </div>
     </div>
 
