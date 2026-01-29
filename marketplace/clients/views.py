@@ -1,6 +1,6 @@
 from django.views.generic import ListView, DetailView
 from django.db.models import Count, Avg, Q
-from providers.models import Provider, Service
+from providers.models import Provider, Service, ProviderGalleryImage
 from reviews.models import Review
 
 
@@ -112,7 +112,7 @@ class ProviderDetailView(DetailView):
         return Provider.objects.filter(
             subscription_status='active',
             user__is_email_verified=True
-        ).select_related('user').prefetch_related('services', 'reviews')
+        ).select_related('user').prefetch_related('services', 'reviews', 'gallery_images')
 
     def get_context_data(self, **kwargs):
         """Add services and reviews to context."""
@@ -124,6 +124,9 @@ class ProviderDetailView(DetailView):
             provider=provider,
             is_active=True
         ).order_by('service_type')
+
+        # Get gallery images
+        context['gallery_images'] = ProviderGalleryImage.objects.filter(provider=provider)
 
         # Get reviews
         context['reviews'] = Review.objects.filter(

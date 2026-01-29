@@ -1,9 +1,10 @@
 from django.test import TestCase, Client
 from django.core.exceptions import ValidationError
 from django.urls import reverse
+from django.core.files.uploadedfile import SimpleUploadedFile
 from users.models import User
 from reviews.models import Review
-from .models import Provider, Service
+from .models import Provider, Service, ProviderGalleryImage
 
 
 class ProviderModelTests(TestCase):
@@ -2053,3 +2054,392 @@ class PaymentFormTests(TestCase):
         })
         self.assertFalse(form.is_valid())
         self.assertIn('bank_name', form.errors)
+
+
+class GalleryImageModelTests(TestCase):
+    """Test ProviderGalleryImage model functionality."""
+
+    def setUp(self):
+        """Set up test data."""
+        self.user = User.objects.create_user(
+            email='provider@test.com',
+            password='pass',
+            user_type='provider'
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone='+1234567890'
+        )
+
+    def _create_test_image(self):
+        """Create a test image file."""
+        from PIL import Image as PILImage
+        import io
+        img = PILImage.new('RGB', (100, 100), color='red')
+        img_io = io.BytesIO()
+        img.save(img_io, format='JPEG')
+        img_io.seek(0)
+        return SimpleUploadedFile('test.jpg', img_io.getvalue(), content_type='image/jpeg')
+
+    def test_gallery_image_creation(self):
+        """Test creating a gallery image."""
+        image = ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image(),
+            caption='Test caption'
+        )
+        self.assertEqual(image.provider, self.provider)
+        self.assertEqual(image.caption, 'Test caption')
+        self.assertIsNotNone(image.uploaded_at)
+
+    def test_gallery_image_str(self):
+        """Test __str__ method."""
+        image = ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image()
+        )
+        self.assertIn(self.user.email, str(image))
+
+    def test_gallery_image_ordering(self):
+        """Test that images are ordered by -uploaded_at."""
+        img1 = ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image(),
+            caption='First'
+        )
+        img2 = ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image(),
+            caption='Second'
+        )
+        images = list(ProviderGalleryImage.objects.filter(provider=self.provider))
+        self.assertEqual(images[0].caption, 'Second')
+        self.assertEqual(images[1].caption, 'First')
+
+    def test_max_images_constant(self):
+        """Test MAX_IMAGES_PER_PROVIDER is 10."""
+        self.assertEqual(ProviderGalleryImage.MAX_IMAGES_PER_PROVIDER, 10)
+
+    def test_cascade_delete(self):
+        """Test that gallery images are deleted when provider is deleted."""
+        ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image()
+        )
+        self.assertEqual(ProviderGalleryImage.objects.count(), 1)
+        self.provider.delete()
+        self.assertEqual(ProviderGalleryImage.objects.count(), 0)
+
+    def test_caption_optional(self):
+        """Test that caption is optional."""
+        image = ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image()
+        )
+        self.assertEqual(image.caption, '')
+
+
+class GalleryImageFormTests(TestCase):
+    """Test GalleryImageForm functionality."""
+
+    def setUp(self):
+        """Set up test data."""
+        self.user = User.objects.create_user(
+            email='provider@test.com',
+            password='pass',
+            user_type='provider'
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone='+1234567890'
+        )
+
+    def _create_test_image(self, format='JPEG', content_type='image/jpeg'):
+        """Create a test image file."""
+        from PIL import Image as PILImage
+        import io
+        img = PILImage.new('RGB', (100, 100), color='red')
+        img_io = io.BytesIO()
+        img.save(img_io, format=format)
+        img_io.seek(0)
+        filename = f'test.{format.lower()}'
+        return SimpleUploadedFile(filename, img_io.getvalue(), content_type=content_type)
+
+    def test_form_fields(self):
+        """Test form has correct fields."""
+        from providers.forms import GalleryImageForm
+        form = GalleryImageForm(provider=self.provider)
+        self.assertIn('image', form.fields)
+        self.assertIn('caption', form.fields)
+
+    def test_form_valid_data(self):
+        """Test form with valid image data."""
+        from providers.forms import GalleryImageForm
+        image = self._create_test_image()
+        form = GalleryImageForm(
+            data={'caption': 'Test'},
+            files={'image': image},
+            provider=self.provider
+        )
+        self.assertTrue(form.is_valid())
+
+    def test_form_invalid_format(self):
+        """Test form rejects invalid image format."""
+        from providers.forms import GalleryImageForm
+        invalid_file = SimpleUploadedFile('test.txt', b'not an image', content_type='text/plain')
+        form = GalleryImageForm(
+            data={'caption': 'Test'},
+            files={'image': invalid_file},
+            provider=self.provider
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('image', form.errors)
+
+    def test_form_max_limit(self):
+        """Test form enforces max image limit."""
+        from providers.forms import GalleryImageForm
+        # Create 10 images
+        for i in range(10):
+            ProviderGalleryImage.objects.create(
+                provider=self.provider,
+                image=self._create_test_image()
+            )
+
+        image = self._create_test_image()
+        form = GalleryImageForm(
+            data={'caption': 'Too many'},
+            files={'image': image},
+            provider=self.provider
+        )
+        self.assertFalse(form.is_valid())
+
+    def test_form_caption_optional(self):
+        """Test form allows empty caption."""
+        from providers.forms import GalleryImageForm
+        image = self._create_test_image()
+        form = GalleryImageForm(
+            data={'caption': ''},
+            files={'image': image},
+            provider=self.provider
+        )
+        self.assertTrue(form.is_valid())
+
+    def test_form_requires_image(self):
+        """Test form requires image field."""
+        from providers.forms import GalleryImageForm
+        form = GalleryImageForm(
+            data={'caption': 'No image'},
+            files={},
+            provider=self.provider
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('image', form.errors)
+
+
+class GalleryImageCreateViewTests(TestCase):
+    """Test GalleryImageCreateView functionality."""
+
+    def setUp(self):
+        """Set up test data."""
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email='provider@test.com',
+            password='testpass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone='+1234567890'
+        )
+        self.client_user = User.objects.create_user(
+            email='client@test.com',
+            password='testpass123',
+            user_type='client',
+            is_email_verified=True
+        )
+
+    def _create_test_image(self, format='JPEG', content_type='image/jpeg'):
+        """Create a test image file."""
+        from PIL import Image as PILImage
+        import io
+        img = PILImage.new('RGB', (100, 100), color='red')
+        img_io = io.BytesIO()
+        img.save(img_io, format=format)
+        img_io.seek(0)
+        return SimpleUploadedFile(f'test.{format.lower()}', img_io.getvalue(), content_type=content_type)
+
+    def test_requires_login(self):
+        """Test that gallery upload requires login."""
+        response = self.client.get(reverse('gallery_upload'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/auth/login/', response.url)
+
+    def test_requires_provider(self):
+        """Test that non-providers cannot access gallery upload."""
+        self.client.login(email=self.client_user.email, password='testpass123')
+        response = self.client.get(reverse('gallery_upload'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_page_loads(self):
+        """Test that gallery upload page loads for provider."""
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.get(reverse('gallery_upload'))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'providers/gallery_upload.html')
+
+    def test_upload_valid_image(self):
+        """Test uploading a valid gallery image."""
+        self.client.login(email=self.user.email, password='testpass123')
+        image = self._create_test_image()
+        response = self.client.post(reverse('gallery_upload'), {
+            'image': image,
+            'caption': 'My workspace'
+        })
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(ProviderGalleryImage.objects.filter(provider=self.provider).count(), 1)
+
+    def test_upload_invalid_format(self):
+        """Test that invalid formats are rejected."""
+        self.client.login(email=self.user.email, password='testpass123')
+        invalid_file = SimpleUploadedFile('test.txt', b'not an image', content_type='text/plain')
+        response = self.client.post(reverse('gallery_upload'), {
+            'image': invalid_file,
+            'caption': 'Bad file'
+        })
+        self.assertEqual(response.status_code, 200)  # Re-renders form
+        self.assertEqual(ProviderGalleryImage.objects.filter(provider=self.provider).count(), 0)
+
+    def test_upload_max_limit(self):
+        """Test that upload is rejected when at max limit."""
+        self.client.login(email=self.user.email, password='testpass123')
+        for i in range(10):
+            ProviderGalleryImage.objects.create(
+                provider=self.provider,
+                image=self._create_test_image()
+            )
+        image = self._create_test_image()
+        response = self.client.post(reverse('gallery_upload'), {
+            'image': image,
+            'caption': 'Too many'
+        })
+        self.assertEqual(response.status_code, 200)  # Re-renders form
+        self.assertEqual(ProviderGalleryImage.objects.filter(provider=self.provider).count(), 10)
+
+    def test_upload_success_message(self):
+        """Test that success message is shown after upload."""
+        self.client.login(email=self.user.email, password='testpass123')
+        image = self._create_test_image()
+        response = self.client.post(reverse('gallery_upload'), {
+            'image': image,
+            'caption': 'Test'
+        }, follow=True)
+        msgs = list(response.context['messages'])
+        self.assertTrue(any('uploaded successfully' in str(m).lower() for m in msgs))
+
+    def test_context_has_gallery_images(self):
+        """Test that context includes gallery images."""
+        self.client.login(email=self.user.email, password='testpass123')
+        ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image()
+        )
+        response = self.client.get(reverse('gallery_upload'))
+        self.assertIn('gallery_images', response.context)
+        self.assertEqual(response.context['gallery_images'].count(), 1)
+
+    def test_context_has_max_images(self):
+        """Test that context includes max_images."""
+        self.client.login(email=self.user.email, password='testpass123')
+        response = self.client.get(reverse('gallery_upload'))
+        self.assertEqual(response.context['max_images'], 10)
+
+
+class GalleryImageDeleteViewTests(TestCase):
+    """Test GalleryImageDeleteView functionality."""
+
+    def setUp(self):
+        """Set up test data."""
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email='provider@test.com',
+            password='testpass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone='+1234567890'
+        )
+        self.other_user = User.objects.create_user(
+            email='other@test.com',
+            password='testpass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        self.other_provider = Provider.objects.create(
+            user=self.other_user,
+            phone='+9876543210'
+        )
+
+    def _create_test_image(self):
+        """Create a test image file."""
+        from PIL import Image as PILImage
+        import io
+        img = PILImage.new('RGB', (100, 100), color='red')
+        img_io = io.BytesIO()
+        img.save(img_io, format='JPEG')
+        img_io.seek(0)
+        return SimpleUploadedFile('test.jpg', img_io.getvalue(), content_type='image/jpeg')
+
+    def test_requires_login(self):
+        """Test that gallery delete requires login."""
+        image = ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image()
+        )
+        response = self.client.post(reverse('gallery_delete', args=[image.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/auth/login/', response.url)
+
+    def test_delete_own_image(self):
+        """Test that provider can delete their own image."""
+        self.client.login(email=self.user.email, password='testpass123')
+        image = ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image()
+        )
+        response = self.client.post(reverse('gallery_delete', args=[image.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ProviderGalleryImage.objects.filter(pk=image.pk).exists())
+
+    def test_cannot_delete_other_providers_image(self):
+        """Test that provider cannot delete another provider's image."""
+        self.client.login(email=self.user.email, password='testpass123')
+        image = ProviderGalleryImage.objects.create(
+            provider=self.other_provider,
+            image=self._create_test_image()
+        )
+        response = self.client.post(reverse('gallery_delete', args=[image.pk]))
+        self.assertTrue(ProviderGalleryImage.objects.filter(pk=image.pk).exists())
+
+    def test_delete_success_message(self):
+        """Test that success message is shown after deletion."""
+        self.client.login(email=self.user.email, password='testpass123')
+        image = ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image()
+        )
+        response = self.client.post(reverse('gallery_delete', args=[image.pk]), follow=True)
+        msgs = list(response.context['messages'])
+        self.assertTrue(any('deleted successfully' in str(m).lower() for m in msgs))
+
+    def test_get_not_allowed(self):
+        """Test that GET requests are not allowed for delete."""
+        self.client.login(email=self.user.email, password='testpass123')
+        image = ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image()
+        )
+        response = self.client.get(reverse('gallery_delete', args=[image.pk]))
+        self.assertEqual(response.status_code, 405)  # Method not allowed

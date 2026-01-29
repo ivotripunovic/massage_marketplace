@@ -121,6 +121,30 @@ class Provider(models.Model):
         return self.user.email.split('@')[0]
 
 
+class ProviderGalleryImage(models.Model):
+    """Gallery image for a provider's profile."""
+
+    MAX_IMAGES_PER_PROVIDER = 10
+
+    provider = models.ForeignKey(
+        'Provider',
+        on_delete=models.CASCADE,
+        related_name='gallery_images'
+    )
+    image = models.ImageField(upload_to='providers/gallery/')
+    caption = models.CharField(max_length=200, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'providers_galleryimage'
+        verbose_name = 'Gallery Image'
+        verbose_name_plural = 'Gallery Images'
+        ordering = ['-uploaded_at']
+
+    def __str__(self):
+        return f"Gallery image for {self.provider.user.email} ({self.uploaded_at.strftime('%Y-%m-%d')})"
+
+
 class Service(models.Model):
     """Service offered by a provider."""
     

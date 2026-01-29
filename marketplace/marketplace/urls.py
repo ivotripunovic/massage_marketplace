@@ -27,7 +27,8 @@ from providers.views import (
     ProviderDashboardView, ProviderProfileUpdateView,
     ServiceListView, ServiceCreateView, ServiceUpdateView, ServiceDeleteView,
     AdminProviderListView, ProviderSubscriptionView, SubscriptionConfirmView,
-    CryptoPaymentView, BankTransferPaymentView
+    CryptoPaymentView, BankTransferPaymentView,
+    GalleryImageCreateView, GalleryImageDeleteView
 )
 from payments.views import (
     AdminPaymentListView, AdminPaymentDetailView, AdminDashboardView,
@@ -67,6 +68,8 @@ urlpatterns = [
     path('provider/services/create/', ServiceCreateView.as_view(), name='service_create'),
     path('provider/services/<int:pk>/edit/', ServiceUpdateView.as_view(), name='service_edit'),
     path('provider/services/<int:pk>/delete/', ServiceDeleteView.as_view(), name='service_delete'),
+    path('provider/gallery/upload/', GalleryImageCreateView.as_view(), name='gallery_upload'),
+    path('provider/gallery/<int:pk>/delete/', GalleryImageDeleteView.as_view(), name='gallery_delete'),
     
     # Admin URLs
     path('internal/admin/', AdminDashboardView.as_view(), name='admin_dashboard'),

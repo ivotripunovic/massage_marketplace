@@ -1,7 +1,8 @@
 from django.test import TestCase, Client
 from django.urls import reverse
+from django.core.files.uploadedfile import SimpleUploadedFile
 from users.models import User
-from providers.models import Provider, Service
+from providers.models import Provider, Service, ProviderGalleryImage
 from reviews.models import Review
 
 
@@ -484,3 +485,66 @@ class ProviderFilteringTests(TestCase):
         self.assertContains(response, 'provider1@example.com')
         self.assertContains(response, 'provider2@example.com')
         self.assertContains(response, 'provider3@example.com')
+
+
+class ProviderDetailGalleryTests(TestCase):
+    """Tests for gallery display on provider detail page."""
+
+    def setUp(self):
+        """Set up test data."""
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email='provider@example.com',
+            password='testpass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone='+1234567890',
+            subscription_status='active'
+        )
+
+    def _create_test_image(self):
+        """Create a test image file."""
+        from PIL import Image as PILImage
+        import io
+        img = PILImage.new('RGB', (100, 100), color='blue')
+        img_io = io.BytesIO()
+        img.save(img_io, format='JPEG')
+        img_io.seek(0)
+        return SimpleUploadedFile('test.jpg', img_io.getvalue(), content_type='image/jpeg')
+
+    def test_gallery_images_in_context(self):
+        """Test that gallery images are included in detail view context."""
+        ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image(),
+            caption='Workspace photo'
+        )
+        response = self.client.get(
+            reverse('provider_detail', kwargs={'slug': self.user.email})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('gallery_images', response.context)
+        self.assertEqual(response.context['gallery_images'].count(), 1)
+
+    def test_gallery_section_displayed(self):
+        """Test that gallery section is displayed when images exist."""
+        ProviderGalleryImage.objects.create(
+            provider=self.provider,
+            image=self._create_test_image(),
+            caption='My studio'
+        )
+        response = self.client.get(
+            reverse('provider_detail', kwargs={'slug': self.user.email})
+        )
+        self.assertContains(response, 'Photo Gallery')
+        self.assertContains(response, 'My studio')
+
+    def test_gallery_section_hidden_when_empty(self):
+        """Test that gallery section is hidden when no images."""
+        response = self.client.get(
+            reverse('provider_detail', kwargs={'slug': self.user.email})
+        )
+        self.assertNotContains(response, 'Photo Gallery')

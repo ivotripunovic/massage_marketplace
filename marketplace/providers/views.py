@@ -6,8 +6,8 @@ from django.contrib import messages
 from django import forms
 from django.db.models import Count, Avg
 from django.http import HttpResponseForbidden
-from providers.models import Provider, Service
-from providers.forms import ServiceForm, SubscriptionSettingsForm, CryptoPaymentForm, BankTransferForm
+from providers.models import Provider, Service, ProviderGalleryImage
+from providers.forms import ServiceForm, SubscriptionSettingsForm, CryptoPaymentForm, BankTransferForm, GalleryImageForm
 from users.models import User
 
 
@@ -49,6 +49,7 @@ class ProviderDashboardView(ProviderRequiredMixin, TemplateView):
             else:
                 context['total_reviews'] = 0
                 context['average_rating'] = 0
+            context['gallery_images'] = ProviderGalleryImage.objects.filter(provider=provider)
         except Provider.DoesNotExist:
             # Provider profile not yet created, redirect to create
             context['provider'] = None
@@ -680,3 +681,60 @@ class SubscriptionConfirmView(ProviderRequiredMixin, TemplateView):
         except Provider.DoesNotExist:
             context['provider'] = None
         return context
+
+
+class GalleryImageCreateView(ProviderRequiredMixin, CreateView):
+    """View for uploading a gallery image."""
+
+    model = ProviderGalleryImage
+    form_class = GalleryImageForm
+    template_name = 'providers/gallery_upload.html'
+    success_url = reverse_lazy('gallery_upload')
+
+    def get_form_kwargs(self):
+        """Pass provider to form for limit check."""
+        kwargs = super().get_form_kwargs()
+        kwargs['provider'] = Provider.objects.get(user=self.request.user)
+        return kwargs
+
+    def form_valid(self, form):
+        """Assign image to current provider."""
+        provider = Provider.objects.get(user=self.request.user)
+        form.instance.provider = provider
+        messages.success(self.request, 'Gallery image uploaded successfully.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        """Add existing gallery images to context."""
+        context = super().get_context_data(**kwargs)
+        provider = Provider.objects.get(user=self.request.user)
+        context['provider'] = provider
+        context['gallery_images'] = ProviderGalleryImage.objects.filter(provider=provider)
+        context['max_images'] = ProviderGalleryImage.MAX_IMAGES_PER_PROVIDER
+        return context
+
+
+class GalleryImageDeleteView(ProviderRequiredMixin, DeleteView):
+    """View for deleting a gallery image."""
+
+    model = ProviderGalleryImage
+    success_url = reverse_lazy('gallery_upload')
+    pk_url_kwarg = 'pk'
+    http_method_names = ['post']
+
+    def get_object(self, queryset=None):
+        """Get image and verify ownership."""
+        image = super().get_object(queryset)
+        provider = Provider.objects.get(user=self.request.user)
+        if image.provider != provider:
+            messages.error(self.request, 'You do not have permission to delete this image.')
+            raise PermissionError('Image does not belong to this provider')
+        return image
+
+    def post(self, request, *args, **kwargs):
+        """Handle deletion with message."""
+        try:
+            messages.success(request, 'Gallery image deleted successfully.')
+            return super().post(request, *args, **kwargs)
+        except (PermissionError, ProviderGalleryImage.DoesNotExist):
+            return redirect('gallery_upload')

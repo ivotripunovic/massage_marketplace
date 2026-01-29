@@ -2,7 +2,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from PIL import Image
 import io
-from providers.models import Provider, Service
+from providers.models import Provider, Service, ProviderGalleryImage
 
 
 class ProviderPhotoForm(forms.ModelForm):
@@ -187,3 +187,61 @@ class BankTransferForm(forms.Form):
         }),
         help_text='Enter your bank transfer confirmation number if you have one. You can also provide this later.'
     )
+
+
+class GalleryImageForm(forms.ModelForm):
+    """Form for uploading gallery images."""
+
+    class Meta:
+        model = ProviderGalleryImage
+        fields = ('image', 'caption')
+        labels = {
+            'image': 'Photo',
+            'caption': 'Caption (optional)',
+        }
+        widgets = {
+            'image': forms.FileInput(attrs={
+                'class': 'block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700',
+                'accept': 'image/jpeg,image/png,image/gif',
+            }),
+            'caption': forms.TextInput(attrs={
+                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+                'placeholder': 'Describe this photo',
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.provider = kwargs.pop('provider', None)
+        super().__init__(*args, **kwargs)
+
+    def clean_image(self):
+        """Validate image file."""
+        image = self.cleaned_data.get('image')
+
+        if image:
+            if image.size > 5 * 1024 * 1024:
+                raise ValidationError('Image must be smaller than 5MB')
+
+            valid_formats = ['image/jpeg', 'image/png', 'image/gif']
+            if image.content_type not in valid_formats:
+                raise ValidationError('Only JPEG, PNG, and GIF images are allowed')
+
+            try:
+                img = Image.open(image)
+                img.verify()
+                image.seek(0)
+            except Exception:
+                raise ValidationError('The uploaded file is not a valid image')
+
+        return image
+
+    def clean(self):
+        """Enforce per-provider image limit."""
+        cleaned_data = super().clean()
+        if self.provider:
+            current_count = ProviderGalleryImage.objects.filter(provider=self.provider).count()
+            if current_count >= ProviderGalleryImage.MAX_IMAGES_PER_PROVIDER:
+                raise ValidationError(
+                    f'You can upload a maximum of {ProviderGalleryImage.MAX_IMAGES_PER_PROVIDER} gallery images.'
+                )
+        return cleaned_data

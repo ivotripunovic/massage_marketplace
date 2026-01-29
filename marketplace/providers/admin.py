@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Provider, Service
+from .models import Provider, Service, ProviderGalleryImage
 
 
 class ServiceInline(admin.TabularInline):
@@ -7,6 +7,14 @@ class ServiceInline(admin.TabularInline):
     model = Service
     extra = 1
     fields = ('service_type', 'price', 'duration_minutes', 'is_active')
+
+
+class GalleryImageInline(admin.TabularInline):
+    """Inline editor for gallery images."""
+    model = ProviderGalleryImage
+    extra = 1
+    fields = ('image', 'caption', 'uploaded_at')
+    readonly_fields = ('uploaded_at',)
 
 
 @admin.register(Provider)
@@ -33,7 +41,7 @@ class ProviderAdmin(admin.ModelAdmin):
         'phone'
     )
     readonly_fields = ('created_at', 'updated_at')
-    inlines = [ServiceInline]
+    inlines = [ServiceInline, GalleryImageInline]
     
     fieldsets = (
         ('User Information', {
@@ -132,3 +140,17 @@ class ServiceAdmin(admin.ModelAdmin):
     provider_email.admin_order_field = 'provider__user__email'
 
 
+@admin.register(ProviderGalleryImage)
+class GalleryImageAdmin(admin.ModelAdmin):
+    """Admin interface for ProviderGalleryImage model."""
+
+    list_display = ('provider_email', 'caption', 'uploaded_at')
+    list_filter = ('uploaded_at',)
+    search_fields = ('provider__user__email', 'caption')
+    readonly_fields = ('uploaded_at',)
+
+    def provider_email(self, obj):
+        """Display provider email in list view."""
+        return obj.provider.user.email
+    provider_email.short_description = 'Provider Email'
+    provider_email.admin_order_field = 'provider__user__email'
