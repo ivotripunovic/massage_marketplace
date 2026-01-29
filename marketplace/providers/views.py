@@ -6,8 +6,8 @@ from django.contrib import messages
 from django import forms
 from django.db.models import Count, Avg
 from django.http import HttpResponseForbidden
-from providers.models import Provider, Service, Certification
-from providers.forms import CertificationForm, ServiceForm, SubscriptionSettingsForm, CryptoPaymentForm, BankTransferForm
+from providers.models import Provider, Service
+from providers.forms import ServiceForm, SubscriptionSettingsForm, CryptoPaymentForm, BankTransferForm
 from users.models import User
 
 
@@ -40,8 +40,6 @@ class ProviderDashboardView(ProviderRequiredMixin, TemplateView):
             context['provider'] = provider
             # Use direct query for related objects
             context['services'] = Service.objects.filter(provider=provider, is_active=True)
-            context['certifications'] = Certification.objects.filter(provider=provider)
-            
             # Calculate stats
             from reviews.models import Review
             reviews = Review.objects.filter(provider=provider)
@@ -224,74 +222,6 @@ class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
     
     def get_context_data(self, **kwargs):
         """Add provider data to context."""
-        context = super().get_context_data(**kwargs)
-        context['provider'] = Provider.objects.get(user=self.request.user)
-        return context
-
-
-class CertificationCreateView(ProviderRequiredMixin, CreateView):
-    """View for adding new certification."""
-    
-    model = Certification
-    form_class = CertificationForm
-    template_name = 'providers/certification_form.html'
-    success_url = reverse_lazy('provider_profile')
-    
-    def form_valid(self, form):
-        """Handle valid form - assign to current provider."""
-        try:
-            provider = Provider.objects.get(user=self.request.user)
-            form.instance.provider = provider
-            messages.success(self.request, 'Certification added successfully.')
-        except Provider.DoesNotExist:
-            messages.error(self.request, 'Provider profile not found.')
-            return redirect('provider_profile')
-        
-        return super().form_valid(form)
-    
-    def get_context_data(self, **kwargs):
-        """Add provider to context."""
-        context = super().get_context_data(**kwargs)
-        context['provider'] = Provider.objects.get(user=self.request.user)
-        return context
-
-
-class CertificationDeleteView(ProviderRequiredMixin, DeleteView):
-    """View for deleting certification."""
-    
-    model = Certification
-    success_url = reverse_lazy('provider_profile')
-    pk_url_kwarg = 'pk'
-    http_method_names = ['post']
-    
-    def get_object(self, queryset=None):
-        """Get certification and verify ownership."""
-        cert = super().get_object(queryset)
-        
-        # Verify the certification belongs to the current provider
-        try:
-            provider = Provider.objects.get(user=self.request.user)
-            if cert.provider != provider:
-                messages.error(self.request, 'You do not have permission to delete this certification.')
-                redirect_response = redirect('provider_profile')
-                redirect_response.status_code = 403
-                raise PermissionError('Certification does not belong to this provider')
-        except Provider.DoesNotExist:
-            messages.error(self.request, 'Provider profile not found.')
-            raise PermissionError('Provider profile not found')
-        
-        return cert
-    
-    def post(self, request, *args, **kwargs):
-        """Handle deletion with message."""
-        try:
-            messages.success(request, 'Certification deleted successfully.')
-            return super().post(request, *args, **kwargs)
-        except (PermissionError, Certification.DoesNotExist):
-            return redirect('provider_profile')
-    
-    def get_context_data(self, **kwargs):
-        """Add provider to context for certification delete."""
         context = super().get_context_data(**kwargs)
         context['provider'] = Provider.objects.get(user=self.request.user)
         return context

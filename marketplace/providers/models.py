@@ -192,28 +192,3 @@ class Service(models.Model):
         super().save(*args, **kwargs)
 
 
-class Certification(models.Model):
-    """Certification or credential for a provider."""
-    
-    provider = models.ForeignKey(
-        Provider,
-        on_delete=models.CASCADE,
-        related_name='certifications'
-    )
-    
-    name = models.CharField(
-        max_length=255,
-        help_text='e.g., Licensed Massage Therapist'
-    )
-    
-    image = models.ImageField(upload_to='providers/certifications/')
-    
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-    
-    class Meta:
-        db_table = 'providers_certification'
-        verbose_name = 'Certification'
-        verbose_name_plural = 'Certifications'
-    
-    def __str__(self):
-        return f"{self.provider.user.email} - {self.name}"

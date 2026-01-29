@@ -2,7 +2,7 @@ from django import forms
 from django.core.exceptions import ValidationError
 from PIL import Image
 import io
-from providers.models import Provider, Service, Certification
+from providers.models import Provider, Service
 
 
 class ProviderPhotoForm(forms.ModelForm):
@@ -120,53 +120,6 @@ class ServiceForm(forms.ModelForm):
                 'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
             }),
         }
-
-
-class CertificationForm(forms.ModelForm):
-    """Form for uploading certifications."""
-    
-    class Meta:
-        model = Certification
-        fields = ('name', 'image')
-        labels = {
-            'name': 'Certification Name',
-            'image': 'Certificate Image',
-        }
-        widgets = {
-            'name': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
-                'placeholder': 'e.g., Licensed Massage Therapist'
-            }),
-            'image': forms.FileInput(attrs={
-                'class': 'block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700',
-                'accept': 'image/jpeg,image/png,image/gif'
-            }),
-        }
-    
-    def clean_image(self):
-        """Validate certification image."""
-        image = self.cleaned_data.get('image')
-        
-        if image:
-            # Check file size (< 5MB)
-            if image.size > 5 * 1024 * 1024:
-                raise ValidationError('Image must be smaller than 5MB')
-            
-            # Check file format
-            valid_formats = ['image/jpeg', 'image/png', 'image/gif']
-            if image.content_type not in valid_formats:
-                raise ValidationError('Only JPEG, PNG, and GIF images are allowed')
-            
-            # Validate that it's a real image
-            try:
-                img = Image.open(image)
-                img.verify()
-                # Reset file pointer after verification
-                image.seek(0)
-            except Exception:
-                raise ValidationError('The uploaded file is not a valid image')
-        
-        return image
 
 
 class SubscriptionSettingsForm(forms.Form):

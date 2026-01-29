@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Provider, Service, Certification
+from .models import Provider, Service
 
 
 class ServiceInline(admin.TabularInline):
@@ -7,13 +7,6 @@ class ServiceInline(admin.TabularInline):
     model = Service
     extra = 1
     fields = ('service_type', 'price', 'duration_minutes', 'is_active')
-
-
-class CertificationInline(admin.TabularInline):
-    """Inline editor for certifications."""
-    model = Certification
-    extra = 1
-    fields = ('name', 'image')
 
 
 @admin.register(Provider)
@@ -40,7 +33,7 @@ class ProviderAdmin(admin.ModelAdmin):
         'phone'
     )
     readonly_fields = ('created_at', 'updated_at')
-    inlines = [ServiceInline, CertificationInline]
+    inlines = [ServiceInline]
     
     fieldsets = (
         ('User Information', {
@@ -139,30 +132,3 @@ class ServiceAdmin(admin.ModelAdmin):
     provider_email.admin_order_field = 'provider__user__email'
 
 
-@admin.register(Certification)
-class CertificationAdmin(admin.ModelAdmin):
-    """Admin interface for Certification model."""
-    
-    list_display = ('provider_email', 'name', 'uploaded_at')
-    list_filter = ('uploaded_at',)
-    search_fields = ('provider__user__email', 'name')
-    readonly_fields = ('uploaded_at',)
-    
-    fieldsets = (
-        ('Provider', {
-            'fields': ('provider',)
-        }),
-        ('Certification', {
-            'fields': ('name', 'image')
-        }),
-        ('Timestamps', {
-            'fields': ('uploaded_at',),
-            'classes': ('collapse',)
-        }),
-    )
-    
-    def provider_email(self, obj):
-        """Display provider email in list view."""
-        return obj.provider.user.email
-    provider_email.short_description = 'Provider Email'
-    provider_email.admin_order_field = 'provider__user__email'

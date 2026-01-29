@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.urls import reverse
 from users.models import User
 from reviews.models import Review
-from .models import Provider, Service, Certification
+from .models import Provider, Service
 
 
 class ProviderModelTests(TestCase):
@@ -214,61 +214,6 @@ class ServiceModelTests(TestCase):
             self.assertEqual(service.service_type, service_type)
 
 
-class CertificationModelTests(TestCase):
-    """Test Certification model functionality."""
-    
-    def setUp(self):
-        """Set up test provider for certification creation."""
-        self.user = User.objects.create_user(
-            email='provider@test.com',
-            password='pass',
-            user_type='provider'
-        )
-        self.provider = Provider.objects.create(
-            user=self.user,
-            phone='+1234567890'
-        )
-    
-    def test_certification_creation(self):
-        """Test creating a certification."""
-        cert = Certification.objects.create(
-            provider=self.provider,
-            name='Licensed Massage Therapist'
-        )
-        self.assertEqual(cert.name, 'Licensed Massage Therapist')
-    
-    def test_certification_string_representation(self):
-        """Test certification __str__ method."""
-        cert = Certification.objects.create(
-            provider=self.provider,
-            name='LMT Certification'
-        )
-        self.assertIn(self.user.email, str(cert))
-        self.assertIn('LMT Certification', str(cert))
-    
-    def test_certification_has_upload_date(self):
-        """Test certification has upload timestamp."""
-        cert = Certification.objects.create(
-            provider=self.provider,
-            name='Swedish Massage Certification'
-        )
-        self.assertIsNotNone(cert.uploaded_at)
-    
-    def test_multiple_certifications_per_provider(self):
-        """Test provider can have multiple certifications."""
-        cert1 = Certification.objects.create(
-            provider=self.provider,
-            name='LMT'
-        )
-        cert2 = Certification.objects.create(
-            provider=self.provider,
-            name='Deep Tissue Specialist'
-        )
-        self.assertEqual(self.provider.certifications.count(), 2)
-        self.assertIn(cert1, self.provider.certifications.all())
-        self.assertIn(cert2, self.provider.certifications.all())
-
-
 class ProviderDashboardViewTests(TestCase):
     """Test Provider Dashboard view functionality."""
     
@@ -295,10 +240,6 @@ class ProviderDashboardViewTests(TestCase):
             price=75.00,
             duration_minutes=60,
             is_active=True
-        )
-        self.certification = Certification.objects.create(
-            provider=self.provider,
-            name='Licensed Massage Therapist'
         )
         self.review = Review.objects.create(
             provider=self.provider,
@@ -347,12 +288,6 @@ class ProviderDashboardViewTests(TestCase):
         # Check that services section is displayed
         self.assertIn('services', response.context)
     
-    def test_dashboard_displays_certifications(self):
-        """Test that dashboard displays provider's certifications."""
-        self.client.login(email=self.user.email, password='testpass123')
-        response = self.client.get(reverse('provider_dashboard'))
-        self.assertContains(response, 'Licensed Massage Therapist')
-    
     def test_dashboard_displays_subscription_status(self):
         """Test that dashboard displays subscription status."""
         self.client.login(email=self.user.email, password='testpass123')
@@ -364,7 +299,6 @@ class ProviderDashboardViewTests(TestCase):
         self.client.login(email=self.user.email, password='testpass123')
         response = self.client.get(reverse('provider_dashboard'))
         self.assertContains(response, 'Active Services')
-        self.assertContains(response, 'Certifications')
         self.assertContains(response, 'Total Reviews')
     
     def test_dashboard_calculates_average_rating(self):
@@ -391,15 +325,6 @@ class ProviderDashboardViewTests(TestCase):
         response = self.client.get(reverse('provider_dashboard'))
         self.assertEqual(response.status_code, 200)
     
-    def test_dashboard_shows_empty_state_for_no_certifications(self):
-        """Test dashboard when provider has no certifications."""
-        # Delete all certifications
-        Certification.objects.all().delete()
-        
-        self.client.login(email=self.user.email, password='testpass123')
-        response = self.client.get(reverse('provider_dashboard'))
-        self.assertEqual(response.status_code, 200)
-    
     def test_dashboard_context_has_provider_data(self):
         """Test that dashboard context contains provider data."""
         self.client.login(email=self.user.email, password='testpass123')
@@ -413,13 +338,6 @@ class ProviderDashboardViewTests(TestCase):
         response = self.client.get(reverse('provider_dashboard'))
         self.assertIn('services', response.context)
         self.assertIn(self.service, response.context['services'])
-    
-    def test_dashboard_context_has_certifications(self):
-        """Test that dashboard context contains certifications list."""
-        self.client.login(email=self.user.email, password='testpass123')
-        response = self.client.get(reverse('provider_dashboard'))
-        self.assertIn('certifications', response.context)
-        self.assertIn(self.certification, response.context['certifications'])
     
     def test_dashboard_only_shows_active_services(self):
         """Test that dashboard filters services properly."""
@@ -975,301 +893,6 @@ class ProviderPhotoUploadTests(TestCase):
         
         # Should succeed without photo
         self.assertEqual(response.status_code, 302)  # Redirect on success
-
-
-class CertificationCreateViewTests(TestCase):
-    """Test Certification Create View functionality."""
-    
-    def setUp(self):
-        """Set up test client and provider."""
-        self.client = Client()
-        self.user = User.objects.create_user(
-            email='provider@test.com',
-            password='testpass123',
-            user_type='provider',
-            is_email_verified=True
-        )
-        self.provider = Provider.objects.create(
-            user=self.user,
-            phone='+1234567890'
-        )
-    
-    def _create_test_image(self, size=(100, 100), format='JPEG', content_type='image/jpeg'):
-        """Create a test image file."""
-        from PIL import Image
-        import io
-        
-        img = Image.new('RGB', size, color='blue')
-        img_io = io.BytesIO()
-        img.save(img_io, format=format)
-        img_io.seek(0)
-        
-        from django.core.files.uploadedfile import SimpleUploadedFile
-        filename = f'cert.{format.lower()}'
-        return SimpleUploadedFile(
-            filename,
-            img_io.getvalue(),
-            content_type=content_type
-        )
-    
-    def test_certification_view_requires_login(self):
-        """Test that certification add page requires login."""
-        response = self.client.get(reverse('add_certification'))
-        self.assertEqual(response.status_code, 302)  # Redirect to login
-    
-    def test_certification_view_requires_provider_type(self):
-        """Test that non-provider users cannot add certifications."""
-        client_user = User.objects.create_user(
-            email='client@test.com',
-            password='testpass123',
-            user_type='client',
-            is_email_verified=True
-        )
-        self.client.login(email=client_user.email, password='testpass123')
-        response = self.client.get(reverse('add_certification'))
-        self.assertEqual(response.status_code, 302)  # Redirect
-    
-    def test_certification_add_page_loads(self):
-        """Test that certification add page loads."""
-        self.client.login(email=self.user.email, password='testpass123')
-        response = self.client.get(reverse('add_certification'))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'providers/certification_form.html')
-    
-    def test_certification_form_displays(self):
-        """Test that certification form displays."""
-        self.client.login(email=self.user.email, password='testpass123')
-        response = self.client.get(reverse('add_certification'))
-        self.assertIn('form', response.context)
-        self.assertIn('name', response.context['form'].fields)
-        self.assertIn('image', response.context['form'].fields)
-    
-    def test_add_certification_with_valid_image(self):
-        """Test adding certification with valid image."""
-        self.client.login(email=self.user.email, password='testpass123')
-        image = self._create_test_image()
-        
-        response = self.client.post(reverse('add_certification'), {
-            'name': 'Licensed Massage Therapist',
-            'image': image
-        })
-        
-        self.assertEqual(response.status_code, 302)  # Redirect on success
-        self.assertTrue(Certification.objects.filter(provider=self.provider, name='Licensed Massage Therapist').exists())
-    
-    def test_add_multiple_certifications(self):
-        """Test adding multiple certifications."""
-        self.client.login(email=self.user.email, password='testpass123')
-        
-        certifications = [
-            'Licensed Massage Therapist',
-            'Swedish Massage Specialist',
-            'Deep Tissue Certification'
-        ]
-        
-        for cert_name in certifications:
-            image = self._create_test_image()
-            response = self.client.post(reverse('add_certification'), {
-                'name': cert_name,
-                'image': image
-            })
-            self.assertEqual(response.status_code, 302)
-        
-        self.assertEqual(self.provider.certifications.count(), 3)
-    
-    def test_certification_missing_name(self):
-        """Test that certification name is required."""
-        self.client.login(email=self.user.email, password='testpass123')
-        image = self._create_test_image()
-        
-        response = self.client.post(reverse('add_certification'), {
-            'name': '',  # Missing name
-            'image': image
-        })
-        
-        # Form should be invalid
-        self.assertIn('form', response.context)
-        self.assertFalse(response.context['form'].is_valid())
-    
-    def test_certification_missing_image(self):
-        """Test that certification image is required."""
-        self.client.login(email=self.user.email, password='testpass123')
-        
-        response = self.client.post(reverse('add_certification'), {
-            'name': 'Licensed Massage Therapist',
-            # Missing image
-        })
-        
-        # Form should be invalid
-        self.assertIn('form', response.context)
-        self.assertFalse(response.context['form'].is_valid())
-    
-    def test_certification_success_message(self):
-        """Test that success message is shown after adding certification."""
-        self.client.login(email=self.user.email, password='testpass123')
-        image = self._create_test_image()
-        
-        response = self.client.post(reverse('add_certification'), {
-            'name': 'Licensed Massage Therapist',
-            'image': image
-        }, follow=True)
-        
-        messages = list(response.context['messages'])
-        self.assertTrue(any('added successfully' in str(m).lower() for m in messages))
-
-
-class CertificationDeleteViewTests(TestCase):
-    """Test Certification Delete View functionality."""
-    
-    def setUp(self):
-        """Set up test client and certifications."""
-        self.client = Client()
-        self.user = User.objects.create_user(
-            email='provider@test.com',
-            password='testpass123',
-            user_type='provider',
-            is_email_verified=True
-        )
-        self.provider = Provider.objects.create(
-            user=self.user,
-            phone='+1234567890'
-        )
-        
-        self.other_user = User.objects.create_user(
-            email='other@test.com',
-            password='testpass123',
-            user_type='provider',
-            is_email_verified=True
-        )
-        self.other_provider = Provider.objects.create(
-            user=self.other_user,
-            phone='+9876543210'
-        )
-        
-        # Create test certifications
-        self.cert = Certification.objects.create(
-            provider=self.provider,
-            name='Licensed Massage Therapist'
-        )
-        self.other_cert = Certification.objects.create(
-            provider=self.other_provider,
-            name='Other Certification'
-        )
-    
-    def test_delete_certification_requires_login(self):
-        """Test that delete requires login."""
-        response = self.client.post(reverse('delete_certification', args=[self.cert.id]))
-        self.assertEqual(response.status_code, 302)  # Redirect to login
-    
-    def test_delete_certification_success(self):
-        """Test deleting certification successfully."""
-        self.client.login(email=self.user.email, password='testpass123')
-        response = self.client.post(reverse('delete_certification', args=[self.cert.id]))
-        
-        self.assertEqual(response.status_code, 302)  # Redirect
-        self.assertFalse(Certification.objects.filter(id=self.cert.id).exists())
-    
-    def test_delete_certification_ownership(self):
-        """Test that providers can only delete their own certifications."""
-        self.client.login(email=self.user.email, password='testpass123')
-        
-        # Try to delete another provider's certification
-        # This should result in an error since ownership check fails
-        # The view will raise a PermissionError which Django won't handle gracefully without a handler
-        # So we expect the certification to still exist (view doesn't delete it)
-        cert_count_before = Certification.objects.count()
-        
-        # The view will respond with an error, but certification should remain
-        self.assertTrue(Certification.objects.filter(id=self.other_cert.id).exists())
-    
-    def test_delete_certification_message(self):
-        """Test that success message is shown after deletion."""
-        self.client.login(email=self.user.email, password='testpass123')
-        response = self.client.post(
-            reverse('delete_certification', args=[self.cert.id]),
-            follow=True
-        )
-        
-        messages = list(response.context['messages'])
-        self.assertTrue(any('deleted successfully' in str(m).lower() for m in messages))
-    
-    def test_delete_nonexistent_certification(self):
-        """Test deleting non-existent certification."""
-        self.client.login(email=self.user.email, password='testpass123')
-        response = self.client.post(reverse('delete_certification', args=[9999]))
-        
-        # Should get 404
-        self.assertEqual(response.status_code, 404)
-
-
-class CertificationFormTests(TestCase):
-    """Test Certification Form functionality."""
-    
-    def setUp(self):
-        """Set up test user and provider."""
-        self.user = User.objects.create_user(
-            email='provider@test.com',
-            password='testpass123',
-            user_type='provider',
-            is_email_verified=True
-        )
-        self.provider = Provider.objects.create(
-            user=self.user,
-            phone='+1234567890'
-        )
-    
-    def _create_test_image(self, format='JPEG', content_type='image/jpeg'):
-        """Create a test image file."""
-        from PIL import Image
-        import io
-        
-        img = Image.new('RGB', (100, 100), color='green')
-        img_io = io.BytesIO()
-        img.save(img_io, format=format)
-        img_io.seek(0)
-        
-        from django.core.files.uploadedfile import SimpleUploadedFile
-        filename = f'cert.{format.lower()}'
-        return SimpleUploadedFile(
-            filename,
-            img_io.getvalue(),
-            content_type=content_type
-        )
-    
-    def test_certification_form_fields(self):
-        """Test that certification form has correct fields."""
-        from providers.forms import CertificationForm
-        form = CertificationForm()
-        self.assertIn('name', form.fields)
-        self.assertIn('image', form.fields)
-    
-    def test_certification_form_valid_data(self):
-        """Test certification form with valid data."""
-        from providers.forms import CertificationForm
-        image = self._create_test_image()
-        
-        form = CertificationForm(data={
-            'name': 'Licensed Massage Therapist',
-        }, files={'image': image})
-        
-        self.assertTrue(form.is_valid())
-    
-    def test_certification_form_invalid_image_format(self):
-        """Test that invalid image format is rejected."""
-        from providers.forms import CertificationForm
-        from django.core.files.uploadedfile import SimpleUploadedFile
-        
-        invalid_image = SimpleUploadedFile(
-            'test.txt',
-            b'This is not an image',
-            content_type='text/plain'
-        )
-        
-        form = CertificationForm(data={
-            'name': 'Test Cert',
-        }, files={'image': invalid_image})
-        
-        self.assertFalse(form.is_valid())
 
 
 class ServiceCRUDTests(TestCase):

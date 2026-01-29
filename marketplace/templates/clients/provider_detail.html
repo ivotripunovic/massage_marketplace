@@ -94,27 +94,6 @@
     {% endif %}
 </div>
 
-<!-- Certifications Section -->
-{% if certifications %}
-<div class="bg-white rounded-lg shadow p-8 mb-8">
-    <h2 class="text-2xl font-bold mb-6">Certifications</h2>
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {% for cert in certifications %}
-        <div>
-            {% if cert.image %}
-            <img src="{{ cert.image.url }}" alt="{{ cert.name }}" class="w-full h-32 object-cover rounded mb-2">
-            {% else %}
-            <div class="w-full h-32 bg-gray-200 rounded flex items-center justify-center mb-2">
-                <span class="text-gray-600 text-sm text-center px-2">{{ cert.name }}</span>
-            </div>
-            {% endif %}
-            <p class="text-sm font-semibold text-center">{{ cert.name }}</p>
-        </div>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
-
 <!-- Reviews Section -->
 <div class="bg-white rounded-lg shadow p-8 mb-8">
     <h2 class="text-2xl font-bold mb-6">Reviews ({{ total_reviews }})</h2>

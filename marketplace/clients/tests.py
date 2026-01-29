@@ -1,7 +1,7 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from users.models import User
-from providers.models import Provider, Service, Certification
+from providers.models import Provider, Service
 from reviews.models import Review
 
 
@@ -169,12 +169,6 @@ class ProviderDetailViewTests(TestCase):
             duration_minutes=60
         )
 
-        # Create certifications
-        self.cert = Certification.objects.create(
-            provider=self.provider,
-            name='Licensed Massage Therapist'
-        )
-
         # Create reviews
         self.review = Review.objects.create(
             provider=self.provider,
@@ -226,15 +220,6 @@ class ProviderDetailViewTests(TestCase):
 
         # Should show description
         self.assertContains(response, 'Relaxing Swedish massage')
-
-    def test_provider_detail_shows_certifications(self):
-        """Test that certifications are displayed."""
-        response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.user.email})
-        )
-
-        # Should show certification name
-        self.assertContains(response, 'Licensed Massage Therapist')
 
     def test_provider_detail_shows_reviews(self):
         """Test that reviews are displayed."""

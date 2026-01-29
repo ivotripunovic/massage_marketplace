@@ -112,10 +112,10 @@ class ProviderDetailView(DetailView):
         return Provider.objects.filter(
             subscription_status='active',
             user__is_email_verified=True
-        ).select_related('user').prefetch_related('services', 'certifications', 'reviews')
+        ).select_related('user').prefetch_related('services', 'reviews')
 
     def get_context_data(self, **kwargs):
-        """Add services, certifications, and reviews to context."""
+        """Add services and reviews to context."""
         context = super().get_context_data(**kwargs)
         provider = context['provider']
 
@@ -124,9 +124,6 @@ class ProviderDetailView(DetailView):
             provider=provider,
             is_active=True
         ).order_by('service_type')
-
-        # Get certifications
-        context['certifications'] = provider.certifications.all()
 
         # Get reviews
         context['reviews'] = Review.objects.filter(

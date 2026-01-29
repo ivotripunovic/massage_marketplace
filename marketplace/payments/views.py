@@ -140,14 +140,13 @@ class AdminProviderDetailView(AdminRequiredMixin, DetailView):
 
     def get_queryset(self):
         return Provider.objects.select_related('user').prefetch_related(
-            'services', 'certifications', 'reviews', 'subscription_payments'
+            'services', 'reviews', 'subscription_payments'
         )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         provider = self.object
         context['services'] = provider.services.all()
-        context['certifications'] = provider.certifications.all()
         context['reviews'] = provider.reviews.all().order_by('-created_at')[:10]
         context['payments'] = provider.subscription_payments.all().order_by('-created_at')[:10]
         context['avg_rating'] = provider.average_rating()
