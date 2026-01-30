@@ -115,11 +115,15 @@ class LoginForm(forms.Form):
             user = authenticate(email=email, password=password)
             if user is None:
                 raise ValidationError('Invalid email or password.')
-            
+
+            # Block admin users from client-facing login
+            if user.user_type == 'admin':
+                raise ValidationError('Invalid email or password.')
+
             # Check if email is verified
             if not user.is_email_verified:
                 raise ValidationError('Please verify your email before logging in.')
-            
+
             # Check if user is active
             if not user.is_active:
                 raise ValidationError('This account has been deactivated.')
