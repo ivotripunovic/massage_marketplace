@@ -12,15 +12,19 @@ class EmailBackend(ModelBackend):
     def authenticate(self, request, email=None, password=None, **kwargs):
         """
         Authenticate user by email and password.
-        
+
         Args:
             request: Django request object
             email: User email (case-insensitive)
             password: User password
-            
+
         Returns:
             User object if authentication successful, None otherwise
         """
+        if email is None:
+            email = kwargs.get('username')
+        if email is None:
+            return None
         try:
             # Case-insensitive email lookup
             user = User.objects.get(email__iexact=email)
