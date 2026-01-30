@@ -235,3 +235,17 @@ RATE_LIMIT_RULES = {
     'signup': (5, 3600),        # 5 signups per hour
     'password_reset': (3, 3600),  # 3 reset requests per hour
 }
+
+LOGGING = {
+    'version': 1,
+    'handlers': {
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': '/var/log/marketplace/django.log',
+        },
+    },
+    'root': {
+        'handlers': ['file'],
+        'level': 'WARNING',
+    },
+}
