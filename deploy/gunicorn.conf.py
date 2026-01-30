@@ -29,7 +29,7 @@ limit_request_field_size = 8190
 graceful_timeout = 30
 
 # Working directory.
-chdir = os.getenv('APP_DIR', '/opt/marketplace')
+chdir = os.getenv('APP_DIR', '/opt/marketplace/marketplace')
 
 # Django WSGI application.
 wsgi_app = 'marketplace.wsgi:application'
