@@ -70,14 +70,14 @@ systemctl start marketplace
 # ---- Nginx configuration ----
 echo "[8/8] Configuring Nginx..."
 sed "s/YOUR_DOMAIN/${DOMAIN}/g" "${APP_DIR}/deploy/nginx.conf" > "/etc/nginx/sites-available/marketplace"
-ln -sf /etc/nginx/sites-available/marketplace /etc/nginx/sites-enabled/marketplace
+ln -sf /etc/nginx/sites-available/marketplace.conf /etc/nginx/sites-enabled/marketplace.conf
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl reload nginx
 
 # ---- SSL certificate (skip if no real domain) ----
 if [ "${DOMAIN}" != "YOUR_DOMAIN" ]; then
     echo "Obtaining SSL certificate for ${DOMAIN}..."
-    certbot --nginx -d "${DOMAIN}" -d "www.${DOMAIN}" --non-interactive --agree-tos --email "admin@${DOMAIN}" || \
+    certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --email "admin@${DOMAIN}" || \
         echo "WARNING: SSL certificate setup failed. Run certbot manually."
 fi
 
