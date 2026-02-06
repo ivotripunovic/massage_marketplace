@@ -548,3 +548,258 @@ class ProviderDetailGalleryTests(TestCase):
             reverse('provider_detail', kwargs={'slug': self.user.email})
         )
         self.assertNotContains(response, 'Photo Gallery')
+
+
+class LocationSearchAPITests(TestCase):
+    """Tests for location search API endpoints."""
+
+    def setUp(self):
+        """Set up test data."""
+        from providers.models import Continent, Country, City
+
+        self.client = Client()
+
+        # Create continents
+        self.europe = Continent.objects.create(name='Europe', code='EU', display_order=1)
+        self.asia = Continent.objects.create(name='Asia', code='AS', display_order=2)
+
+        # Create countries
+        self.uk = Country.objects.create(name='United Kingdom', code='GB', continent=self.europe, is_active=True)
+        self.france = Country.objects.create(name='France', code='FR', continent=self.europe, is_active=True)
+        self.uae = Country.objects.create(name='United Arab Emirates', code='AE', continent=self.asia, is_active=True)
+        self.inactive_country = Country.objects.create(
+            name='Inactive Country', code='IC', continent=self.europe, is_active=False
+        )
+
+        # Create cities
+        self.london = City.objects.create(
+            name='London', country=self.uk, population=8982000, is_capital=True, is_major_city=True
+        )
+        self.birmingham = City.objects.create(
+            name='Birmingham', country=self.uk, population=1149000, is_capital=False, is_major_city=True
+        )
+        self.paris = City.objects.create(
+            name='Paris', country=self.france, population=2161000, is_capital=True, is_major_city=True
+        )
+
+    def test_country_search_basic(self):
+        """Test basic country search functionality."""
+        response = self.client.get(reverse('api_country_search'), {'q': 'united'})
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertIn('results', data)
+
+        names = [r['name'] for r in data['results']]
+        self.assertIn('United Kingdom', names)
+        self.assertIn('United Arab Emirates', names)
+
+    def test_country_search_by_code(self):
+        """Test country search by country code."""
+        response = self.client.get(reverse('api_country_search'), {'q': 'GB'})
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data['results']), 1)
+        self.assertEqual(data['results'][0]['code'], 'GB')
+
+    def test_country_search_includes_continent(self):
+        """Test that country search includes continent info."""
+        response = self.client.get(reverse('api_country_search'), {'q': 'united king'})
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data['results']), 1)
+        self.assertEqual(data['results'][0]['continent'], 'Europe')
+        self.assertEqual(data['results'][0]['continent_code'], 'EU')
+
+    def test_country_search_excludes_inactive(self):
+        """Test that inactive countries are excluded."""
+        response = self.client.get(reverse('api_country_search'), {'q': 'inactive'})
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data['results']), 0)
+
+    def test_country_search_min_chars(self):
+        """Test that search requires minimum 2 characters."""
+        response = self.client.get(reverse('api_country_search'), {'q': 'u'})
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data['results']), 0)
+
+    def test_country_search_empty_query(self):
+        """Test that empty query returns no results."""
+        response = self.client.get(reverse('api_country_search'), {'q': ''})
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data['results']), 0)
+
+    def test_city_search_basic(self):
+        """Test basic city search functionality."""
+        response = self.client.get(
+            reverse('api_city_search'),
+            {'q': 'lon', 'country': str(self.uk.id)}
+        )
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data['results']), 1)
+        self.assertEqual(data['results'][0]['name'], 'London')
+
+    def test_city_search_requires_country(self):
+        """Test that city search requires country ID."""
+        response = self.client.get(reverse('api_city_search'), {'q': 'lon'})
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data['results']), 0)
+
+    def test_city_search_invalid_country_id(self):
+        """Test city search with invalid country ID."""
+        response = self.client.get(
+            reverse('api_city_search'),
+            {'q': 'lon', 'country': 'invalid'}
+        )
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data['results']), 0)
+
+    def test_city_search_scoped_to_country(self):
+        """Test that city search is scoped to selected country."""
+        # Search for 'par' in UK should not find Paris
+        response = self.client.get(
+            reverse('api_city_search'),
+            {'q': 'par', 'country': str(self.uk.id)}
+        )
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data['results']), 0)
+
+        # Search for 'par' in France should find Paris
+        response = self.client.get(
+            reverse('api_city_search'),
+            {'q': 'par', 'country': str(self.france.id)}
+        )
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data['results']), 1)
+        self.assertEqual(data['results'][0]['name'], 'Paris')
+
+    def test_city_search_includes_flags(self):
+        """Test that city search includes is_capital and is_major_city flags."""
+        response = self.client.get(
+            reverse('api_city_search'),
+            {'q': 'london', 'country': str(self.uk.id)}
+        )
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data['results']), 1)
+        self.assertTrue(data['results'][0]['is_capital'])
+        self.assertTrue(data['results'][0]['is_major_city'])
+
+    def test_city_search_min_chars(self):
+        """Test that city search requires minimum 2 characters."""
+        response = self.client.get(
+            reverse('api_city_search'),
+            {'q': 'l', 'country': str(self.uk.id)}
+        )
+        self.assertEqual(response.status_code, 200)
+
+        data = response.json()
+        self.assertEqual(len(data['results']), 0)
+
+
+class ProviderLocationFKFilterTests(TestCase):
+    """Tests for provider filtering by ForeignKey location fields."""
+
+    def setUp(self):
+        """Set up test data."""
+        from providers.models import Continent, Country, City
+
+        self.client = Client()
+
+        # Create location data
+        self.europe = Continent.objects.create(name='Europe', code='EU', display_order=1)
+        self.uk = Country.objects.create(name='United Kingdom', code='GB', continent=self.europe, is_active=True)
+        self.france = Country.objects.create(name='France', code='FR', continent=self.europe, is_active=True)
+        self.london = City.objects.create(name='London', country=self.uk, is_capital=True)
+        self.paris = City.objects.create(name='Paris', country=self.france, is_capital=True)
+
+        # Create providers with FK locations
+        self.provider1 = self._create_provider('provider1@example.com', self.uk, self.london)
+        self.provider2 = self._create_provider('provider2@example.com', self.france, self.paris)
+        self.provider3 = self._create_provider('provider3@example.com', self.uk, None)
+
+    def _create_provider(self, email, country, city):
+        """Helper to create a provider."""
+        user = User.objects.create_user(
+            email=email,
+            password='testpass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        provider = Provider.objects.create(
+            user=user,
+            phone='+1234567890',
+            subscription_status='active',
+            country_new=country,
+            city_new=city
+        )
+        return provider
+
+    def test_filter_by_country_id(self):
+        """Test filtering providers by country_id."""
+        response = self.client.get(
+            reverse('providers') + f'?country_id={self.uk.id}'
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Should show UK providers
+        self.assertContains(response, 'provider1@example.com')
+        self.assertContains(response, 'provider3@example.com')
+        # Should not show France provider
+        self.assertNotContains(response, 'provider2@example.com')
+
+    def test_filter_by_city_id(self):
+        """Test filtering providers by city_id."""
+        response = self.client.get(
+            reverse('providers') + f'?city_id={self.london.id}'
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Should show only London provider
+        self.assertContains(response, 'provider1@example.com')
+        # Should not show others
+        self.assertNotContains(response, 'provider2@example.com')
+        self.assertNotContains(response, 'provider3@example.com')
+
+    def test_filter_by_both_country_and_city(self):
+        """Test filtering by both country_id and city_id."""
+        response = self.client.get(
+            reverse('providers') + f'?country_id={self.uk.id}&city_id={self.london.id}'
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Should show only London provider
+        self.assertContains(response, 'provider1@example.com')
+        self.assertNotContains(response, 'provider2@example.com')
+        self.assertNotContains(response, 'provider3@example.com')
+
+    def test_invalid_country_id_ignored(self):
+        """Test that invalid country_id is ignored."""
+        response = self.client.get(
+            reverse('providers') + '?country_id=invalid'
+        )
+        self.assertEqual(response.status_code, 200)
+
+        # Should show all providers
+        self.assertContains(response, 'provider1@example.com')
+        self.assertContains(response, 'provider2@example.com')
+        self.assertContains(response, 'provider3@example.com')

@@ -1,7 +1,107 @@
 from django.views.generic import ListView, DetailView
 from django.db.models import Count, Avg, Q
-from providers.models import Provider, Service, ProviderGalleryImage
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+from providers.models import Provider, Service, ProviderGalleryImage, Country, City
 from reviews.models import Review
+
+
+@require_GET
+def country_search_api(request):
+    """Search countries by name or code, or list all countries grouped by continent."""
+    query = request.GET.get('q', '').strip()
+    list_all = request.GET.get('all', '').strip() == '1'
+
+    # Get provider counts per country
+    provider_counts = dict(
+        Provider.objects.filter(
+            subscription_status='active',
+            user__is_email_verified=True,
+            country_new__isnull=False
+        ).values('country_new').annotate(count=Count('id')).values_list('country_new', 'count')
+    )
+
+    if list_all or len(query) >= 1:
+        # Filter by query if provided
+        countries_qs = Country.objects.filter(is_active=True).select_related('continent')
+        if query:
+            countries_qs = countries_qs.filter(
+                Q(name__icontains=query) | Q(code__icontains=query)
+            )
+        # Order: Europe first (display_order), then by country name
+        countries_qs = countries_qs.order_by('continent__display_order', 'name')
+
+        # Group by continent
+        continents = {}
+        for c in countries_qs:
+            continent_name = c.continent.name
+            if continent_name not in continents:
+                continents[continent_name] = {
+                    'name': continent_name,
+                    'code': c.continent.code,
+                    'order': c.continent.display_order,
+                    'countries': []
+                }
+            continents[continent_name]['countries'].append({
+                'id': c.id,
+                'name': c.name,
+                'code': c.code,
+                'provider_count': provider_counts.get(c.id, 0)
+            })
+
+        # Sort continents by display order and convert to list
+        results = sorted(continents.values(), key=lambda x: x['order'])
+
+        return JsonResponse({'continents': results})
+
+    return JsonResponse({'continents': []})
+
+
+@require_GET
+def city_search_api(request):
+    """List or search cities within a selected country."""
+    query = request.GET.get('q', '').strip()
+    country_id = request.GET.get('country', '').strip()
+    list_all = request.GET.get('all', '').strip() == '1'
+
+    if not country_id:
+        return JsonResponse({'results': []})
+
+    try:
+        country_id = int(country_id)
+    except ValueError:
+        return JsonResponse({'results': []})
+
+    # Get provider counts per city
+    provider_counts = dict(
+        Provider.objects.filter(
+            subscription_status='active',
+            user__is_email_verified=True,
+            city_new__isnull=False,
+            country_new_id=country_id
+        ).values('city_new').annotate(count=Count('id')).values_list('city_new', 'count')
+    )
+
+    cities_qs = City.objects.filter(country_id=country_id).select_related('country')
+
+    if query:
+        cities_qs = cities_qs.filter(name__icontains=query)
+
+    cities_qs = cities_qs.order_by('-is_capital', '-is_major_city', '-population', 'name')
+
+    if not list_all:
+        cities_qs = cities_qs[:20]
+
+    results = [{
+        'id': c.id,
+        'name': c.name,
+        'country': c.country.name,
+        'is_capital': c.is_capital,
+        'is_major_city': c.is_major_city,
+        'provider_count': provider_counts.get(c.id, 0)
+    } for c in cities_qs]
+
+    return JsonResponse({'results': results})
 
 
 class ProviderDirectoryView(ListView):
@@ -17,12 +117,13 @@ class ProviderDirectoryView(ListView):
         queryset = Provider.objects.filter(
             subscription_status='active',
             user__is_email_verified=True
-        ).select_related('user').prefetch_related('services', 'reviews')
+        ).select_related('user', 'country_new', 'city_new').prefetch_related('services', 'reviews')
 
         # Apply filters from query parameters
         service_type = self.request.GET.get('service_type', '').strip()
-        country = self.request.GET.get('country', '').strip()
-        city = self.request.GET.get('city', '').strip()
+        country_id = self.request.GET.get('country_id', '').strip()
+        city_id = self.request.GET.get('city_id', '').strip()
+        keyword = self.request.GET.get('keyword', '').strip()
         price_min = self.request.GET.get('price_min', '').strip()
         price_max = self.request.GET.get('price_max', '').strip()
 
@@ -30,11 +131,26 @@ class ProviderDirectoryView(ListView):
         if service_type:
             queryset = queryset.filter(services__service_type=service_type, services__is_active=True).distinct()
 
-        # Filter by location
-        if country:
-            queryset = queryset.filter(country__iexact=country)
-        if city:
-            queryset = queryset.filter(city__iexact=city)
+        # Filter by location using ForeignKey fields
+        if country_id:
+            try:
+                queryset = queryset.filter(country_new_id=int(country_id))
+            except ValueError:
+                pass
+        if city_id:
+            try:
+                queryset = queryset.filter(city_new_id=int(city_id))
+            except ValueError:
+                pass
+
+        # Filter by keyword (search in bio, user name, services)
+        if keyword:
+            queryset = queryset.filter(
+                Q(bio__icontains=keyword) |
+                Q(user__first_name__icontains=keyword) |
+                Q(user__last_name__icontains=keyword) |
+                Q(services__description__icontains=keyword)
+            ).distinct()
 
         # Filter by price range (providers who have services in this range)
         if price_min:
@@ -67,11 +183,25 @@ class ProviderDirectoryView(ListView):
             service_count = Service.objects.filter(provider=provider, is_active=True).count()
             avg_rating = provider.average_rating()
 
+            # Get active services for display
+            services = Service.objects.filter(provider=provider, is_active=True)[:3]
+
+            # Get price range
+            all_services = Service.objects.filter(provider=provider, is_active=True)
+            if all_services.exists():
+                min_price = all_services.order_by('price').first().price
+                max_price = all_services.order_by('-price').first().price
+            else:
+                min_price = max_price = None
+
             providers_with_stats.append({
                 'provider': provider,
                 'service_count': service_count,
+                'services': services,
                 'review_count': reviews.count(),
-                'avg_rating': avg_rating
+                'avg_rating': avg_rating,
+                'min_price': min_price,
+                'max_price': max_price,
             })
 
         context['providers_with_stats'] = providers_with_stats
@@ -79,21 +209,30 @@ class ProviderDirectoryView(ListView):
         # Add filter choices and current values
         context['service_types'] = Service.SERVICE_TYPE_CHOICES
         context['current_service_type'] = self.request.GET.get('service_type', '')
-        context['current_country'] = self.request.GET.get('country', '')
-        context['current_city'] = self.request.GET.get('city', '')
+        context['current_country_id'] = self.request.GET.get('country_id', '')
+        context['current_city_id'] = self.request.GET.get('city_id', '')
+        context['current_keyword'] = self.request.GET.get('keyword', '')
         context['current_price_min'] = self.request.GET.get('price_min', '')
         context['current_price_max'] = self.request.GET.get('price_max', '')
 
-        # Get unique countries and cities from active providers
-        context['countries'] = Provider.objects.filter(
-            subscription_status='active',
-            country__isnull=False
-        ).values_list('country', flat=True).distinct().order_by('country')
+        # Get country and city names for display if IDs are set
+        if context['current_country_id']:
+            try:
+                country = Country.objects.get(pk=int(context['current_country_id']))
+                context['current_country_name'] = country.name
+            except (Country.DoesNotExist, ValueError):
+                context['current_country_name'] = ''
+        else:
+            context['current_country_name'] = ''
 
-        context['cities'] = Provider.objects.filter(
-            subscription_status='active',
-            city__isnull=False
-        ).values_list('city', flat=True).distinct().order_by('city')
+        if context['current_city_id']:
+            try:
+                city = City.objects.get(pk=int(context['current_city_id']))
+                context['current_city_name'] = city.name
+            except (City.DoesNotExist, ValueError):
+                context['current_city_name'] = ''
+        else:
+            context['current_city_name'] = ''
 
         return context
 

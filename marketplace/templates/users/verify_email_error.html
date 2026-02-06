@@ -1,47 +1,36 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Verification Error - Massage Marketplace</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial, sans-serif; background-color: #f5f5f5; }
-        .container { max-width: 500px; margin: 50px auto; padding: 40px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }
-        h1 { color: #dc3545; margin-bottom: 20px; }
-        p { color: #666; line-height: 1.6; margin-bottom: 15px; }
-        .icon { font-size: 48px; margin-bottom: 20px; }
-        .error-box { background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 4px; margin: 20px 0; color: #721c24; }
-        .button { display: inline-block; padding: 12px 24px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; margin: 10px 5px; }
-        .button:hover { background-color: #0056b3; }
-        .button.secondary { background-color: #6c757d; }
-        .button.secondary:hover { background-color: #5a6268; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="icon">✕</div>
-        
-        <h1>Verification Error</h1>
-        
-        <div class="error-box">
-            <p>{{ error_message }}</p>
+{% extends "base.html" %}
+
+{% block title %}Verification Error - Massage Marketplace{% endblock %}
+
+{% block content %}
+<div class="min-h-[80vh] flex items-center justify-center py-12 px-4">
+    <div class="w-full max-w-md">
+        <div class="card-dark p-8 text-center">
+            <div class="w-16 h-16 mx-auto mb-6 rounded-full bg-red-900/50 flex items-center justify-center">
+                <svg class="w-8 h-8 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </div>
+
+            <h1 class="text-2xl font-display font-bold text-red-400 mb-4">Verification Error</h1>
+
+            <div class="bg-red-900/30 border border-red-700 rounded-lg p-4 mb-6">
+                <p class="text-red-300">{{ error_message }}</p>
+            </div>
+
+            <p class="text-text-muted mb-6">The verification link has {{ error|lower }}.</p>
+
+            <p class="text-text-muted text-sm mb-6">Please request a new verification email to continue.</p>
+
+            <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                <a href="/auth/resend-email/" class="btn-gold">Request New Link</a>
+                <a href="{% url 'signup' %}" class="px-6 py-2 bg-dark-200 text-text-secondary rounded-md hover:bg-dark-300 transition-colors">Sign Up Again</a>
+            </div>
+
+            <div class="mt-6">
+                <a href="/" class="text-gold hover:text-gold-light text-sm">Back to Home</a>
+            </div>
         </div>
-        
-        <p>The verification link has {{ error|lower }}.</p>
-        
-        <p style="font-size: 14px; color: #666;">
-            Please request a new verification email to continue.
-        </p>
-        
-        <div>
-            <a href="/auth/resend-email/" class="button">Request New Link</a>
-            <a href="/auth/signup/" class="button secondary">Sign Up Again</a>
-        </div>
-        
-        <p style="font-size: 12px; color: #999; margin-top: 20px;">
-            <a href="/" style="color: #007bff;">Back to Home</a>
-        </p>
     </div>
-</body>
-</html>
+</div>
+{% endblock %}

@@ -1207,9 +1207,10 @@ class ProviderAdminTests(TestCase):
         """Test admin list display shows required columns."""
         from providers.admin import ProviderAdmin
         admin_instance = ProviderAdmin(Provider, None)
-        self.assertEqual(len(admin_instance.list_display), 5)
+        self.assertEqual(len(admin_instance.list_display), 6)
         self.assertIn('user_email', admin_instance.list_display)
         self.assertIn('phone', admin_instance.list_display)
+        self.assertIn('location_display', admin_instance.list_display)
         self.assertIn('subscription_status', admin_instance.list_display)
     
     def test_admin_search_fields(self):
@@ -2443,3 +2444,131 @@ class GalleryImageDeleteViewTests(TestCase):
         )
         response = self.client.get(reverse('gallery_delete', args=[image.pk]))
         self.assertEqual(response.status_code, 405)  # Method not allowed
+
+
+class LocationModelTests(TestCase):
+    """Tests for Continent, Country, and City models."""
+
+    def test_continent_creation(self):
+        """Test creating a continent."""
+        from providers.models import Continent
+        continent = Continent.objects.create(
+            name='Europe',
+            code='EU',
+            display_order=1
+        )
+        self.assertEqual(str(continent), 'Europe')
+        self.assertEqual(continent.code, 'EU')
+
+    def test_continent_ordering(self):
+        """Test continents are ordered by display_order then name."""
+        from providers.models import Continent
+        c1 = Continent.objects.create(name='Zebra', code='ZB', display_order=2)
+        c2 = Continent.objects.create(name='Alpha', code='AL', display_order=1)
+        c3 = Continent.objects.create(name='Beta', code='BE', display_order=1)
+
+        continents = list(Continent.objects.all())
+        self.assertEqual(continents[0], c2)  # Alpha (display_order=1, comes first alphabetically)
+        self.assertEqual(continents[1], c3)  # Beta (display_order=1)
+        self.assertEqual(continents[2], c1)  # Zebra (display_order=2)
+
+    def test_country_creation(self):
+        """Test creating a country with continent."""
+        from providers.models import Continent, Country
+        continent = Continent.objects.create(name='Europe', code='EU', display_order=1)
+        country = Country.objects.create(
+            name='United Kingdom',
+            code='GB',
+            continent=continent,
+            is_active=True
+        )
+        self.assertEqual(str(country), 'United Kingdom')
+        self.assertEqual(country.continent, continent)
+        self.assertTrue(country.is_active)
+
+    def test_country_continent_relationship(self):
+        """Test that countries are related to continents."""
+        from providers.models import Continent, Country
+        europe = Continent.objects.create(name='Europe', code='EU', display_order=1)
+        uk = Country.objects.create(name='United Kingdom', code='GB', continent=europe)
+        france = Country.objects.create(name='France', code='FR', continent=europe)
+
+        self.assertEqual(europe.countries.count(), 2)
+        self.assertIn(uk, europe.countries.all())
+        self.assertIn(france, europe.countries.all())
+
+    def test_city_creation(self):
+        """Test creating a city."""
+        from providers.models import Continent, Country, City
+        europe = Continent.objects.create(name='Europe', code='EU', display_order=1)
+        uk = Country.objects.create(name='United Kingdom', code='GB', continent=europe)
+        city = City.objects.create(
+            name='London',
+            country=uk,
+            population=8982000,
+            is_capital=True,
+            is_major_city=True,
+            latitude='51.507351',
+            longitude='-0.127758'
+        )
+        self.assertEqual(str(city), 'London, United Kingdom')
+        self.assertTrue(city.is_capital)
+        self.assertTrue(city.is_major_city)
+
+    def test_city_ordering(self):
+        """Test cities are ordered by is_capital, is_major_city, population desc, name."""
+        from providers.models import Continent, Country, City
+        europe = Continent.objects.create(name='Europe', code='EU', display_order=1)
+        uk = Country.objects.create(name='United Kingdom', code='GB', continent=europe)
+
+        london = City.objects.create(name='London', country=uk, population=8982000, is_capital=True, is_major_city=True)
+        birmingham = City.objects.create(name='Birmingham', country=uk, population=1149000, is_capital=False, is_major_city=True)
+        oxford = City.objects.create(name='Oxford', country=uk, population=150000, is_capital=False, is_major_city=False)
+
+        cities = list(City.objects.filter(country=uk))
+        self.assertEqual(cities[0], london)  # Capital first
+        self.assertEqual(cities[1], birmingham)  # Major city second
+        self.assertEqual(cities[2], oxford)  # Small city last
+
+    def test_city_unique_together(self):
+        """Test that city name + country must be unique."""
+        from providers.models import Continent, Country, City
+        from django.db import IntegrityError
+
+        europe = Continent.objects.create(name='Europe', code='EU', display_order=1)
+        uk = Country.objects.create(name='United Kingdom', code='GB', continent=europe)
+        City.objects.create(name='London', country=uk)
+
+        with self.assertRaises(IntegrityError):
+            City.objects.create(name='London', country=uk)
+
+    def test_provider_location_fk_fields(self):
+        """Test provider with new FK location fields."""
+        from providers.models import Continent, Country, City, Provider
+
+        europe = Continent.objects.create(name='Europe', code='EU', display_order=1)
+        uk = Country.objects.create(name='United Kingdom', code='GB', continent=europe)
+        london = City.objects.create(name='London', country=uk, is_capital=True)
+
+        user = User.objects.create_user(
+            email='provider@test.com',
+            password='pass',
+            user_type='provider'
+        )
+        provider = Provider.objects.create(
+            user=user,
+            phone='+1234567890',
+            country_new=uk,
+            city_new=london
+        )
+
+        self.assertEqual(provider.country_new.name, 'United Kingdom')
+        self.assertEqual(provider.city_new.name, 'London')
+
+    def test_us_not_in_fixtures(self):
+        """Test that United States is not in the country fixtures."""
+        from providers.models import Country
+
+        # Load fixtures in test if they haven't been loaded
+        us = Country.objects.filter(code='US').first()
+        self.assertIsNone(us)

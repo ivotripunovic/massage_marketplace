@@ -198,6 +198,47 @@ def test_certification_creation():
 - [ ] Service model with all required fields
 - [ ] Certification model created
 - [ ] Both models have proper validation
+
+---
+
+## SPRINT 3: UI/UX Theme & Discovery
+
+### WEEK 9: Marketplace Theming & Mobile Discovery
+
+#### TASK 3.1: Apply Inspired Theme
+**Status:** [✓ DONE] ✓
+
+**Objective:** Re-theme the public marketplace to match the color palette, typography, and layout mood of example.com, but strictly for massage services. Mobile-first design with search/filters at the top and provider cards below.
+
+**Requirements:**
+- Extract a minimal color system (primary, secondary, background, text, accent) inspired by example.com; document tokens in SCSS/CSS variables.
+- Global typography: choose a font pair similar in feel (e.g., a sharp sans for UI and a serif or contrasted display for headings); load via Google Fonts or local if already available.
+- Layout: mobile-first; header with search and location filters stacked; provider list/cards follow; ensure responsive behavior for tablet/desktop.
+- Discovery controls:
+  - Country selector covering all countries **except United States**.
+  - Country selector groups countries by continent for quicker scanning.
+  - City selector dynamically scoped to selected country (non-US dataset only).
+  - Service-type filter (reuse existing service choices).
+  - Keyword search bar.
+- Provider cards: photo, name, city/country, service types, price range, rating/reviews snippet, quick contact CTA.
+- Accessibility: maintain contrast AA for text on primary/background; focus styles on form controls.
+
+**Deliverables:**
+- Updated global styles (CSS/SCSS) with documented variables.
+- Updated templates for search/filters placement and provider list ordering (mobile-first semantics). 
+- Country/City data source excluding US; seed or fixture if needed.
+- Brief design notes in `docs/ui_theme.md` (palette, fonts, component notes).
+
+**Tests:**
+- Snapshot/DOM tests (if present) updated for new structure; otherwise add template tests asserting filters render and ordering (filters above list).
+- Contrast check via `assert`able CSS variables (hex values present) or manual checklist in PR notes.
+
+**Acceptance Criteria:**
+- Theme matches target palette/feel while remaining appropriate for massage services.
+- Search + country (non-US) + city filters render inside top bar on  mobile (<768px) and remain accessible on desktop, it must look exactly like country/city selection as example.com
+- Provider cards display required fields and respond to filter selections.
+- No US option appears in country selector; city list updates per country.
+- Styles and design notes are documented in `docs/ui_theme.md`.
 - [ ] Both registered in Django admin
 - [ ] Migrations created and applied
 - [ ] All tests pass

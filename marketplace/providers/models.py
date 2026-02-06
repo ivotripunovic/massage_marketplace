@@ -4,6 +4,112 @@ from django.core.exceptions import ValidationError
 from datetime import timedelta, date
 
 
+class Continent(models.Model):
+    """Continent model for geographical organization."""
+
+    name = models.CharField(max_length=50, unique=True)
+    code = models.CharField(max_length=2, unique=True, help_text='2-character continent code')
+    display_order = models.IntegerField(default=0, help_text='Order for display in lists')
+
+    class Meta:
+        db_table = 'providers_continent'
+        verbose_name = 'Continent'
+        verbose_name_plural = 'Continents'
+        ordering = ['display_order', 'name']
+
+    def __str__(self):
+        return self.name
+
+
+class Country(models.Model):
+    """Country model - excludes United States."""
+
+    name = models.CharField(max_length=100, unique=True)
+    code = models.CharField(
+        max_length=2,
+        unique=True,
+        help_text='ISO 3166-1 alpha-2 country code'
+    )
+    continent = models.ForeignKey(
+        Continent,
+        on_delete=models.CASCADE,
+        related_name='countries'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Whether this country is available for selection'
+    )
+    display_order = models.IntegerField(
+        default=0,
+        help_text='Order for display within continent'
+    )
+
+    class Meta:
+        db_table = 'providers_country'
+        verbose_name = 'Country'
+        verbose_name_plural = 'Countries'
+        ordering = ['continent', 'display_order', 'name']
+        indexes = [
+            models.Index(fields=['continent', 'name']),
+            models.Index(fields=['is_active']),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class City(models.Model):
+    """City model with population and geographic data."""
+
+    name = models.CharField(max_length=100)
+    country = models.ForeignKey(
+        Country,
+        on_delete=models.CASCADE,
+        related_name='cities'
+    )
+    population = models.IntegerField(
+        null=True,
+        blank=True,
+        help_text='City population'
+    )
+    is_capital = models.BooleanField(
+        default=False,
+        help_text='Whether this is a capital city'
+    )
+    is_major_city = models.BooleanField(
+        default=False,
+        help_text='Whether this is a major city (pop > 500k or important)'
+    )
+    latitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text='Latitude coordinate'
+    )
+    longitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text='Longitude coordinate'
+    )
+
+    class Meta:
+        db_table = 'providers_city'
+        verbose_name = 'City'
+        verbose_name_plural = 'Cities'
+        ordering = ['-is_capital', '-is_major_city', '-population', 'name']
+        unique_together = ('name', 'country')
+        indexes = [
+            models.Index(fields=['country', 'name']),
+            models.Index(fields=['is_major_city']),
+        ]
+
+    def __str__(self):
+        return f"{self.name}, {self.country.name}"
+
+
 class Provider(models.Model):
     """Provider profile model."""
     
@@ -32,17 +138,35 @@ class Provider(models.Model):
         null=True
     )
 
-    # Location fields
+    # Location fields (old CharField - will be deprecated)
     country = models.CharField(
         max_length=100,
         blank=True,
         null=True,
-        help_text='Country where services are provided'
+        help_text='Country where services are provided (deprecated, use country_new)'
     )
     city = models.CharField(
         max_length=100,
         blank=True,
         null=True,
+        help_text='City where services are provided (deprecated, use city_new)'
+    )
+
+    # New ForeignKey location fields
+    country_new = models.ForeignKey(
+        Country,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='providers',
+        help_text='Country where services are provided'
+    )
+    city_new = models.ForeignKey(
+        City,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='providers',
         help_text='City where services are provided'
     )
     

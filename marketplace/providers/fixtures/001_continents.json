@@ -1,0 +1,56 @@
+[
+  {
+    "model": "providers.continent",
+    "pk": 1,
+    "fields": {
+      "name": "Europe",
+      "code": "EU",
+      "display_order": 1
+    }
+  },
+  {
+    "model": "providers.continent",
+    "pk": 2,
+    "fields": {
+      "name": "Asia",
+      "code": "AS",
+      "display_order": 2
+    }
+  },
+  {
+    "model": "providers.continent",
+    "pk": 3,
+    "fields": {
+      "name": "Africa",
+      "code": "AF",
+      "display_order": 3
+    }
+  },
+  {
+    "model": "providers.continent",
+    "pk": 4,
+    "fields": {
+      "name": "South America",
+      "code": "SA",
+      "display_order": 4
+    }
+  },
+  {
+    "model": "providers.continent",
+    "pk": 5,
+    "fields": {
+      "name": "Oceania",
+      "code": "OC",
+      "display_order": 5
+    }
+  },
+  {
+    "model": "providers.continent",
+    "pk": 6,
+    "fields": {
+      "name": "Antarctica",
+      "code": "AN",
+      "display_order": 6
+    }
+  }
+]

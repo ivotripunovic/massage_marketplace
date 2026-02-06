@@ -1,30 +1,209 @@
+{% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Massage Marketplace{% endblock %}</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS with custom config -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        // Primary dark colors
+                        dark: {
+                            DEFAULT: '#0a0a0a',
+                            50: '#1a1a1a',
+                            100: '#242424',
+                            200: '#2d2d2d',
+                            300: '#3d3d3d',
+                            400: '#4d4d4d',
+                        },
+                        // Accent reds
+                        accent: {
+                            DEFAULT: '#8b1538',
+                            light: '#a31d47',
+                            dark: '#6b1030',
+                        },
+                        // Deep purple
+                        purple: {
+                            deep: '#4a1a4a',
+                        },
+                        // Gold accents
+                        gold: {
+                            DEFAULT: '#d4af37',
+                            light: '#e6c757',
+                            dark: '#b8952f',
+                        },
+                        // Text colors
+                        text: {
+                            primary: '#f5f5f5',
+                            secondary: '#b8b8b8',
+                            muted: '#808080',
+                        },
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                        display: ['Playfair Display', 'Georgia', 'serif'],
+                    },
+                },
+            },
+        }
+    </script>
+
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-        .nav-link { display: inline-block; padding: 8px 16px; color: #333; text-decoration: none; border-radius: 4px; }
-        .nav-link:hover { background-color: #f0f0f0; }
-        .nav-link.active { background-color: #007bff; color: white; }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3d3d3d;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4d4d4d;
+        }
+
+        /* Focus styles */
+        *:focus {
+            outline: 2px solid #d4af37;
+            outline-offset: 2px;
+        }
+
+        /* Navigation link hover */
+        .nav-link {
+            display: inline-block;
+            padding: 8px 16px;
+            color: #b8b8b8;
+            text-decoration: none;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+        .nav-link:hover {
+            color: #d4af37;
+            background-color: rgba(212, 175, 55, 0.1);
+        }
+        .nav-link.active {
+            color: #d4af37;
+            background-color: rgba(212, 175, 55, 0.15);
+        }
+
+        /* Gold gradient text */
+        .gold-gradient {
+            background: linear-gradient(135deg, #d4af37, #e6c757);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        /* Button styles */
+        .btn-gold {
+            background: linear-gradient(135deg, #d4af37, #b8952f);
+            color: #0a0a0a;
+            font-weight: 600;
+            padding: 10px 24px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .btn-gold:hover {
+            background: linear-gradient(135deg, #e6c757, #d4af37);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(212, 175, 55, 0.3);
+        }
+
+        .btn-accent {
+            background: linear-gradient(135deg, #8b1538, #a31d47);
+            color: #f5f5f5;
+            font-weight: 600;
+            padding: 10px 24px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .btn-accent:hover {
+            background: linear-gradient(135deg, #a31d47, #b82252);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(139, 21, 56, 0.4);
+        }
+
+        /* Card styles */
+        .card-dark {
+            background-color: #242424;
+            border: 1px solid #3d3d3d;
+            border-radius: 12px;
+            transition: all 0.2s;
+        }
+        .card-dark:hover {
+            border-color: #d4af37;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Input styles for dark theme */
+        .input-dark {
+            background-color: #1a1a1a;
+            border: 1px solid #3d3d3d;
+            color: #f5f5f5;
+            border-radius: 6px;
+            padding: 10px 14px;
+            transition: border-color 0.2s;
+        }
+        .input-dark:focus {
+            border-color: #d4af37;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+        }
+        .input-dark::placeholder {
+            color: #808080;
+        }
+
+        /* Select dropdown */
+        .select-dark {
+            background-color: #1a1a1a;
+            border: 1px solid #3d3d3d;
+            color: #f5f5f5;
+            border-radius: 6px;
+            padding: 10px 14px;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23808080'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 20px;
+            padding-right: 40px;
+        }
+        .select-dark:focus {
+            border-color: #d4af37;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.15);
+        }
     </style>
+
+    {% block extra_css %}{% endblock %}
 </head>
-<body class="bg-gray-50">
+<body class="bg-dark text-text-primary font-sans min-h-screen flex flex-col">
     <!-- Navigation -->
-    <nav class="bg-white shadow-sm">
+    <nav class="bg-dark-50 border-b border-dark-300 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex justify-between items-center h-16">
-                <div class="flex items-center">
-                    <a href="/" class="text-2xl font-bold text-blue-600">Massage Marketplace</a>
-                </div>
-                
-                <div class="hidden md:flex items-center space-x-1">
+            <div class="flex items-center h-12 gap-2">
+                <a href="/" class="text-base md:text-xl font-display font-bold gold-gradient whitespace-nowrap flex-shrink-0">Massage Marketplace</a>
+
+                {% block nav_center %}{% endblock %}
+
+                <div class="hidden md:flex items-center space-x-1 flex-shrink-0">
                     {% if user.is_authenticated %}
-                        <span class="text-gray-700 mr-4">Hello, <strong>{{ user.email }}</strong></span>
-                        
+                        <span class="text-text-secondary mr-4">Hello, <strong class="text-gold">{{ user.email }}</strong></span>
+
                         {% if user.user_type == 'provider' %}
                             <a href="{% url 'provider_dashboard' %}" class="nav-link">Dashboard</a>
                             <a href="{% url 'provider_profile' %}" class="nav-link">Profile</a>
@@ -33,103 +212,116 @@
                             <a href="/client/dashboard/" class="nav-link">Find Services</a>
                             <a href="/client/bookings/" class="nav-link">My Bookings</a>
                         {% endif %}
-                        
+
                         <form method="post" action="{% url 'logout' %}" style="display: inline;">
                             {% csrf_token %}
-                            <button type="submit" class="nav-link ml-4">Logout</button>
+                            <button type="submit" class="nav-link ml-4 text-accent-light hover:text-accent">Logout</button>
                         </form>
                     {% else %}
                         <a href="{% url 'login' %}" class="nav-link">Login</a>
-                        <a href="{% url 'signup' %}" class="nav-link">Sign Up</a>
+                        <a href="{% url 'signup' %}" class="btn-gold text-sm">Sign Up</a>
                     {% endif %}
                 </div>
-                
+
                 <!-- Mobile menu button -->
-                <div class="md:hidden">
-                    <button id="mobile-menu-btn" class="inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:bg-gray-100">
-                        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="md:hidden flex-shrink-0">
+                    <button id="mobile-menu-btn" class="inline-flex items-center justify-center p-1.5 rounded-md text-text-secondary hover:text-gold hover:bg-dark-200">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                         </svg>
                     </button>
                 </div>
             </div>
-            
+
             <!-- Mobile menu -->
             <div id="mobile-menu" class="hidden md:hidden pb-4">
                 {% if user.is_authenticated %}
-                    <span class="block text-gray-700 px-2 py-2">{{ user.email }}</span>
+                    <span class="block text-text-secondary px-2 py-2 border-b border-dark-300 mb-2">{{ user.email }}</span>
                     {% if user.user_type == 'provider' %}
-                        <a href="{% url 'provider_dashboard' %}" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">Dashboard</a>
-                        <a href="{% url 'provider_profile' %}" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">Profile</a>
-                        <a href="{% url 'services_list' %}" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">Services</a>
+                        <a href="{% url 'provider_dashboard' %}" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">Dashboard</a>
+                        <a href="{% url 'provider_profile' %}" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">Profile</a>
+                        <a href="{% url 'services_list' %}" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">Services</a>
                     {% elif user.user_type == 'client' %}
-                        <a href="/client/dashboard/" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">Find Services</a>
-                        <a href="/client/bookings/" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">My Bookings</a>
+                        <a href="/client/dashboard/" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">Find Services</a>
+                        <a href="/client/bookings/" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">My Bookings</a>
                     {% endif %}
                     <form method="post" action="{% url 'logout' %}">
                         {% csrf_token %}
-                        <button type="submit" class="block w-full text-left px-2 py-2 text-gray-700 hover:bg-gray-100">Logout</button>
+                        <button type="submit" class="block w-full text-left px-2 py-2 text-accent-light hover:bg-dark-200 rounded mt-2">Logout</button>
                     </form>
                 {% else %}
-                    <a href="{% url 'login' %}" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">Login</a>
-                    <a href="{% url 'signup' %}" class="block px-2 py-2 text-gray-700 hover:bg-gray-100">Sign Up</a>
+                    <a href="{% url 'login' %}" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">Login</a>
+                    <a href="{% url 'signup' %}" class="block px-2 py-2 text-gold hover:bg-dark-200 rounded">Sign Up</a>
                 {% endif %}
             </div>
         </div>
     </nav>
-    
+
     <!-- Messages -->
     {% if messages %}
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
         {% for message in messages %}
             <div class="
                 {% if message.tags %}
-                    {% if 'success' in message.tags %}bg-green-50 border border-green-200 text-green-800{% elif 'error' in message.tags %}bg-red-50 border border-red-200 text-red-800{% else %}bg-blue-50 border border-blue-200 text-blue-800{% endif %}
+                    {% if 'success' in message.tags %}bg-emerald-900/50 border border-emerald-700 text-emerald-300
+                    {% elif 'error' in message.tags %}bg-red-900/50 border border-red-700 text-red-300
+                    {% elif 'warning' in message.tags %}bg-amber-900/50 border border-amber-700 text-amber-300
+                    {% else %}bg-blue-900/50 border border-blue-700 text-blue-300{% endif %}
                 {% else %}
-                    bg-blue-50 border border-blue-200 text-blue-800
+                    bg-blue-900/50 border border-blue-700 text-blue-300
                 {% endif %}
-                rounded-md p-4 mb-4">
+                rounded-lg p-4 mb-4 flex items-start">
+                <svg class="h-5 w-5 mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    {% if 'success' in message.tags %}
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    {% elif 'error' in message.tags %}
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                    {% else %}
+                    <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                    {% endif %}
+                </svg>
                 <p>{{ message }}</p>
             </div>
         {% endfor %}
     </div>
     {% endif %}
-    
+
     <!-- Main content -->
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <main class="flex-grow">
         {% block content %}{% endblock %}
-    </div>
-    
+    </main>
+
     <!-- Footer -->
-    <footer class="bg-white border-t mt-12">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div class="grid grid-cols-3 gap-8 md:grid-cols-3">
+    <footer class="bg-dark-50 border-t border-dark-300 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div>
-                    <h4 class="font-bold mb-4">Massage Marketplace</h4>
-                    <p class="text-gray-600 text-sm">Connect with professional massage therapists.</p>
+                    <h4 class="font-display font-bold text-lg text-gold mb-4">Massage Marketplace</h4>
+                    <p class="text-text-muted text-sm leading-relaxed">Connect with professional massage therapists worldwide. Premium services, verified providers.</p>
                 </div>
                 <div>
-                    <h4 class="font-bold mb-4">Legal</h4>
-                    <ul class="text-sm space-y-2">
-                        <li><a href="{% url 'terms' %}" class="text-blue-600 hover:underline">Terms of Service</a></li>
-                        <li><a href="{% url 'privacy' %}" class="text-blue-600 hover:underline">Privacy Policy</a></li>
-                        <li><a href="{% url 'payment_policy' %}" class="text-blue-600 hover:underline">Payment Policy</a></li>
+                    <h4 class="font-semibold text-text-primary mb-4">Legal</h4>
+                    <ul class="text-sm space-y-3">
+                        <li><a href="{% url 'terms' %}" class="text-text-secondary hover:text-gold transition-colors">Terms of Service</a></li>
+                        <li><a href="{% url 'privacy' %}" class="text-text-secondary hover:text-gold transition-colors">Privacy Policy</a></li>
+                        <li><a href="{% url 'payment_policy' %}" class="text-text-secondary hover:text-gold transition-colors">Payment Policy</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="font-bold mb-4">For Providers</h4>
-                    <ul class="text-sm space-y-2">
-                        <li><a href="{% url 'signup' %}" class="text-blue-600 hover:underline">Join as Provider</a></li>
-                        <li><a href="/provider/faq/" class="text-blue-600 hover:underline">Provider FAQ</a></li>
+                    <h4 class="font-semibold text-text-primary mb-4">For Providers</h4>
+                    <ul class="text-sm space-y-3">
+                        <li><a href="{% url 'signup' %}" class="text-text-secondary hover:text-gold transition-colors">Join as Provider</a></li>
+                        <li><a href="/provider/faq/" class="text-text-secondary hover:text-gold transition-colors">Provider FAQ</a></li>
                     </ul>
                 </div>
             </div>
-            <div class="border-t mt-8 pt-8 text-center text-gray-600 text-sm">
-                <p>&copy; 2024 Massage Marketplace. All rights reserved.</p>
+            <div class="border-t border-dark-300 mt-10 pt-8 text-center">
+                <p class="text-text-muted text-sm">&copy; 2024 Massage Marketplace. All rights reserved.</p>
             </div>
         </div>
     </footer>
-    
+
+    <!-- Core Scripts -->
     <script>
         // Mobile menu toggle
         document.getElementById('mobile-menu-btn')?.addEventListener('click', function() {
@@ -137,5 +329,7 @@
             menu.classList.toggle('hidden');
         });
     </script>
+
+    {% block extra_js %}{% endblock %}
 </body>
 </html>

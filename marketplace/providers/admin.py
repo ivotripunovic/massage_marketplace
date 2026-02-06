@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Provider, Service, ProviderGalleryImage
+from .models import Provider, Service, ProviderGalleryImage, Continent, Country, City
 
 
 class ServiceInline(admin.TabularInline):
@@ -17,13 +17,51 @@ class GalleryImageInline(admin.TabularInline):
     readonly_fields = ('uploaded_at',)
 
 
+@admin.register(Continent)
+class ContinentAdmin(admin.ModelAdmin):
+    """Admin interface for Continent model."""
+    list_display = ('name', 'code', 'display_order', 'country_count')
+    list_editable = ('display_order',)
+    ordering = ('display_order', 'name')
+
+    def country_count(self, obj):
+        return obj.countries.count()
+    country_count.short_description = 'Countries'
+
+
+@admin.register(Country)
+class CountryAdmin(admin.ModelAdmin):
+    """Admin interface for Country model."""
+    list_display = ('name', 'code', 'continent', 'is_active', 'city_count')
+    list_filter = ('continent', 'is_active')
+    search_fields = ('name', 'code')
+    list_editable = ('is_active',)
+    ordering = ('continent', 'name')
+
+    def city_count(self, obj):
+        return obj.cities.count()
+    city_count.short_description = 'Cities'
+
+
+@admin.register(City)
+class CityAdmin(admin.ModelAdmin):
+    """Admin interface for City model."""
+    list_display = ('name', 'country', 'population', 'is_capital', 'is_major_city')
+    list_filter = ('country__continent', 'is_capital', 'is_major_city')
+    search_fields = ('name', 'country__name')
+    list_editable = ('is_capital', 'is_major_city')
+    autocomplete_fields = ('country',)
+    ordering = ('country', '-is_capital', '-is_major_city', 'name')
+
+
 @admin.register(Provider)
 class ProviderAdmin(admin.ModelAdmin):
     """Admin interface for Provider model."""
-    
+
     list_display = (
         'user_email',
         'phone',
+        'location_display',
         'subscription_status',
         'subscription_payment_method',
         'created_at'
@@ -31,6 +69,8 @@ class ProviderAdmin(admin.ModelAdmin):
     list_filter = (
         'subscription_status',
         'subscription_payment_method',
+        'country_new__continent',
+        'country_new',
         'created_at',
         'updated_at'
     )
@@ -38,17 +78,24 @@ class ProviderAdmin(admin.ModelAdmin):
         'user__email',
         'user__first_name',
         'user__last_name',
-        'phone'
+        'phone',
+        'country_new__name',
+        'city_new__name'
     )
     readonly_fields = ('created_at', 'updated_at')
     inlines = [ServiceInline, GalleryImageInline]
-    
+    autocomplete_fields = ('country_new', 'city_new')
+
     fieldsets = (
         ('User Information', {
             'fields': ('user',)
         }),
         ('Personal Information', {
             'fields': ('bio', 'phone', 'photo')
+        }),
+        ('Location', {
+            'fields': ('country_new', 'city_new', 'country', 'city'),
+            'description': 'Use country_new and city_new fields (the old country/city fields are deprecated)'
         }),
         ('Subscription', {
             'fields': (
@@ -66,6 +113,17 @@ class ProviderAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+
+    def location_display(self, obj):
+        """Display location in list view."""
+        if obj.city_new and obj.country_new:
+            return f"{obj.city_new.name}, {obj.country_new.name}"
+        elif obj.country_new:
+            return obj.country_new.name
+        elif obj.city and obj.country:
+            return f"{obj.city}, {obj.country}"
+        return '-'
+    location_display.short_description = 'Location'
     
     actions = ['deactivate_subscriptions', 'suspend_accounts', 'activate_subscriptions']
     

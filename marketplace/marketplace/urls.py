@@ -35,7 +35,7 @@ from payments.views import (
     AdminProviderDetailView, AdminProviderSuspendView,
     AdminPaymentApproveView, AdminAnalyticsView
 )
-from clients.views import ProviderDirectoryView, ProviderDetailView
+from clients.views import ProviderDirectoryView, ProviderDetailView, country_search_api, city_search_api
 from reviews.views import ReviewSubmitView
 
 urlpatterns = [
@@ -85,6 +85,10 @@ urlpatterns = [
     path('terms/', TemplateView.as_view(template_name='legal/terms.html'), name='terms'),
     path('privacy/', TemplateView.as_view(template_name='legal/privacy.html'), name='privacy'),
     path('payment-policy/', TemplateView.as_view(template_name='legal/payment_policy.html'), name='payment_policy'),
+
+    # API endpoints for location autocomplete
+    path('api/countries/search/', country_search_api, name='api_country_search'),
+    path('api/cities/search/', city_search_api, name='api_city_search'),
 ]
 
 # Serve media files in development

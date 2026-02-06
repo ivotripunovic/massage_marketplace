@@ -2,219 +2,302 @@
 
 {% block title %}{{ provider.get_name }} - Massage Marketplace{% endblock %}
 
-{% block content %}
-<!-- Breadcrumb -->
-<nav class="text-sm mb-6">
-    <a href="{% url 'home' %}" class="text-blue-600 hover:underline">Home</a>
-    <span class="text-gray-500 mx-2">›</span>
-    <a href="{% url 'providers' %}" class="text-blue-600 hover:underline">Providers</a>
-    <span class="text-gray-500 mx-2">›</span>
-    <span class="text-gray-700">{{ provider.get_name }}</span>
-</nav>
+{% block extra_css %}
+<style>
+    .gallery-image {
+        transition: transform 0.3s ease;
+    }
+    .gallery-image:hover {
+        transform: scale(1.05);
+    }
+    .star-rating {
+        color: #d4af37;
+    }
+    .star-empty {
+        color: #3d3d3d;
+    }
+</style>
+{% endblock %}
 
-<!-- Provider Header -->
-<div class="bg-white rounded-lg shadow p-8 mb-8">
-    <div class="flex flex-col md:flex-row items-start gap-8">
-        <!-- Photo -->
-        <div class="flex-shrink-0">
-            {% if provider.photo %}
-            <img src="{{ provider.photo.url }}" alt="{{ provider.get_name }}" class="w-32 h-32 rounded-full object-cover">
-            {% else %}
-            <div class="w-32 h-32 rounded-full bg-gray-200 flex items-center justify-center">
-                <svg class="w-16 h-16 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path>
-                </svg>
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Breadcrumb -->
+    <nav class="text-sm mb-6 flex items-center gap-2">
+        <a href="{% url 'home' %}" class="text-text-secondary hover:text-gold transition-colors">Home</a>
+        <svg class="w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
+        <a href="{% url 'providers' %}" class="text-text-secondary hover:text-gold transition-colors">Providers</a>
+        <svg class="w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+        </svg>
+        <span class="text-gold">{{ provider.get_name }}</span>
+    </nav>
+
+    <!-- Provider Header -->
+    <div class="card-dark p-6 md:p-8 mb-8">
+        <div class="flex flex-col md:flex-row items-start gap-6 md:gap-8">
+            <!-- Photo -->
+            <div class="flex-shrink-0">
+                {% if provider.photo %}
+                <img src="{{ provider.photo.url }}" alt="{{ provider.get_name }}"
+                     class="w-32 h-32 md:w-40 md:h-40 rounded-xl object-cover border-2 border-dark-300">
+                {% else %}
+                <div class="w-32 h-32 md:w-40 md:h-40 rounded-xl bg-dark-200 flex items-center justify-center border-2 border-dark-300">
+                    <svg class="w-16 h-16 text-dark-400" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path>
+                    </svg>
+                </div>
+                {% endif %}
             </div>
-            {% endif %}
+
+            <!-- Info -->
+            <div class="flex-grow">
+                <h1 class="text-3xl md:text-4xl font-display font-bold text-text-primary mb-3">{{ provider.get_name }}</h1>
+
+                <!-- Location -->
+                {% if provider.city_new or provider.country_new %}
+                <div class="flex items-center gap-2 text-text-secondary mb-4">
+                    <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span>
+                        {% if provider.city_new %}{{ provider.city_new.name }}{% endif %}{% if provider.city_new and provider.country_new %}, {% endif %}{% if provider.country_new %}{{ provider.country_new.name }}{% endif %}
+                    </span>
+                </div>
+                {% elif provider.city or provider.country %}
+                <div class="flex items-center gap-2 text-text-secondary mb-4">
+                    <svg class="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <span>
+                        {% if provider.city %}{{ provider.city }}{% endif %}{% if provider.city and provider.country %}, {% endif %}{% if provider.country %}{{ provider.country }}{% endif %}
+                    </span>
+                </div>
+                {% endif %}
+
+                <!-- Rating -->
+                {% if avg_rating > 0 %}
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="flex items-center">
+                        {% for i in "12345" %}
+                            {% if forloop.counter <= avg_rating %}
+                            <svg class="w-5 h-5 star-rating" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                            {% else %}
+                            <svg class="w-5 h-5 star-empty" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <span class="text-xl font-semibold text-gold">{{ avg_rating }}</span>
+                    <span class="text-text-muted">({{ total_reviews }} review{{ total_reviews|pluralize }})</span>
+                </div>
+                {% else %}
+                <p class="text-text-muted mb-6">No reviews yet</p>
+                {% endif %}
+
+                <!-- Contact Button -->
+                {% if provider.phone %}
+                <div class="flex flex-wrap gap-3">
+                    <a href="tel:{{ provider.phone }}" class="btn-accent inline-flex items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+                        </svg>
+                        Contact Provider
+                    </a>
+                    <span class="text-text-secondary self-center">{{ provider.phone }}</span>
+                </div>
+                {% endif %}
+            </div>
         </div>
 
-        <!-- Info -->
-        <div class="flex-grow">
-            <h1 class="text-3xl font-bold mb-2">{{ provider.get_name }}</h1>
+        <!-- Bio -->
+        {% if provider.bio %}
+        <div class="mt-8 pt-8 border-t border-dark-300">
+            <h2 class="text-xl font-display font-bold text-gold mb-4">About</h2>
+            <p class="text-text-secondary whitespace-pre-line leading-relaxed">{{ provider.bio }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Services Section -->
+    <div class="card-dark p-6 md:p-8 mb-8">
+        <h2 class="text-2xl font-display font-bold text-gold mb-6">Services</h2>
+
+        {% if services %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for service in services %}
+            <div class="bg-dark-200 rounded-xl p-5 border border-dark-300 hover:border-gold transition-colors">
+                <div class="flex justify-between items-start mb-3">
+                    <div>
+                        <h3 class="font-semibold text-lg text-text-primary">{{ service.get_service_type_display }}</h3>
+                        <p class="text-text-muted text-sm flex items-center gap-1 mt-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            {{ service.duration_minutes }} minutes
+                        </p>
+                    </div>
+                    <span class="text-2xl font-bold text-gold">${{ service.price }}</span>
+                </div>
+                {% if service.description %}
+                <p class="text-text-secondary text-sm">{{ service.description }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-text-muted">No services listed yet.</p>
+        {% endif %}
+    </div>
+
+    <!-- Gallery Section -->
+    {% if gallery_images %}
+    <div class="card-dark p-6 md:p-8 mb-8">
+        <h2 class="text-2xl font-display font-bold text-gold mb-6">Photo Gallery</h2>
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {% for image in gallery_images %}
+            <div class="rounded-xl overflow-hidden bg-dark-200">
+                <img src="{{ image.image.url }}" alt="{{ image.caption|default:'Gallery image' }}"
+                     class="gallery-image w-full h-48 object-cover">
+                {% if image.caption %}
+                <div class="p-3">
+                    <p class="text-sm text-text-secondary">{{ image.caption }}</p>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Reviews Section -->
+    <div class="card-dark p-6 md:p-8 mb-8">
+        <h2 class="text-2xl font-display font-bold text-gold mb-6">Reviews ({{ total_reviews }})</h2>
+
+        {% if reviews %}
+        <div class="space-y-6">
+            {% for review in reviews %}
+            <div class="{% if not forloop.last %}border-b border-dark-300 pb-6{% endif %}">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        {% for i in "12345" %}
+                            {% if forloop.counter <= review.rating %}
+                            <svg class="w-4 h-4 star-rating" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                            {% else %}
+                            <svg class="w-4 h-4 star-empty" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <span class="text-text-muted text-sm">{{ review.created_at|date:"M d, Y" }}</span>
+                </div>
+                {% if review.client_name %}
+                <p class="font-semibold text-text-primary mb-2">{{ review.client_name }}</p>
+                {% else %}
+                <p class="font-semibold text-text-muted mb-2">Anonymous</p>
+                {% endif %}
+                {% if review.comment %}
+                <p class="text-text-secondary leading-relaxed">{{ review.comment }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-text-muted">No reviews yet. Be the first to review this provider!</p>
+        {% endif %}
+    </div>
+
+    <!-- Submit Review Section -->
+    <div class="card-dark p-6 md:p-8">
+        <h2 class="text-2xl font-display font-bold text-gold mb-6">Write a Review</h2>
+
+        {% include "includes/_messages.html" %}
+
+        <form method="post" action="{% url 'review_submit' provider.user.email %}" class="space-y-6">
+            {% csrf_token %}
 
             <!-- Rating -->
-            {% if avg_rating > 0 %}
-            <div class="flex items-center mb-4">
-                <span class="text-yellow-500 text-2xl mr-2">★</span>
-                <span class="text-xl font-semibold">{{ avg_rating }}</span>
-                <span class="text-gray-500 ml-2">({{ total_reviews }} review{{ total_reviews|pluralize }})</span>
-            </div>
-            {% else %}
-            <p class="text-gray-500 mb-4">No reviews yet</p>
-            {% endif %}
-
-            <!-- Contact Info -->
-            {% if provider.phone %}
-            <div class="space-y-2 mb-4">
-                <p class="text-gray-700">
-                    <span class="font-semibold">Phone:</span> {{ provider.phone }}
-                </p>
-            </div>
-
-            <!-- Contact Button -->
-            <a href="tel:{{ provider.phone }}" class="inline-block bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700">
-                Contact Provider
-            </a>
-            {% endif %}
-        </div>
-    </div>
-
-    <!-- Bio -->
-    {% if provider.bio %}
-    <div class="mt-6 pt-6 border-t">
-        <h2 class="text-xl font-bold mb-3">About</h2>
-        <p class="text-gray-700 whitespace-pre-line">{{ provider.bio }}</p>
-    </div>
-    {% endif %}
-</div>
-
-<!-- Services Section -->
-<div class="bg-white rounded-lg shadow p-8 mb-8">
-    <h2 class="text-2xl font-bold mb-6">Services</h2>
-
-    {% if services %}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {% for service in services %}
-        <div class="border rounded-lg p-4">
-            <div class="flex justify-between items-start mb-2">
-                <div>
-                    <h3 class="font-bold text-lg">{{ service.get_service_type_display }}</h3>
-                    <p class="text-gray-600 text-sm">{{ service.duration_minutes }} minutes</p>
-                </div>
-                <p class="text-2xl font-bold text-green-600">${{ service.price }}</p>
-            </div>
-            {% if service.description %}
-            <p class="text-gray-700 text-sm mt-3">{{ service.description }}</p>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <p class="text-gray-600">No services listed yet.</p>
-    {% endif %}
-</div>
-
-<!-- Gallery Section -->
-{% if gallery_images %}
-<div class="bg-white rounded-lg shadow p-8 mb-8">
-    <h2 class="text-2xl font-bold mb-6">Photo Gallery</h2>
-    <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {% for image in gallery_images %}
-        <div class="rounded-lg overflow-hidden">
-            <img src="{{ image.image.url }}" alt="{{ image.caption|default:'Gallery image' }}" class="w-full h-48 object-cover">
-            {% if image.caption %}
-            <div class="p-2">
-                <p class="text-sm text-gray-700">{{ image.caption }}</p>
-            </div>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-</div>
-{% endif %}
-
-<!-- Reviews Section -->
-<div class="bg-white rounded-lg shadow p-8 mb-8">
-    <h2 class="text-2xl font-bold mb-6">Reviews ({{ total_reviews }})</h2>
-
-    {% if reviews %}
-    <div class="space-y-6">
-        {% for review in reviews %}
-        <div class="border-b pb-6 last:border-b-0">
-            <div class="flex items-center mb-2">
-                <span class="text-yellow-500 text-xl mr-2">
-                    {% for i in "12345" %}
-                        {% if forloop.counter <= review.rating %}★{% else %}☆{% endif %}
-                    {% endfor %}
-                </span>
-                <span class="text-gray-600 text-sm">{{ review.created_at|date:"M d, Y" }}</span>
-            </div>
-            {% if review.client_name %}
-            <p class="font-semibold mb-2">{{ review.client_name }}</p>
-            {% else %}
-            <p class="font-semibold mb-2 text-gray-500">Anonymous</p>
-            {% endif %}
-            {% if review.comment %}
-            <p class="text-gray-700">{{ review.comment }}</p>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <p class="text-gray-600 mb-6">No reviews yet. Be the first to review this provider!</p>
-    {% endif %}
-</div>
-
-<!-- Submit Review Section -->
-<div class="bg-white rounded-lg shadow p-8">
-    <h2 class="text-2xl font-bold mb-6">Write a Review</h2>
-
-    {% include "includes/_messages.html" %}
-
-    <form method="post" action="{% url 'review_submit' provider.user.email %}" class="space-y-6">
-        {% csrf_token %}
-
-        <!-- Rating -->
-        <div class="form-group">
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-                Rating <span class="text-red-600">*</span>
-            </label>
-            <div class="flex gap-2">
-                {% for value, label in form.rating.field.choices %}
-                <label class="flex items-center cursor-pointer">
-                    <input type="radio" name="rating" value="{{ value }}" class="sr-only peer" required>
-                    <div class="w-12 h-12 flex items-center justify-center text-2xl border-2 border-gray-300 rounded-lg peer-checked:border-yellow-500 peer-checked:bg-yellow-50 hover:border-yellow-400 transition">
-                        <span class="peer-checked:text-yellow-500">{{ value }}★</span>
-                    </div>
+            <div>
+                <label class="block text-sm font-medium text-text-secondary mb-3">
+                    Rating <span class="text-accent">*</span>
                 </label>
-                {% endfor %}
+                <div class="flex gap-2">
+                    {% for value, label in form.rating.field.choices %}
+                    <label class="cursor-pointer">
+                        <input type="radio" name="rating" value="{{ value }}" class="sr-only peer" required>
+                        <div class="w-12 h-12 flex items-center justify-center text-lg font-semibold
+                                    bg-dark-200 border-2 border-dark-300 rounded-lg
+                                    peer-checked:border-gold peer-checked:bg-dark-100 peer-checked:text-gold
+                                    hover:border-gold/50 transition-all">
+                            {{ value }}
+                        </div>
+                    </label>
+                    {% endfor %}
+                </div>
+                {% if form.rating.errors %}
+                <p class="mt-2 text-accent text-sm">{{ form.rating.errors.0 }}</p>
+                {% endif %}
             </div>
-            {% if form.rating.errors %}
-            <p class="mt-2 text-red-600 text-sm">{{ form.rating.errors.0 }}</p>
-            {% endif %}
-        </div>
 
-        <!-- Comment -->
-        <div class="form-group">
-            <label for="{{ form.comment.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                {{ form.comment.label }} <span class="text-red-600">*</span>
-            </label>
-            {{ form.comment }}
-            <p class="mt-1 text-sm text-gray-500">{{ form.comment.help_text }}</p>
-            {% if form.comment.errors %}
-            <p class="mt-2 text-red-600 text-sm">{{ form.comment.errors.0 }}</p>
-            {% endif %}
-        </div>
+            <!-- Comment -->
+            <div>
+                <label for="{{ form.comment.id_for_label }}" class="block text-sm font-medium text-text-secondary mb-2">
+                    {{ form.comment.label }} <span class="text-accent">*</span>
+                </label>
+                <textarea name="comment" id="{{ form.comment.id_for_label }}" rows="4"
+                          class="input-dark w-full resize-none"
+                          placeholder="Share your experience...">{{ form.comment.value|default:'' }}</textarea>
+                <p class="mt-1 text-sm text-text-muted">{{ form.comment.help_text }}</p>
+                {% if form.comment.errors %}
+                <p class="mt-2 text-accent text-sm">{{ form.comment.errors.0 }}</p>
+                {% endif %}
+            </div>
 
-        <!-- Client Name (Optional) -->
-        <div class="form-group">
-            <label for="{{ form.client_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                {{ form.client_name.label }}
-            </label>
-            {{ form.client_name }}
-            {% if form.client_name.errors %}
-            <p class="mt-2 text-red-600 text-sm">{{ form.client_name.errors.0 }}</p>
-            {% endif %}
-        </div>
+            <!-- Client Name -->
+            <div>
+                <label for="{{ form.client_name.id_for_label }}" class="block text-sm font-medium text-text-secondary mb-2">
+                    {{ form.client_name.label }} <span class="text-text-muted">(optional)</span>
+                </label>
+                <input type="text" name="client_name" id="{{ form.client_name.id_for_label }}"
+                       value="{{ form.client_name.value|default:'' }}"
+                       class="input-dark w-full"
+                       placeholder="Your name">
+                {% if form.client_name.errors %}
+                <p class="mt-2 text-accent text-sm">{{ form.client_name.errors.0 }}</p>
+                {% endif %}
+            </div>
 
-        <!-- Client Email -->
-        <div class="form-group">
-            <label for="{{ form.client_email.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-1">
-                {{ form.client_email.label }} <span class="text-red-600">*</span>
-            </label>
-            {{ form.client_email }}
-            <p class="mt-1 text-sm text-gray-500">{{ form.client_email.help_text }}</p>
-            {% if form.client_email.errors %}
-            <p class="mt-2 text-red-600 text-sm">{{ form.client_email.errors.0 }}</p>
-            {% endif %}
-        </div>
+            <!-- Client Email -->
+            <div>
+                <label for="{{ form.client_email.id_for_label }}" class="block text-sm font-medium text-text-secondary mb-2">
+                    {{ form.client_email.label }} <span class="text-accent">*</span>
+                </label>
+                <input type="email" name="client_email" id="{{ form.client_email.id_for_label }}"
+                       value="{{ form.client_email.value|default:'' }}"
+                       class="input-dark w-full"
+                       placeholder="your@email.com" required>
+                <p class="mt-1 text-sm text-text-muted">{{ form.client_email.help_text }}</p>
+                {% if form.client_email.errors %}
+                <p class="mt-2 text-accent text-sm">{{ form.client_email.errors.0 }}</p>
+                {% endif %}
+            </div>
 
-        <!-- Submit Button -->
-        <div>
-            <button type="submit" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-semibold">
-                Submit Review
-            </button>
-        </div>
-    </form>
+            <!-- Submit Button -->
+            <div>
+                <button type="submit" class="btn-gold px-8">
+                    Submit Review
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 {% endblock %}
