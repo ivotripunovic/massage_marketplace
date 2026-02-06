@@ -195,12 +195,13 @@
     <!-- Navigation -->
     <nav class="bg-dark-50 border-b border-dark-300 sticky top-0 z-50">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div class="flex items-center h-12 gap-2">
-                <a href="/" class="text-base md:text-xl font-display font-bold gold-gradient whitespace-nowrap flex-shrink-0">Massage Marketplace</a>
+            <div class="flex items-center justify-between h-12 gap-2">
+                <a href="/" class="text-xl font-display font-bold gold-gradient whitespace-nowrap flex-shrink-0">MM</a>
 
-                {% block nav_center %}{% endblock %}
+                <div class="flex items-center gap-4">
+                    {% block nav_center %}{% endblock %}
 
-                <div class="hidden md:flex items-center space-x-1 flex-shrink-0">
+                    <div class="hidden md:flex items-center space-x-1 flex-shrink-0">
                     {% if user.is_authenticated %}
                         <span class="text-text-secondary mr-4">Hello, <strong class="text-gold">{{ user.email }}</strong></span>
 
@@ -221,6 +222,7 @@
                         <a href="{% url 'login' %}" class="nav-link">Login</a>
                         <a href="{% url 'signup' %}" class="btn-gold text-sm">Sign Up</a>
                     {% endif %}
+                    </div>
                 </div>
 
                 <!-- Mobile menu button -->

@@ -23,24 +23,21 @@
 {% endblock %}
 
 {% block nav_center %}
-<!-- Desktop: full search in nav -->
-<form method="get" action="{% url 'providers' %}" class="hidden md:flex items-center gap-2 flex-1 justify-center max-w-2xl mx-4">
-    <input type="text" name="keyword" id="keyword" value="{{ current_keyword }}"
-           placeholder="Search..."
-           class="input-dark w-28 text-sm py-1.5 px-2">
+<!-- Desktop: location filters in nav -->
+<form method="get" action="{% url 'providers' %}" class="hidden md:flex items-center gap-2">
     <div class="relative">
         <input type="text" id="country-autocomplete"
                value="{{ current_country_name }}"
-               placeholder="Country..."
-               class="input-dark w-28 text-sm py-1.5 px-2"
+               placeholder="Select country..."
+               class="input-dark w-44 text-sm py-1.5 px-3"
                autocomplete="off">
         <input type="hidden" name="country_id" id="country_id" value="{{ current_country_id }}">
     </div>
     <div class="relative">
         <input type="text" id="city-autocomplete"
                value="{{ current_city_name }}"
-               placeholder="City..."
-               class="input-dark w-24 text-sm py-1.5 px-2"
+               placeholder="Select city..."
+               class="input-dark w-40 text-sm py-1.5 px-3"
                autocomplete="off">
         <input type="hidden" name="city_id" id="city_id" value="{{ current_city_id }}">
     </div>
