@@ -4,8 +4,59 @@ from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from users.models import User
 from reviews.models import Review
-from .models import Provider, Service, ProviderGalleryImage
+from .models import (
+    Provider,
+    Service,
+    ProviderGalleryImage,
+    ProviderAttributeDefinition,
+    ProviderAttributeValue,
+)
 
+
+class ProviderAttributeSettingsTests(TestCase):
+    """Ensure providers can edit their admin-defined attributes."""
+
+    def setUp(self):
+        """Create provider user, profile, and attribute definition."""
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email='attr-provider@test.com',
+            password='testpass123',
+            user_type='provider',
+            is_email_verified=True
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone='+15551234567',
+            bio='Attribute-friendly provider',
+            subscription_status='active'
+        )
+        self.attribute_definition = ProviderAttributeDefinition.objects.create(
+            name='Years of Practice',
+            data_type=ProviderAttributeDefinition.DATA_TYPE_INTEGER,
+            display_order=1,
+            show_on_card=True,
+            is_active=True
+        )
+
+    def test_provider_updates_attribute_from_profile_form(self):
+        """Providers should be able to save attribute values via profile form."""
+        self.client.login(email=self.user.email, password='testpass123')
+        url = reverse('provider_profile')
+        response = self.client.post(url, {
+            'first_name': 'Taylor',
+            'last_name': 'Doe',
+            'bio': self.provider.bio,
+            'phone': self.provider.phone,
+            f'attribute_{self.attribute_definition.pk}': '8',
+        }, follow=True)
+
+        self.assertRedirects(response, reverse('provider_dashboard'))
+        attribute = ProviderAttributeValue.objects.get(
+            provider=self.provider,
+            definition=self.attribute_definition
+        )
+        self.assertEqual(attribute.value_text, '8')
 
 class ProviderModelTests(TestCase):
     """Test Provider model functionality."""

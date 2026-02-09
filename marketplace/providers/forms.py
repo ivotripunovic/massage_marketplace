@@ -1,5 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import UploadedFile
 from PIL import Image
 import io
 from providers.models import Provider, Service, ProviderGalleryImage
@@ -26,24 +27,26 @@ class ProviderPhotoForm(forms.ModelForm):
         """Validate photo file."""
         photo = self.cleaned_data.get('photo')
         
-        if photo:
-            # Check file size (< 5MB)
-            if photo.size > 5 * 1024 * 1024:
-                raise ValidationError('Image must be smaller than 5MB')
-            
-            # Check file format
-            valid_formats = ['image/jpeg', 'image/png', 'image/gif']
-            if photo.content_type not in valid_formats:
-                raise ValidationError('Only JPEG, PNG, and GIF images are allowed')
-            
-            # Validate that it's a real image
-            try:
-                img = Image.open(photo)
-                img.verify()
-                # Reset file pointer after verification
-                photo.seek(0)
-            except Exception:
-                raise ValidationError('The uploaded file is not a valid image')
+        if not photo or not isinstance(photo, UploadedFile):
+            return photo
+
+        # Check file size (< 5MB)
+        if photo.size > 5 * 1024 * 1024:
+            raise ValidationError('Image must be smaller than 5MB')
+        
+        # Check file format
+        valid_formats = ['image/jpeg', 'image/png', 'image/gif']
+        if photo.content_type not in valid_formats:
+            raise ValidationError('Only JPEG, PNG, and GIF images are allowed')
+        
+        # Validate that it's a real image
+        try:
+            img = Image.open(photo)
+            img.verify()
+            # Reset file pointer after verification
+            photo.seek(0)
+        except Exception:
+            raise ValidationError('The uploaded file is not a valid image')
         
         return photo
     
@@ -76,14 +79,17 @@ class ProviderPhotoForm(forms.ModelForm):
             # Save the resized image back to the field
             img_io = io.BytesIO()
             
-            # Determine format from content type
-            if provider.photo.content_type == 'image/png':
-                img.save(img_io, format='PNG')
-            elif provider.photo.content_type == 'image/gif':
-                img.save(img_io, format='GIF')
-            else:  # JPEG
-                img.save(img_io, format='JPEG')
-            
+            # Determine format from content_type or filename
+            content_type = getattr(provider.photo, 'content_type', '')
+            filename_lower = provider.photo.name.lower()
+            if content_type == 'image/png' or filename_lower.endswith('.png'):
+                save_format = 'PNG'
+            elif content_type == 'image/gif' or filename_lower.endswith('.gif'):
+                save_format = 'GIF'
+            else:
+                save_format = 'JPEG'
+
+            img.save(img_io, format=save_format)
             img_io.seek(0)
             provider.photo.save(provider.photo.name, img_io, save=False)
 
