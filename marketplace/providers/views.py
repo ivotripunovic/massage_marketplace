@@ -60,27 +60,27 @@ class ProviderDashboardView(ProviderRequiredMixin, TemplateView):
 
 class ProviderProfileForm(forms.ModelForm):
     """Form for updating provider profile."""
-    
+
     first_name = forms.CharField(
         max_length=150,
         required=False,
         label='First Name',
         widget=forms.TextInput(attrs={
-            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+            'class': 'input-dark w-full',
             'placeholder': 'First Name'
         })
     )
-    
+
     last_name = forms.CharField(
         max_length=150,
         required=False,
         label='Last Name',
         widget=forms.TextInput(attrs={
-            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+            'class': 'input-dark w-full',
             'placeholder': 'Last Name'
         })
     )
-    
+
     class Meta:
         model = Provider
         fields = ('bio', 'phone', 'photo')
@@ -91,17 +91,17 @@ class ProviderProfileForm(forms.ModelForm):
         }
         widgets = {
             'bio': forms.Textarea(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+                'class': 'input-dark w-full',
                 'placeholder': 'Tell clients about your experience and specialties',
                 'rows': 4
             }),
             'phone': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+                'class': 'input-dark w-full',
                 'placeholder': '+1 (555) 123-4567',
                 'type': 'tel'
             }),
             'photo': forms.FileInput(attrs={
-                'class': 'block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700',
+                'class': 'block w-full text-sm text-text-primary file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gold file:text-dark cursor-pointer',
                 'accept': 'image/jpeg,image/png,image/gif',
             }),
         }

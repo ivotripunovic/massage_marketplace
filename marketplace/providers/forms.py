@@ -90,7 +90,7 @@ class ProviderPhotoForm(forms.ModelForm):
 
 class ServiceForm(forms.ModelForm):
     """Form for creating and updating services."""
-    
+
     class Meta:
         model = Service
         fields = ('service_type', 'description', 'price', 'duration_minutes')
@@ -102,22 +102,22 @@ class ServiceForm(forms.ModelForm):
         }
         widgets = {
             'service_type': forms.Select(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+                'class': 'select-dark w-full',
             }),
             'description': forms.Textarea(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+                'class': 'input-dark w-full',
                 'placeholder': 'Describe your service',
                 'rows': 4
             }),
             'price': forms.NumberInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+                'class': 'input-dark w-full',
                 'placeholder': '75.00',
                 'min': '5.00',
                 'step': '0.01',
                 'type': 'number'
             }),
             'duration_minutes': forms.Select(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+                'class': 'select-dark w-full',
             }),
         }
 
@@ -149,7 +149,7 @@ class CryptoPaymentForm(forms.Form):
         label='Transaction ID / Hash',
         max_length=255,
         widget=forms.TextInput(attrs={
-            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono',
+            'class': 'input-dark w-full font-mono',
             'placeholder': 'e.g., 0x123abc456def...',
         }),
         help_text='Paste the transaction hash from your wallet after sending payment.'
@@ -163,7 +163,7 @@ class BankTransferForm(forms.Form):
         label='Account Holder Name',
         max_length=255,
         widget=forms.TextInput(attrs={
-            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            'class': 'input-dark w-full',
             'placeholder': 'Name on bank account',
         })
     )
@@ -172,7 +172,7 @@ class BankTransferForm(forms.Form):
         label='Bank Name',
         max_length=255,
         widget=forms.TextInput(attrs={
-            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            'class': 'input-dark w-full',
             'placeholder': 'e.g., Chase Bank',
         })
     )
@@ -182,7 +182,7 @@ class BankTransferForm(forms.Form):
         max_length=255,
         required=False,
         widget=forms.TextInput(attrs={
-            'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent',
+            'class': 'input-dark w-full',
             'placeholder': 'Bank transfer reference (if available)',
         }),
         help_text='Enter your bank transfer confirmation number if you have one. You can also provide this later.'
@@ -201,11 +201,11 @@ class GalleryImageForm(forms.ModelForm):
         }
         widgets = {
             'image': forms.FileInput(attrs={
-                'class': 'block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700',
+                'class': 'block w-full text-sm text-text-primary file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gold file:text-dark cursor-pointer',
                 'accept': 'image/jpeg,image/png,image/gif',
             }),
             'caption': forms.TextInput(attrs={
-                'class': 'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent',
+                'class': 'input-dark w-full',
                 'placeholder': 'Describe this photo',
             }),
         }

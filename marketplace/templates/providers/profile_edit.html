@@ -4,13 +4,13 @@
 
 {% block content %}
 {% include "includes/_messages.html" %}
-<div class="max-w-2xl mx-auto">
+<div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900 mb-2">Edit Your Profile</h1>
-        <p class="text-gray-600">Update your professional information and bio</p>
+        <h1 class="text-3xl font-bold mb-2">Edit Your Profile</h1>
+        <p class="text-text-secondary">Update your professional information and bio</p>
     </div>
-    
-    <div class="bg-white rounded-lg shadow-md p-8">
+
+    <div class="card-dark p-8">
         <form method="post" enctype="multipart/form-data" class="space-y-6">
             {% csrf_token %}
             
@@ -21,51 +21,51 @@
                     <img src="{{ provider.photo.url }}" alt="Profile Photo" class="w-24 h-24 rounded-full object-cover">
                 </div>
                 <div>
-                    <p class="text-sm text-gray-600">Current profile photo</p>
-                    <p class="text-xs text-gray-500">Upload a new photo to replace it</p>
+                    <p class="text-sm text-text-secondary">Current profile photo</p>
+                    <p class="text-xs text-text-muted">Upload a new photo to replace it</p>
                 </div>
             </div>
             {% endif %}
-            
+
             <!-- Photo Upload -->
             <div>
-                <label for="{{ form.photo.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                <label for="{{ form.photo.id_for_label }}" class="block text-sm font-medium text-text-primary mb-2">
                     {{ form.photo.label }}
                 </label>
                 {{ form.photo }}
                 {% if form.photo.errors %}
-                    <div class="text-red-500 text-sm mt-1">
+                    <div class="text-red-400 text-sm mt-1">
                         {% for error in form.photo.errors %}
                             {{ error }}
                         {% endfor %}
                     </div>
                 {% endif %}
-                <p class="text-gray-500 text-sm mt-1">JPEG, PNG or GIF. Max 5MB. Image will be resized to 800×800.</p>
+                <p class="text-text-muted text-sm mt-1">JPEG, PNG or GIF. Max 5MB. Image will be resized to 800×800.</p>
             </div>
-            
+
             <!-- Name Fields -->
             <div class="grid grid-cols-2 gap-6">
                 <div>
-                    <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                    <label for="{{ form.first_name.id_for_label }}" class="block text-sm font-medium text-text-primary mb-2">
                         {{ form.first_name.label }}
                     </label>
                     {{ form.first_name }}
                     {% if form.first_name.errors %}
-                        <div class="text-red-500 text-sm mt-1">
+                        <div class="text-red-400 text-sm mt-1">
                             {% for error in form.first_name.errors %}
                                 {{ error }}
                             {% endfor %}
                         </div>
                     {% endif %}
                 </div>
-                
+
                 <div>
-                    <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                    <label for="{{ form.last_name.id_for_label }}" class="block text-sm font-medium text-text-primary mb-2">
                         {{ form.last_name.label }}
                     </label>
                     {{ form.last_name }}
                     {% if form.last_name.errors %}
-                        <div class="text-red-500 text-sm mt-1">
+                        <div class="text-red-400 text-sm mt-1">
                             {% for error in form.last_name.errors %}
                                 {{ error }}
                             {% endfor %}
@@ -73,46 +73,46 @@
                     {% endif %}
                 </div>
             </div>
-            
+
             <!-- Phone Number -->
             <div>
-                <label for="{{ form.phone.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                <label for="{{ form.phone.id_for_label }}" class="block text-sm font-medium text-text-primary mb-2">
                     {{ form.phone.label }}
-                    <span class="text-red-500">*</span>
+                    <span class="text-red-400">*</span>
                 </label>
                 {{ form.phone }}
                 {% if form.phone.errors %}
-                    <div class="text-red-500 text-sm mt-1">
+                    <div class="text-red-400 text-sm mt-1">
                         {% for error in form.phone.errors %}
                             {{ error }}
                         {% endfor %}
                     </div>
                 {% endif %}
-                <p class="text-gray-500 text-sm mt-1">Clients will use this to contact you</p>
+                <p class="text-text-muted text-sm mt-1">Clients will use this to contact you</p>
             </div>
-            
+
             <!-- Bio -->
             <div>
-                <label for="{{ form.bio.id_for_label }}" class="block text-sm font-medium text-gray-700 mb-2">
+                <label for="{{ form.bio.id_for_label }}" class="block text-sm font-medium text-text-primary mb-2">
                     {{ form.bio.label }}
                 </label>
                 {{ form.bio }}
                 {% if form.bio.errors %}
-                    <div class="text-red-500 text-sm mt-1">
+                    <div class="text-red-400 text-sm mt-1">
                         {% for error in form.bio.errors %}
                             {{ error }}
                         {% endfor %}
                     </div>
                 {% endif %}
-                <p class="text-gray-500 text-sm mt-1">Max 500 characters</p>
+                <p class="text-text-muted text-sm mt-1">Max 500 characters</p>
             </div>
-            
+
             <!-- Form Actions -->
-            <div class="flex gap-4 pt-6 border-t">
-                <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition">
+            <div class="flex gap-4 pt-6 border-t border-dark-300">
+                <button type="submit" class="flex-1 btn-gold py-2 px-4 rounded-lg">
                     Save Changes
                 </button>
-                <a href="{% url 'provider_dashboard' %}" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 rounded-lg text-center transition">
+                <a href="{% url 'provider_dashboard' %}" class="flex-1 bg-dark-200 hover:bg-dark-300 text-text-primary font-semibold py-2 px-4 rounded-lg text-center transition">
                     Cancel
                 </a>
             </div>
@@ -120,9 +120,9 @@
     </div>
     
     <!-- Profile Completion Tips -->
-    <div class="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 class="font-semibold text-blue-900 mb-3">Complete Your Profile</h3>
-        <ul class="text-blue-800 text-sm space-y-2">
+    <div class="mt-8 bg-blue-900/50 border border-blue-700 rounded-lg p-6">
+        <h3 class="font-semibold text-blue-300 mb-3">Complete Your Profile</h3>
+        <ul class="text-blue-200 text-sm space-y-2">
             <li>✓ Add a professional name and phone number</li>
             <li>✓ Write a compelling bio to attract clients</li>
             <li>✓ Add a profile photo to build trust</li>
