@@ -107,6 +107,29 @@
                 <p class="text-text-muted text-sm mt-1">Max 500 characters</p>
             </div>
 
+            {% if form.attribute_fields %}
+            <div>
+                <h3 class="text-lg font-semibold text-text-primary mb-3">Custom Attributes</h3>
+                <div class="grid gap-4">
+                    {% for attr in form.attribute_fields %}
+                    <div>
+                        <label for="{{ attr.bound_field.id_for_label }}" class="block text-sm font-medium text-text-primary mb-1">
+                            {{ attr.bound_field.label }}
+                        </label>
+                        {{ attr.bound_field }}
+                        {% if attr.bound_field.errors %}
+                        <div class="text-red-400 text-sm mt-1">
+                            {% for error in attr.bound_field.errors %}
+                                {{ error }}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Form Actions -->
             <div class="flex gap-4 pt-6 border-t border-dark-300">
                 <button type="submit" class="flex-1 btn-gold py-2 px-4 rounded-lg">

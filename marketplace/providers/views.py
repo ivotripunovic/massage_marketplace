@@ -6,7 +6,13 @@ from django.contrib import messages
 from django import forms
 from django.db.models import Count, Avg
 from django.http import HttpResponseForbidden
-from providers.models import Provider, Service, ProviderGalleryImage
+from providers.models import (
+    Provider,
+    Service,
+    ProviderGalleryImage,
+    ProviderAttributeDefinition,
+    ProviderAttributeValue,
+)
 from providers.forms import ServiceForm, SubscriptionSettingsForm, CryptoPaymentForm, BankTransferForm, GalleryImageForm
 from users.models import User
 
@@ -50,6 +56,12 @@ class ProviderDashboardView(ProviderRequiredMixin, TemplateView):
                 context['total_reviews'] = 0
                 context['average_rating'] = 0
             context['gallery_images'] = ProviderGalleryImage.objects.filter(provider=provider)
+            context['attribute_values'] = ProviderAttributeValue.objects.select_related(
+                'definition'
+            ).filter(
+                provider=provider,
+                definition__is_active=True
+            )
         except Provider.DoesNotExist:
             # Provider profile not yet created, redirect to create
             context['provider'] = None
@@ -112,6 +124,24 @@ class ProviderProfileForm(forms.ModelForm):
         if self.instance and self.instance.user:
             self.fields['first_name'].initial = self.instance.user.first_name
             self.fields['last_name'].initial = self.instance.user.last_name
+        self.attribute_definitions = list(
+            ProviderAttributeDefinition.objects.filter(is_active=True)
+            .order_by('display_order', 'name')
+        )
+        self.attribute_fields = []
+        for definition in self.attribute_definitions:
+            field_name = f'attribute_{definition.pk}'
+            field = self._build_attribute_field(definition)
+            initial_value = self._get_attribute_initial(definition)
+            if initial_value is not None:
+                field.initial = initial_value
+            self.fields[field_name] = field
+            bound_field = self[field_name]
+            self.attribute_fields.append({
+                'definition': definition,
+                'name': field_name,
+                'bound_field': bound_field,
+            })
     
     def clean_photo(self):
         """Validate photo file."""
@@ -155,6 +185,7 @@ class ProviderProfileForm(forms.ModelForm):
         if commit:
             user.save()
             provider.save()
+            self._save_attribute_values(provider)
         
         return provider
     
@@ -195,6 +226,83 @@ class ProviderProfileForm(forms.ModelForm):
             img_io.seek(0)
             provider.photo.save(provider.photo.name, img_io, save=False)
 
+    def _build_attribute_field(self, definition):
+        """Create a form field for a provider attribute definition."""
+        common_widget_attrs = {'class': 'input-dark w-full'}
+
+        if definition.data_type == ProviderAttributeDefinition.DATA_TYPE_INTEGER:
+            return forms.IntegerField(
+                label=definition.name,
+                required=False,
+                widget=forms.NumberInput(attrs=common_widget_attrs)
+            )
+
+        if definition.data_type == ProviderAttributeDefinition.DATA_TYPE_BOOLEAN:
+            return forms.BooleanField(
+                label=definition.name,
+                required=False,
+                widget=forms.CheckboxInput(attrs={'class': 'form-checkbox h-4 w-4 text-gold'})
+            )
+
+        return forms.CharField(
+            label=definition.name,
+            required=False,
+            max_length=255,
+            widget=forms.TextInput(attrs=common_widget_attrs)
+        )
+
+    def _get_attribute_initial(self, definition):
+        """Return the initial value for a provider attribute field."""
+        if not self.instance or not self.instance.pk:
+            return None
+
+        try:
+            attribute_value = ProviderAttributeValue.objects.get(
+                provider=self.instance,
+                definition=definition
+            )
+            typed = attribute_value.get_typed_value()
+            if typed is not None:
+                return typed
+            return attribute_value.value_text
+        except ProviderAttributeValue.DoesNotExist:
+            return None
+
+    def _serialize_attribute_value(self, definition, raw_value):
+        """Convert cleaned value into normalized text."""
+        if definition.data_type == ProviderAttributeDefinition.DATA_TYPE_BOOLEAN:
+            if raw_value in (None, ''):
+                return ''
+            return '1' if raw_value else '0'
+
+        if raw_value in (None, ''):
+            return ''
+
+        text = str(raw_value).strip()
+        return text
+
+    def _save_attribute_values(self, provider):
+        """Persist attribute values using the cleaned data."""
+        for definition in self.attribute_definitions:
+            field_name = f'attribute_{definition.pk}'
+            if field_name not in self.cleaned_data:
+                continue
+            serialized = self._serialize_attribute_value(
+                definition,
+                self.cleaned_data.get(field_name)
+            )
+            if serialized == '':
+                ProviderAttributeValue.objects.filter(
+                    provider=provider,
+                    definition=definition
+                ).delete()
+                continue
+            ProviderAttributeValue.objects.update_or_create(
+                provider=provider,
+                definition=definition,
+                defaults={'value_text': serialized}
+            )
+
 
 class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
     """View for updating provider profile."""
@@ -225,6 +333,7 @@ class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
         """Add provider data to context."""
         context = super().get_context_data(**kwargs)
         context['provider'] = Provider.objects.get(user=self.request.user)
+        context['attribute_fields'] = getattr(context['form'], 'attribute_fields', [])
         return context
 
 

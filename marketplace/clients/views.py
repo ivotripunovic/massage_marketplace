@@ -1,8 +1,15 @@
 from django.views.generic import ListView, DetailView
-from django.db.models import Count, Avg, Q
+from django.db.models import Count, Avg, Q, Prefetch
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET
-from providers.models import Provider, Service, ProviderGalleryImage, Country, City
+from providers.models import (
+    Provider,
+    Service,
+    ProviderGalleryImage,
+    Country,
+    City,
+    ProviderAttributeValue,
+)
 from reviews.models import Review
 
 
@@ -114,10 +121,22 @@ class ProviderDirectoryView(ListView):
 
     def get_queryset(self):
         """Get all active verified providers with related data."""
+        attribute_values_qs = ProviderAttributeValue.objects.select_related('definition').filter(
+            definition__is_active=True
+        )
+        attribute_values_prefetch = Prefetch(
+            'attribute_values',
+            queryset=attribute_values_qs,
+            to_attr='active_attribute_values'
+        )
         queryset = Provider.objects.filter(
             subscription_status='active',
             user__is_email_verified=True
-        ).select_related('user', 'country_new', 'city_new').prefetch_related('services', 'reviews')
+        ).select_related('user', 'country_new', 'city_new').prefetch_related(
+            'services',
+            'reviews',
+            attribute_values_prefetch
+        )
 
         # Apply filters from query parameters
         service_type = self.request.GET.get('service_type', '').strip()
@@ -194,6 +213,21 @@ class ProviderDirectoryView(ListView):
             else:
                 min_price = max_price = None
 
+            card_attributes = []
+            for attr in getattr(provider, 'active_attribute_values', []):
+                definition = attr.definition
+                if not definition.show_on_card:
+                    continue
+                formatted = attr.formatted_value()
+                if not formatted:
+                    continue
+                card_attributes.append({
+                    'name': definition.name,
+                    'value': formatted,
+                    'order': definition.display_order,
+                })
+            card_attributes.sort(key=lambda entry: entry['order'])
+
             providers_with_stats.append({
                 'provider': provider,
                 'service_count': service_count,
@@ -202,6 +236,7 @@ class ProviderDirectoryView(ListView):
                 'avg_rating': avg_rating,
                 'min_price': min_price,
                 'max_price': max_price,
+                'card_attributes': card_attributes,
             })
 
         context['providers_with_stats'] = providers_with_stats
@@ -279,5 +314,9 @@ class ProviderDetailView(DetailView):
         # Add review form
         from reviews.forms import ReviewForm
         context['form'] = ReviewForm()
+        context['attribute_values'] = ProviderAttributeValue.objects.select_related('definition').filter(
+            provider=provider,
+            definition__is_active=True
+        )
 
         return context

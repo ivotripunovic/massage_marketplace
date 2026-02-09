@@ -1,5 +1,14 @@
 from django.contrib import admin
-from .models import Provider, Service, ProviderGalleryImage, Continent, Country, City
+from .models import (
+    Provider,
+    Service,
+    ProviderGalleryImage,
+    ProviderAttributeDefinition,
+    ProviderAttributeValue,
+    Continent,
+    Country,
+    City,
+)
 
 
 class ServiceInline(admin.TabularInline):
@@ -196,6 +205,47 @@ class ServiceAdmin(admin.ModelAdmin):
         return obj.provider.user.email
     provider_email.short_description = 'Provider Email'
     provider_email.admin_order_field = 'provider__user__email'
+
+
+@admin.register(ProviderAttributeDefinition)
+class ProviderAttributeDefinitionAdmin(admin.ModelAdmin):
+    """Admin interface for provider attribute definitions."""
+
+    list_display = (
+        'name',
+        'data_type',
+        'show_on_card',
+        'is_active',
+        'display_order',
+    )
+    list_editable = ('show_on_card', 'is_active', 'display_order')
+    list_filter = ('data_type', 'show_on_card', 'is_active')
+    search_fields = ('name',)
+    ordering = ('display_order', 'name')
+
+
+@admin.register(ProviderAttributeValue)
+class ProviderAttributeValueAdmin(admin.ModelAdmin):
+    """Admin interface for provider attribute values."""
+
+    list_display = ('provider_email', 'definition', 'value_display', 'updated_at')
+    list_select_related = ('provider', 'definition')
+    list_filter = ('definition',)
+    search_fields = (
+        'provider__user__email',
+        'definition__name',
+        'value_text',
+    )
+    readonly_fields = ('updated_at',)
+    raw_id_fields = ('provider',)
+
+    def provider_email(self, obj):
+        return obj.provider.user.email
+    provider_email.short_description = 'Provider Email'
+
+    def value_display(self, obj):
+        return obj.formatted_value() or obj.value_text or '-'
+    value_display.short_description = 'Value'
 
 
 @admin.register(ProviderGalleryImage)

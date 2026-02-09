@@ -340,3 +340,102 @@ class Service(models.Model):
         super().save(*args, **kwargs)
 
 
+class ProviderAttributeDefinition(models.Model):
+    """Admin-defined custom attributes that providers can fill in."""
+
+    DATA_TYPE_STRING = 'string'
+    DATA_TYPE_INTEGER = 'int'
+    DATA_TYPE_BOOLEAN = 'bool'
+
+    DATA_TYPE_CHOICES = (
+        (DATA_TYPE_STRING, 'String'),
+        (DATA_TYPE_INTEGER, 'Integer'),
+        (DATA_TYPE_BOOLEAN, 'Boolean'),
+    )
+
+    name = models.CharField(max_length=150, unique=True)
+    data_type = models.CharField(
+        max_length=10,
+        choices=DATA_TYPE_CHOICES,
+        default=DATA_TYPE_STRING,
+        help_text='Controls how providers input this attribute'
+    )
+    display_order = models.PositiveIntegerField(default=0)
+    show_on_card = models.BooleanField(
+        default=False,
+        help_text='Whether this attribute should be highlighted on the provider card'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Uncheck to hide this attribute from provider-facing forms'
+    )
+
+    class Meta:
+        db_table = 'providers_attribute_definition'
+        verbose_name = 'Provider Attribute Definition'
+        verbose_name_plural = 'Provider Attribute Definitions'
+        ordering = ['display_order', 'name']
+
+    def __str__(self):
+        return self.name
+
+
+class ProviderAttributeValue(models.Model):
+    """Stores provider-specific values for admin-defined attributes."""
+
+    provider = models.ForeignKey(
+        'Provider',
+        on_delete=models.CASCADE,
+        related_name='attribute_values'
+    )
+    definition = models.ForeignKey(
+        ProviderAttributeDefinition,
+        on_delete=models.CASCADE,
+        related_name='values'
+    )
+    value_text = models.TextField(blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'providers_attribute_value'
+        verbose_name = 'Provider Attribute Value'
+        verbose_name_plural = 'Provider Attribute Values'
+        unique_together = ('provider', 'definition')
+
+    def __str__(self):
+        return f"{self.definition.name} → {self.provider.get_name()}"
+
+    def get_typed_value(self):
+        """Return the stored value in the correct Python type."""
+        raw = self.value_text
+        if raw in (None, ''):
+            return None
+
+        dtype = self.definition.data_type
+        if dtype == ProviderAttributeDefinition.DATA_TYPE_BOOLEAN:
+            normalized = raw.strip().lower()
+            if normalized in ('1', 'true', 'yes', 'on'):
+                return True
+            if normalized in ('0', 'false', 'no', 'off'):
+                return False
+            return None
+
+        if dtype == ProviderAttributeDefinition.DATA_TYPE_INTEGER:
+            try:
+                return int(raw)
+            except (ValueError, TypeError):
+                return None
+
+        return raw
+
+    def formatted_value(self):
+        """Return a human-readable representation for UI components."""
+        typed = self.get_typed_value()
+        if typed in (None, ''):
+            return None
+
+        if self.definition.data_type == ProviderAttributeDefinition.DATA_TYPE_BOOLEAN:
+            return 'Yes' if typed else 'No'
+
+        return str(typed)
+

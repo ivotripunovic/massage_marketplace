@@ -37,6 +37,19 @@
             </span>
         </p>
         <a href="{% url 'provider_profile' %}" class="block text-center btn-gold py-2 rounded">Edit Profile</a>
+        {% if attribute_values %}
+        <div class="mt-5 space-y-2 text-sm">
+            <h4 class="text-xs uppercase tracking-wide text-text-muted">Attributes</h4>
+            {% for attr in attribute_values %}
+                {% if attr.formatted_value %}
+                <div class="flex justify-between text-xs text-text-secondary">
+                    <span>{{ attr.definition.name }}</span>
+                    <span class="text-text-primary font-semibold">{{ attr.formatted_value }}</span>
+                </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        {% endif %}
     </div>
 
     <!-- Stats Card -->

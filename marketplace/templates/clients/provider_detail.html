@@ -77,6 +77,18 @@
                     </span>
                 </div>
                 {% endif %}
+                {% if attribute_values %}
+                <div class="flex flex-wrap gap-3 mb-4">
+                    {% for attr in attribute_values %}
+                        {% if attr.formatted_value %}
+                        <div class="inline-flex items-center gap-2 rounded-full bg-dark-200 px-3 py-1 text-xs text-text-primary">
+                            <span class="font-semibold text-text-primary">{{ attr.definition.name }}</span>
+                            <span class="text-text-muted">{{ attr.formatted_value }}</span>
+                        </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+                {% endif %}
 
                 <!-- Rating -->
                 {% if avg_rating > 0 %}
