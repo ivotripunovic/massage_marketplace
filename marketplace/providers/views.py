@@ -229,11 +229,12 @@ class ProviderProfileForm(forms.ModelForm):
     def _build_attribute_field(self, definition):
         """Create a form field for a provider attribute definition."""
         common_widget_attrs = {'class': 'input-dark w-full'}
+        is_required = definition.show_on_card
 
         if definition.data_type == ProviderAttributeDefinition.DATA_TYPE_INTEGER:
             return forms.IntegerField(
                 label=definition.name,
-                required=False,
+                required=is_required,
                 widget=forms.NumberInput(attrs=common_widget_attrs)
             )
 
@@ -246,7 +247,7 @@ class ProviderProfileForm(forms.ModelForm):
 
         return forms.CharField(
             label=definition.name,
-            required=False,
+            required=is_required,
             max_length=255,
             widget=forms.TextInput(attrs=common_widget_attrs)
         )
