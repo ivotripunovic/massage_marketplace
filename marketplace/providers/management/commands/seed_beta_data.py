@@ -10,8 +10,10 @@ import random
 from datetime import timedelta
 from decimal import Decimal
 
+from django.contrib.auth.hashers import make_password
 from django.core.management import call_command
 from django.core.management.base import BaseCommand
+from django.db import transaction
 from django.utils import timezone
 
 from providers.models import (
@@ -316,6 +318,10 @@ REVIEWER_FIRST_NAMES = [
 
 SEED_EMAIL_DOMAIN = "seed.example.com"
 
+# ── Bulk-create batch size ────────────────────────────────────────────────────
+
+BATCH_SIZE = 500
+
 
 class Command(BaseCommand):
     help = "Seed the database with beta test data (providers, services, reviews)"
@@ -394,58 +400,13 @@ class Command(BaseCommand):
             "country_id": country_id,
             "city_id": city_id,
             "services": services,
+            "payment_method": rng.choice(["bank_transfer", "crypto"]),
+            "renewal_days": rng.randint(1, 30),
         }
-
-    def _generate_attributes(self, rng, providers):
-        """Generate attribute values for providers. Returns count created."""
-        definitions = list(ProviderAttributeDefinition.objects.filter(is_active=True))
-        if not definitions:
-            return 0
-
-        # Value generators keyed by attribute name
-        generators = {
-            "Height": lambda: str(rng.randint(155, 195)),  # cm
-            "Weight": lambda: str(rng.randint(50, 95)),  # kg
-            "Established at": lambda: str(rng.randint(2005, 2024)),
-            "Working with eldery": lambda: rng.choice(["true", "false"]),
-        }
-
-        count = 0
-        for provider in providers:
-            # Each provider fills 3-4 attributes (or all if fewer exist)
-            num_attrs = min(rng.randint(3, 4), len(definitions))
-            chosen = rng.sample(definitions, num_attrs)
-            for defn in chosen:
-                if ProviderAttributeValue.objects.filter(
-                    provider=provider, definition=defn
-                ).exists():
-                    continue
-
-                gen = generators.get(defn.name)
-                if gen:
-                    value = gen()
-                else:
-                    # Fallback for unknown attributes
-                    if defn.data_type == ProviderAttributeDefinition.DATA_TYPE_BOOLEAN:
-                        value = rng.choice(["true", "false"])
-                    elif (
-                        defn.data_type == ProviderAttributeDefinition.DATA_TYPE_INTEGER
-                    ):
-                        value = str(rng.randint(1, 100))
-                    else:
-                        value = "N/A"
-
-                ProviderAttributeValue.objects.create(
-                    provider=provider,
-                    definition=defn,
-                    value_text=value,
-                )
-                count += 1
-        return count
 
     def _generate_reviews(self, rng, providers):
-        """Generate reviews for providers. Returns count of reviews created."""
-        count = 0
+        """Generate reviews for providers via bulk_create. Returns count."""
+        review_objects = []
         for provider in providers:
             num_reviews = rng.choices(
                 [0, 1, 2, 3, 4, 5], weights=[10, 15, 25, 25, 15, 10]
@@ -461,14 +422,75 @@ class Command(BaseCommand):
 
                 reviewer = f"{rng.choice(REVIEWER_FIRST_NAMES)} {rng.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZ')}."
 
-                Review.objects.create(
-                    provider=provider,
-                    rating=rating,
-                    client_name=reviewer,
-                    comment=comment,
+                review_objects.append(
+                    Review(
+                        provider=provider,
+                        rating=rating,
+                        client_name=reviewer,
+                        comment=comment,
+                    )
                 )
-                count += 1
-        return count
+
+        Review.objects.bulk_create(review_objects, batch_size=BATCH_SIZE)
+        return len(review_objects)
+
+    def _generate_attributes(self, rng, providers):
+        """Generate attribute values for providers via bulk_create. Returns count."""
+        definitions = list(ProviderAttributeDefinition.objects.filter(is_active=True))
+        if not definitions:
+            return 0
+
+        # Required attributes (show_on_card=True) must always be filled
+        required_defs = [d for d in definitions if d.show_on_card]
+        optional_defs = [d for d in definitions if not d.show_on_card]
+
+        # Pre-fetch all existing attribute values for these providers in one query
+        existing_pairs = set(
+            ProviderAttributeValue.objects.filter(provider__in=providers).values_list(
+                "provider_id", "definition_id"
+            )
+        )
+
+        # Value generators keyed by attribute name
+        generators = {
+            "Height": lambda: str(rng.randint(155, 195)),  # cm
+            "Weight": lambda: str(rng.randint(50, 95)),  # kg
+            "Established at": lambda: str(rng.randint(2005, 2024)),
+            "Working with eldery": lambda: rng.choice(["true", "false"]),
+        }
+
+        attr_objects = []
+        for provider in providers:
+            # Always include required attributes, plus a random sample of optional ones
+            num_optional = min(rng.randint(0, 2), len(optional_defs))
+            chosen = required_defs + rng.sample(optional_defs, num_optional)
+            for defn in chosen:
+                if (provider.pk, defn.pk) in existing_pairs:
+                    continue
+
+                gen = generators.get(defn.name)
+                if gen:
+                    value = gen()
+                else:
+                    if defn.data_type == ProviderAttributeDefinition.DATA_TYPE_BOOLEAN:
+                        value = rng.choice(["true", "false"])
+                    elif (
+                        defn.data_type == ProviderAttributeDefinition.DATA_TYPE_INTEGER
+                    ):
+                        value = str(rng.randint(1, 100))
+                    else:
+                        value = "N/A"
+
+                attr_objects.append(
+                    ProviderAttributeValue(
+                        provider=provider,
+                        definition=defn,
+                        value_text=value,
+                    )
+                )
+
+        ProviderAttributeValue.objects.bulk_create(attr_objects, batch_size=BATCH_SIZE)
+        return len(attr_objects)
 
     def handle(self, *args, **options):
         count = options["count"]
@@ -491,68 +513,105 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Generating {count} providers...")
 
+        # Pre-fetch all existing seed emails in one query
+        existing_emails = set(
+            User.objects.filter(email__endswith=f"@{SEED_EMAIL_DOMAIN}").values_list(
+                "email", flat=True
+            )
+        )
+
+        # Pre-generate all provider data
+        all_data = []
+        for i in range(1, count + 1):
+            all_data.append(self._generate_provider_data(i, rng, city_country_pairs))
+
+        today = timezone.now().date()
         providers = []
         created_count = 0
-        service_count = 0
+        service_objects = []
 
-        for i in range(1, count + 1):
-            data = self._generate_provider_data(i, rng, city_country_pairs)
+        # Hash the shared password once instead of per-user (PBKDF2 is slow)
+        hashed_password = make_password("BetaTest123!")
 
-            if User.objects.filter(email=data["email"]).exists():
-                provider = User.objects.get(email=data["email"]).provider_profile
-                providers.append(provider)
-                continue
+        with transaction.atomic():
+            # Load existing providers for emails that already exist
+            if existing_emails:
+                existing_providers = {
+                    p.user.email: p
+                    for p in Provider.objects.select_related("user").filter(
+                        user__email__in=existing_emails
+                    )
+                }
+            else:
+                existing_providers = {}
 
-            user = User.objects.create_user(
-                email=data["email"],
-                password="BetaTest123!",
-                user_type="provider",
-                is_email_verified=True,
-                first_name=data["first_name"],
-                last_name=data["last_name"],
-            )
+            for data in all_data:
+                if data["email"] in existing_emails:
+                    provider = existing_providers.get(data["email"])
+                    if provider:
+                        providers.append(provider)
+                    continue
 
-            provider = Provider.objects.create(
-                user=user,
-                bio=data["bio"],
-                phone=data["phone"],
-                country_id=data["country_id"],
-                city_id=data["city_id"],
-                subscription_status="active",
-                subscription_payment_method=rng.choice(["bank_transfer", "crypto"]),
-                subscription_renewal_date=timezone.now().date()
-                + timedelta(days=rng.randint(1, 30)),
-            )
-
-            for stype, desc, price, duration in data["services"]:
-                Service.objects.create(
-                    provider=provider,
-                    service_type=stype,
-                    description=desc,
-                    price=Decimal(str(price)),
-                    duration_minutes=duration,
-                    is_active=True,
+                user = User(
+                    email=User.objects.normalize_email(data["email"]),
+                    password=hashed_password,
+                    user_type="provider",
+                    is_email_verified=True,
+                    first_name=data["first_name"],
+                    last_name=data["last_name"],
                 )
-                service_count += 1
+                user.save()
 
-            providers.append(provider)
-            created_count += 1
+                provider = Provider(
+                    user=user,
+                    bio=data["bio"],
+                    phone=data["phone"],
+                    country_id=data["country_id"],
+                    city_id=data["city_id"],
+                    subscription_status="active",
+                    subscription_payment_method=data["payment_method"],
+                    subscription_renewal_date=today
+                    + timedelta(days=data["renewal_days"]),
+                )
+                # Save triggers slug generation (two-step: insert then update)
+                provider.save()
 
-            if created_count % 50 == 0:
-                self.stdout.write(f"  ... {created_count} providers created")
+                for stype, desc, price, duration in data["services"]:
+                    service_objects.append(
+                        Service(
+                            provider=provider,
+                            service_type=stype,
+                            description=desc,
+                            price=Decimal(str(price)),
+                            duration_minutes=duration,
+                            is_active=True,
+                        )
+                    )
+
+                providers.append(provider)
+                created_count += 1
+
+                if created_count % 50 == 0:
+                    self.stdout.write(f"  ... {created_count} providers created")
+
+            # Bulk-create all services at once
+            Service.objects.bulk_create(service_objects, batch_size=BATCH_SIZE)
+            service_count = len(service_objects)
 
         self.stdout.write(
             f"  Created {created_count} providers with {service_count} services"
         )
 
-        # Generate reviews
+        # Generate reviews in bulk
         self.stdout.write("Generating reviews...")
-        review_count = self._generate_reviews(rng, providers)
+        with transaction.atomic():
+            review_count = self._generate_reviews(rng, providers)
         self.stdout.write(f"  Created {review_count} reviews")
 
-        # Generate provider attributes
+        # Generate provider attributes in bulk
         self.stdout.write("Generating provider attributes...")
-        attr_count = self._generate_attributes(rng, providers)
+        with transaction.atomic():
+            attr_count = self._generate_attributes(rng, providers)
         self.stdout.write(f"  Created {attr_count} attribute values")
 
         # Create admin user
