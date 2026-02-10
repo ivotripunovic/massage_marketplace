@@ -14,7 +14,10 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from providers.models import Provider, Service, Country, City
+from providers.models import (
+    Provider, Service, Country, City,
+    ProviderAttributeDefinition, ProviderAttributeValue,
+)
 from reviews.models import Review
 from users.models import User
 
@@ -249,6 +252,51 @@ class Command(BaseCommand):
             'services': services,
         }
 
+    def _generate_attributes(self, rng, providers):
+        """Generate attribute values for providers. Returns count created."""
+        definitions = list(ProviderAttributeDefinition.objects.filter(is_active=True))
+        if not definitions:
+            return 0
+
+        # Value generators keyed by attribute name
+        generators = {
+            'Height': lambda: str(rng.randint(155, 195)),       # cm
+            'Weight': lambda: str(rng.randint(50, 95)),         # kg
+            'Established at': lambda: str(rng.randint(2005, 2024)),
+            'Working with eldery': lambda: rng.choice(['true', 'false']),
+        }
+
+        count = 0
+        for provider in providers:
+            # Each provider fills 3-4 attributes (or all if fewer exist)
+            num_attrs = min(rng.randint(3, 4), len(definitions))
+            chosen = rng.sample(definitions, num_attrs)
+            for defn in chosen:
+                if ProviderAttributeValue.objects.filter(
+                    provider=provider, definition=defn
+                ).exists():
+                    continue
+
+                gen = generators.get(defn.name)
+                if gen:
+                    value = gen()
+                else:
+                    # Fallback for unknown attributes
+                    if defn.data_type == ProviderAttributeDefinition.DATA_TYPE_BOOLEAN:
+                        value = rng.choice(['true', 'false'])
+                    elif defn.data_type == ProviderAttributeDefinition.DATA_TYPE_INTEGER:
+                        value = str(rng.randint(1, 100))
+                    else:
+                        value = 'N/A'
+
+                ProviderAttributeValue.objects.create(
+                    provider=provider,
+                    definition=defn,
+                    value_text=value,
+                )
+                count += 1
+        return count
+
     def _generate_reviews(self, rng, providers):
         """Generate reviews for providers. Returns count of reviews created."""
         count = 0
@@ -349,6 +397,11 @@ class Command(BaseCommand):
         review_count = self._generate_reviews(rng, providers)
         self.stdout.write(f'  Created {review_count} reviews')
 
+        # Generate provider attributes
+        self.stdout.write('Generating provider attributes...')
+        attr_count = self._generate_attributes(rng, providers)
+        self.stdout.write(f'  Created {attr_count} attribute values')
+
         # Create admin user
         admin_email = 'admin@massagemarketplace.com'
         if not User.objects.filter(email=admin_email).exists():
@@ -362,7 +415,8 @@ class Command(BaseCommand):
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS(
             f'Beta data seeded: {created_count} providers, '
-            f'{service_count} services, {review_count} reviews'
+            f'{service_count} services, {review_count} reviews, '
+            f'{attr_count} attribute values'
         ))
 
         self.stdout.write('')
