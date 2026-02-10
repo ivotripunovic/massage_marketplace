@@ -278,7 +278,7 @@ class ProviderDetailView(DetailView):
     model = Provider
     template_name = 'clients/provider_detail.html'
     context_object_name = 'provider'
-    slug_field = 'user__email'
+    slug_field = 'slug'
     slug_url_kwarg = 'slug'
 
     def get_queryset(self):

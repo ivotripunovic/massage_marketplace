@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.utils.text import slugify
 from datetime import timedelta, date
 
 
@@ -129,7 +130,9 @@ class Provider(models.Model):
         on_delete=models.CASCADE,
         related_name='provider_profile'
     )
-    
+
+    slug = models.SlugField(max_length=200, unique=True, blank=True)
+
     bio = models.TextField(blank=True, null=True)
     phone = models.CharField(max_length=20)
     photo = models.ImageField(
@@ -199,7 +202,19 @@ class Provider(models.Model):
     
     def __str__(self):
         return f"{self.user.email} - {self.get_subscription_status_display()}"
-    
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            super().save(*args, **kwargs)
+            args = ()
+            kwargs = {}
+        self.slug = slugify(self.get_name()) + '-' + str(self.pk)
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        from django.urls import reverse
+        return reverse('provider_detail', kwargs={'slug': self.slug})
+
     def is_subscription_active(self):
         """Check if subscription is active."""
         return self.subscription_status == 'active'

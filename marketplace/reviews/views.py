@@ -19,7 +19,7 @@ class ReviewSubmitView(CreateView):
         """Get provider and store in instance."""
         self.provider = get_object_or_404(
             Provider,
-            user__email=self.kwargs.get('slug'),
+            slug=self.kwargs.get('slug'),
             subscription_status='active',
             user__is_email_verified=True
         )
@@ -60,7 +60,7 @@ class ReviewSubmitView(CreateView):
 
     def get_success_url(self):
         """Redirect back to provider detail page."""
-        return reverse('provider_detail', kwargs={'slug': self.provider.user.email})
+        return reverse('provider_detail', kwargs={'slug': self.provider.slug})
 
     def get_context_data(self, **kwargs):
         """Add provider to context."""
@@ -81,7 +81,7 @@ class ReviewSubmitView(CreateView):
                 'provider': self.provider,
                 'review': self.object,
                 'provider_url': self.request.build_absolute_uri(
-                    reverse('provider_detail', kwargs={'slug': self.provider.user.email})
+                    reverse('provider_detail', kwargs={'slug': self.provider.slug})
                 ),
             })
 

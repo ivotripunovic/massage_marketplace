@@ -181,7 +181,7 @@ class ProviderDetailViewTests(TestCase):
     def test_provider_detail_loads(self):
         """Test that provider detail page loads."""
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, 'clients/provider_detail.html')
@@ -189,7 +189,7 @@ class ProviderDetailViewTests(TestCase):
     def test_provider_detail_shows_info(self):
         """Test that provider detail shows all information."""
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
 
         # Should show provider name
@@ -207,7 +207,7 @@ class ProviderDetailViewTests(TestCase):
     def test_provider_detail_shows_services(self):
         """Test that services are displayed."""
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
 
         # Should show service type
@@ -225,7 +225,7 @@ class ProviderDetailViewTests(TestCase):
     def test_provider_detail_shows_reviews(self):
         """Test that reviews are displayed."""
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
 
         # Should show review content
@@ -243,7 +243,7 @@ class ProviderDetailViewTests(TestCase):
         self.provider.save()
 
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
         self.assertEqual(response.status_code, 404)
 
@@ -253,14 +253,14 @@ class ProviderDetailViewTests(TestCase):
         self.user.save()
 
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
         self.assertEqual(response.status_code, 404)
 
     def test_no_authentication_required(self):
         """Test that provider detail is accessible without login."""
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
         self.assertEqual(response.status_code, 200)
 
@@ -315,6 +315,131 @@ class ProviderModelHelperTests(TestCase):
         self.user.save()
         name = self.provider.get_name()
         self.assertEqual(name, 'test')
+
+
+class ProviderSlugTests(TestCase):
+    """Tests for Provider slug generation."""
+
+    def test_slug_generated_on_create(self):
+        """Test that slug is auto-generated when provider is created."""
+        user = User.objects.create_user(
+            email='sarah@example.com',
+            password='testpass123',
+            user_type='provider',
+            first_name='Sarah',
+            last_name='Johnson'
+        )
+        provider = Provider.objects.create(user=user, phone='+1234567890')
+        self.assertEqual(provider.slug, f'sarah-johnson-{provider.pk}')
+
+    def test_slug_uses_email_prefix_when_no_name(self):
+        """Test that slug falls back to email prefix when no name set."""
+        user = User.objects.create_user(
+            email='therapist42@example.com',
+            password='testpass123',
+            user_type='provider'
+        )
+        provider = Provider.objects.create(user=user, phone='+1234567890')
+        self.assertEqual(provider.slug, f'therapist42-{provider.pk}')
+
+    def test_slug_updates_on_name_change(self):
+        """Test that slug updates when provider name changes."""
+        user = User.objects.create_user(
+            email='test@example.com',
+            password='testpass123',
+            user_type='provider',
+            first_name='Old',
+            last_name='Name'
+        )
+        provider = Provider.objects.create(user=user, phone='+1234567890')
+        self.assertEqual(provider.slug, f'old-name-{provider.pk}')
+
+        user.first_name = 'New'
+        user.last_name = 'Name'
+        user.save()
+        provider.save()
+        self.assertEqual(provider.slug, f'new-name-{provider.pk}')
+
+    def test_slug_is_unique_for_same_name(self):
+        """Test that two providers with the same name get different slugs."""
+        user1 = User.objects.create_user(
+            email='jane1@example.com',
+            password='testpass123',
+            user_type='provider',
+            first_name='Jane',
+            last_name='Doe'
+        )
+        user2 = User.objects.create_user(
+            email='jane2@example.com',
+            password='testpass123',
+            user_type='provider',
+            first_name='Jane',
+            last_name='Doe'
+        )
+        p1 = Provider.objects.create(user=user1, phone='+1111111111')
+        p2 = Provider.objects.create(user=user2, phone='+2222222222')
+
+        self.assertNotEqual(p1.slug, p2.slug)
+        self.assertEqual(p1.slug, f'jane-doe-{p1.pk}')
+        self.assertEqual(p2.slug, f'jane-doe-{p2.pk}')
+
+    def test_slug_used_in_detail_url(self):
+        """Test that provider detail page is accessible via slug URL."""
+        user = User.objects.create_user(
+            email='detail@example.com',
+            password='testpass123',
+            user_type='provider',
+            first_name='Detail',
+            last_name='Test',
+            is_email_verified=True
+        )
+        provider = Provider.objects.create(
+            user=user, phone='+1234567890', subscription_status='active'
+        )
+
+        response = self.client.get(
+            reverse('provider_detail', kwargs={'slug': provider.slug})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['provider'], provider)
+
+    def test_get_absolute_url(self):
+        """Test that get_absolute_url returns the correct slug-based URL."""
+        user = User.objects.create_user(
+            email='abs@example.com',
+            password='testpass123',
+            user_type='provider',
+            first_name='Abs',
+            last_name='Url'
+        )
+        provider = Provider.objects.create(user=user, phone='+1234567890')
+        expected = reverse('provider_detail', kwargs={'slug': provider.slug})
+        self.assertEqual(provider.get_absolute_url(), expected)
+
+    def test_review_submit_uses_slug(self):
+        """Test that review submission works with slug-based URL."""
+        user = User.objects.create_user(
+            email='reviewed@example.com',
+            password='testpass123',
+            user_type='provider',
+            first_name='Reviewed',
+            last_name='Provider',
+            is_email_verified=True
+        )
+        provider = Provider.objects.create(
+            user=user, phone='+1234567890', subscription_status='active'
+        )
+
+        response = self.client.post(
+            reverse('review_submit', kwargs={'slug': provider.slug}),
+            {
+                'rating': 5,
+                'comment': 'Slug-based review!',
+                'client_email': 'client@example.com'
+            }
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Review.objects.filter(provider=provider).count(), 1)
 
 
 class ProviderFilteringTests(TestCase):
@@ -523,7 +648,7 @@ class ProviderDetailGalleryTests(TestCase):
             caption='Workspace photo'
         )
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn('gallery_images', response.context)
@@ -537,7 +662,7 @@ class ProviderDetailGalleryTests(TestCase):
             caption='My studio'
         )
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
         self.assertContains(response, 'Photo Gallery')
         self.assertContains(response, 'My studio')
@@ -545,7 +670,7 @@ class ProviderDetailGalleryTests(TestCase):
     def test_gallery_section_hidden_when_empty(self):
         """Test that gallery section is hidden when no images."""
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
         self.assertNotContains(response, 'Photo Gallery')
 

@@ -44,8 +44,8 @@ urlpatterns = [
     # Public URLs
     path('', ProviderDirectoryView.as_view(), name='home'),
     path('providers/', ProviderDirectoryView.as_view(), name='providers'),
-    path('providers/<str:slug>/', ProviderDetailView.as_view(), name='provider_detail'),
-    path('providers/<str:slug>/review/', ReviewSubmitView.as_view(), name='review_submit'),
+    path('providers/<slug:slug>/', ProviderDetailView.as_view(), name='provider_detail'),
+    path('providers/<slug:slug>/review/', ReviewSubmitView.as_view(), name='review_submit'),
 
     # Authentication URLs
     path('auth/signup/', SignupView.as_view(), name='signup'),

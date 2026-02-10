@@ -96,7 +96,7 @@ class ReviewSubmissionTests(TestCase):
     def test_submit_review_success(self):
         """Test successful review submission."""
         response = self.client.post(
-            reverse('review_submit', kwargs={'slug': self.provider.user.email}),
+            reverse('review_submit', kwargs={'slug': self.provider.slug}),
             {
                 'rating': 5,
                 'comment': 'Great massage therapist!',
@@ -109,7 +109,7 @@ class ReviewSubmissionTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertRedirects(
             response,
-            reverse('provider_detail', kwargs={'slug': self.provider.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
 
         # Review should be created
@@ -123,7 +123,7 @@ class ReviewSubmissionTests(TestCase):
     def test_submit_review_anonymous(self):
         """Test anonymous review submission (no client name)."""
         response = self.client.post(
-            reverse('review_submit', kwargs={'slug': self.provider.user.email}),
+            reverse('review_submit', kwargs={'slug': self.provider.slug}),
             {
                 'rating': 4,
                 'comment': 'Good service',
@@ -149,7 +149,7 @@ class ReviewSubmissionTests(TestCase):
 
         # Try to submit second review with same email
         response = self.client.post(
-            reverse('review_submit', kwargs={'slug': self.provider.user.email}),
+            reverse('review_submit', kwargs={'slug': self.provider.slug}),
             {
                 'rating': 4,
                 'comment': 'Second review',
@@ -165,7 +165,7 @@ class ReviewSubmissionTests(TestCase):
     def test_submit_review_invalid_rating(self):
         """Test that invalid rating is rejected."""
         response = self.client.post(
-            reverse('review_submit', kwargs={'slug': self.provider.user.email}),
+            reverse('review_submit', kwargs={'slug': self.provider.slug}),
             {
                 'rating': 6,  # Invalid: must be 1-5
                 'comment': 'Test',
@@ -179,7 +179,7 @@ class ReviewSubmissionTests(TestCase):
     def test_submit_review_missing_comment(self):
         """Test that missing comment is rejected."""
         response = self.client.post(
-            reverse('review_submit', kwargs={'slug': self.provider.user.email}),
+            reverse('review_submit', kwargs={'slug': self.provider.slug}),
             {
                 'rating': 5,
                 'client_email': 'test@example.com'
@@ -192,7 +192,7 @@ class ReviewSubmissionTests(TestCase):
     def test_submit_review_provider_not_found(self):
         """Test that submitting review for non-existent provider returns 404."""
         response = self.client.post(
-            reverse('review_submit', kwargs={'slug': 'nonexistent@example.com'}),
+            reverse('review_submit', kwargs={'slug': 'nonexistent-999'}),
             {
                 'rating': 5,
                 'comment': 'Test',
@@ -206,7 +206,7 @@ class ReviewSubmissionTests(TestCase):
     def test_review_submission_sends_email(self, mock_send_mail):
         """Test that review submission sends email notification."""
         self.client.post(
-            reverse('review_submit', kwargs={'slug': self.provider.user.email}),
+            reverse('review_submit', kwargs={'slug': self.provider.slug}),
             {
                 'rating': 5,
                 'comment': 'Great service!',
@@ -223,7 +223,7 @@ class ReviewSubmissionTests(TestCase):
     def test_review_submission_works_if_email_fails(self, mock_send_mail):
         """Test that review submission works even if email fails."""
         response = self.client.post(
-            reverse('review_submit', kwargs={'slug': self.provider.user.email}),
+            reverse('review_submit', kwargs={'slug': self.provider.slug}),
             {
                 'rating': 5,
                 'comment': 'Great service!',
@@ -273,7 +273,7 @@ class ReviewDisplayTests(TestCase):
         )
 
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.provider.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
 
         self.assertEqual(response.status_code, 200)
@@ -292,7 +292,7 @@ class ReviewDisplayTests(TestCase):
         )
 
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.provider.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
 
         self.assertContains(response, 'Great!')
@@ -301,7 +301,7 @@ class ReviewDisplayTests(TestCase):
     def test_provider_detail_shows_no_reviews_message(self):
         """Test that page shows message when no reviews exist."""
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.provider.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
 
         self.assertContains(response, 'No reviews yet')
@@ -309,7 +309,7 @@ class ReviewDisplayTests(TestCase):
     def test_provider_detail_shows_review_form(self):
         """Test that review form is displayed on provider detail page."""
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.provider.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
 
         self.assertContains(response, 'Write a Review')
@@ -339,7 +339,7 @@ class ReviewDisplayTests(TestCase):
         )
 
         response = self.client.get(
-            reverse('provider_detail', kwargs={'slug': self.provider.user.email})
+            reverse('provider_detail', kwargs={'slug': self.provider.slug})
         )
 
         content = response.content.decode()
