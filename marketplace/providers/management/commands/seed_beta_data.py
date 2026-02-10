@@ -1,10 +1,12 @@
 """Management command to seed beta test data for the marketplace.
 
 Usage:
-    python manage.py seed_beta_data
-    python manage.py seed_beta_data --flush   # Clear existing seed data first
+    python manage.py seed_beta_data              # 100 providers (default)
+    python manage.py seed_beta_data --count 1000  # 1000 providers
+    python manage.py seed_beta_data --flush       # Clear existing seed data first
 """
 
+import random
 from datetime import timedelta
 from decimal import Decimal
 
@@ -16,100 +18,168 @@ from providers.models import Provider, Service, Country, City
 from reviews.models import Review
 from users.models import User
 
+# ── Name pools ────────────────────────────────────────────────────────────────
 
-PROVIDERS_DATA = [
-    {
-        'email': 'sarah.johnson@example.com',
-        'first_name': 'Sarah',
-        'last_name': 'Johnson',
-        'bio': 'Licensed Massage Therapist with 10 years of experience specialising in Swedish and deep tissue massage. I focus on relieving chronic pain and improving mobility.',
-        'phone': '+44-20-7946-0101',
-        'country_name': 'United Kingdom',
-        'city_name': 'London',
-        'services': [
-            ('swedish', 'Relaxing full-body Swedish massage to improve circulation and reduce stress.', 80, 60),
-            ('deep_tissue', 'Targeted deep tissue work for chronic pain relief and muscle recovery.', 100, 60),
-            ('hot_stone', 'Warm stone therapy combined with deep pressure for total relaxation.', 120, 90),
-        ],
-    },
-    {
-        'email': 'michael.chen@example.com',
-        'first_name': 'Michael',
-        'last_name': 'Chen',
-        'bio': 'Certified Thai massage practitioner trained in Chiang Mai, Thailand. I combine traditional Thai techniques with modern wellness approaches.',
-        'phone': '+81-3-1234-5678',
-        'country_name': 'Japan',
-        'city_name': 'Tokyo',
-        'services': [
-            ('thai', 'Traditional Thai massage with gentle stretching and pressure point work.', 90, 60),
-            ('reflexology', 'Therapeutic foot reflexology to restore balance and energy flow.', 55, 30),
-            ('swedish', 'Gentle Swedish massage with Thai-inspired stretching elements.', 75, 60),
-        ],
-    },
-    {
-        'email': 'emma.wilson@example.com',
-        'first_name': 'Emma',
-        'last_name': 'Wilson',
-        'bio': 'Holistic massage therapist offering aromatherapy and hot stone treatments. My goal is to create a healing environment for mind and body.',
-        'phone': '+33-1-2345-6789',
-        'country_name': 'France',
-        'city_name': 'Paris',
-        'services': [
-            ('aromatherapy', 'Customised aromatherapy massage using premium essential oils.', 95, 60),
-            ('hot_stone', 'Hot stone massage combining heat therapy with deep pressure techniques.', 110, 60),
-            ('swedish', 'Gentle Swedish massage for stress relief and relaxation.', 70, 60),
-        ],
-    },
-    {
-        'email': 'david.martinez@example.com',
-        'first_name': 'David',
-        'last_name': 'Martinez',
-        'bio': 'Sports massage specialist working with athletes and active individuals. I help optimise performance and speed up recovery.',
-        'phone': '+55-11-9876-5432',
-        'country_name': 'Brazil',
-        'city_name': 'São Paulo',
-        'services': [
-            ('deep_tissue', 'Sports-focused deep tissue massage for athletes.', 85, 60),
-            ('swedish', 'Recovery-focused Swedish massage for post-workout relaxation.', 70, 60),
-        ],
-    },
-    {
-        'email': 'lisa.patel@example.com',
-        'first_name': 'Lisa',
-        'last_name': 'Patel',
-        'bio': 'Experienced reflexologist and aromatherapist. I believe in the power of touch to heal and restore. Serving clients in the Melbourne area for over 5 years.',
-        'phone': '+61-3-9876-5432',
-        'country_name': 'Australia',
-        'city_name': 'Melbourne',
-        'services': [
-            ('reflexology', 'Full reflexology session focusing on feet and hands.', 60, 30),
-            ('aromatherapy', 'Relaxing aromatherapy massage with essential oil blends.', 85, 60),
-            ('hot_stone', 'Warm stone aromatherapy experience with hot towels.', 120, 90),
-        ],
-    },
+FIRST_NAMES_F = [
+    'Sarah', 'Emma', 'Lisa', 'Anna', 'Maria', 'Elena', 'Sofia', 'Yuki',
+    'Mei', 'Priya', 'Fatima', 'Amara', 'Leila', 'Nina', 'Anya', 'Clara',
+    'Hana', 'Lucia', 'Ingrid', 'Olivia', 'Chloe', 'Aisha', 'Rosa', 'Freya',
+    'Lena', 'Mila', 'Zara', 'Nadia', 'Julia', 'Camille', 'Bianca', 'Petra',
+    'Sakura', 'Ines', 'Suri', 'Vera', 'Kaia', 'Dina', 'Ewa', 'Thea',
 ]
 
-REVIEWS_DATA = [
-    # (provider_index, rating, client_name, comment)
-    (0, 5, 'Alice B.', 'Sarah is amazing! My back pain is completely gone after just two sessions.'),
-    (0, 4, 'Bob T.', 'Very professional and knowledgeable. The deep tissue massage was exactly what I needed.'),
-    (0, 5, 'Carol M.', 'Best massage therapist I have ever visited. Highly recommend!'),
-    (1, 5, 'Dan W.', 'Incredible Thai massage. Michael is very skilled and attentive.'),
-    (1, 4, 'Eve S.', 'Great experience. The reflexology session was very relaxing.'),
-    (2, 5, 'Frank J.', 'The aromatherapy massage was heavenly. Emma creates such a peaceful atmosphere.'),
-    (2, 5, 'Grace L.', 'Hot stone massage was the best I have had. Will definitely return.'),
-    (2, 4, 'Henry K.', 'Very professional. The essential oils she uses are top quality.'),
-    (3, 4, 'Iris N.', 'David really knows sports massage. Helped my running injury tremendously.'),
-    (3, 5, 'Jack P.', 'Perfect for post-workout recovery. Highly recommended for athletes.'),
-    (4, 5, 'Karen R.', 'Lisa has magic hands. The reflexology session left me feeling so relaxed.'),
-    (4, 4, 'Larry V.', 'Great aromatherapy experience. The essential oil blend was wonderful.'),
+FIRST_NAMES_M = [
+    'Michael', 'David', 'James', 'Marco', 'Kenji', 'Raj', 'Omar', 'Luca',
+    'Erik', 'Andre', 'Carlos', 'Tomas', 'Pavel', 'Youssef', 'Leo', 'Felix',
+    'Hugo', 'Mateo', 'Kai', 'Stefan', 'Ravi', 'Chen', 'Ivan', 'Andrei',
+    'Jan', 'Noah', 'Oscar', 'Samir', 'Diego', 'Viktor', 'Lars', 'Abel',
+    'Tariq', 'Bruno', 'Sven', 'Milo', 'Nico', 'Ari', 'Daan', 'Finn',
 ]
+
+LAST_NAMES = [
+    'Johnson', 'Chen', 'Wilson', 'Martinez', 'Patel', 'Müller', 'Rossi',
+    'Tanaka', 'Santos', 'Kim', 'Ali', 'Petrov', 'Johansson', 'Da Silva',
+    'Nguyen', 'Garcia', 'Schmidt', 'Moretti', 'Larsson', 'Oliveira',
+    'Nakamura', 'Hansen', 'Kowalski', 'Dubois', 'Fischer', 'Berg',
+    'Fernandez', 'Bianchi', 'Yamamoto', 'Novak', 'Reyes', 'Ivanov',
+    'Costa', 'Eriksen', 'Laurent', 'Weber', 'Popov', 'Szabo', 'Pereira',
+    'Jansen', 'Andersen', 'Volkov', 'Sato', 'Park', 'Ahmad', 'Torres',
+    'Kato', 'Lindberg', 'Mancini', 'Roy',
+]
+
+# ── Bio templates ─────────────────────────────────────────────────────────────
+
+BIO_TEMPLATES = [
+    'Licensed Massage Therapist with {years} years of experience specialising in {specialty}. I focus on {focus}.',
+    'Certified {specialty} practitioner with a passion for holistic wellness. {years} years helping clients achieve balance and relaxation.',
+    'Experienced therapist offering {specialty} treatments. With {years} years in the field, I bring expertise and care to every session.',
+    'Dedicated massage professional specialising in {specialty}. My {years} years of practice are focused on {focus}.',
+    'Trained in {specialty} with {years} years of hands-on experience. I create a calm, healing space for every client.',
+    'Holistic wellness practitioner with {years} years of expertise in {specialty}. My approach centres on {focus}.',
+    'Professional massage therapist with {years} years in the industry. I specialise in {specialty} and am passionate about {focus}.',
+    'Skilled bodywork therapist offering {specialty} treatments for {years} years. My goal is {focus}.',
+]
+
+SPECIALTIES = [
+    'Swedish and deep tissue massage',
+    'Thai massage and stretching techniques',
+    'aromatherapy and essential oil treatments',
+    'hot stone and thermal therapies',
+    'sports massage and recovery',
+    'reflexology and pressure point therapy',
+    'deep tissue and myofascial release',
+    'relaxation and stress-relief massage',
+]
+
+FOCUSES = [
+    'relieving chronic pain and improving mobility',
+    'helping clients manage stress and find relaxation',
+    'restoring balance through therapeutic touch',
+    'optimising athletic performance and recovery',
+    'promoting overall wellness and vitality',
+    'creating a healing environment for mind and body',
+    'personalised treatment plans for every client',
+    'combining traditional and modern techniques',
+]
+
+# ── Service descriptions ──────────────────────────────────────────────────────
+
+SERVICE_DESCRIPTIONS = {
+    'swedish': [
+        'Relaxing full-body Swedish massage to improve circulation and reduce stress.',
+        'Gentle Swedish massage for deep relaxation and tension relief.',
+        'Classic Swedish technique with long, flowing strokes for total calm.',
+        'Swedish massage combining gentle pressure with soothing movements.',
+    ],
+    'deep_tissue': [
+        'Targeted deep tissue work for chronic pain relief and muscle recovery.',
+        'Intensive deep tissue massage focusing on problem areas.',
+        'Sports-focused deep tissue massage for athletes and active individuals.',
+        'Deep pressure therapy to release tension and restore movement.',
+    ],
+    'thai': [
+        'Traditional Thai massage with gentle stretching and pressure point work.',
+        'Authentic Thai bodywork combining yoga-like stretches with acupressure.',
+        'Thai massage to improve flexibility and energy flow.',
+        'Ancient Thai techniques for full-body rejuvenation.',
+    ],
+    'reflexology': [
+        'Therapeutic foot reflexology to restore balance and energy flow.',
+        'Full reflexology session focusing on feet and hands.',
+        'Precision reflexology targeting key pressure points for whole-body wellness.',
+        'Relaxing reflexology to ease tension and promote natural healing.',
+    ],
+    'hot_stone': [
+        'Warm stone therapy combined with deep pressure for total relaxation.',
+        'Hot stone massage combining heat therapy with soothing techniques.',
+        'Heated basalt stones placed on key points for deep muscle relief.',
+        'Luxurious hot stone treatment for stress release and warmth.',
+    ],
+    'aromatherapy': [
+        'Customised aromatherapy massage using premium essential oils.',
+        'Relaxing aromatherapy massage with carefully blended essential oils.',
+        'Aromatic essential oil massage tailored to your needs.',
+        'Soothing aromatherapy experience with therapeutic-grade oils.',
+    ],
+}
+
+SERVICE_TYPES = list(SERVICE_DESCRIPTIONS.keys())
+
+# ── Review templates ──────────────────────────────────────────────────────────
+
+REVIEW_COMMENTS_5 = [
+    'Absolutely amazing experience! Best massage I have ever had.',
+    'Incredibly skilled therapist. I felt completely renewed afterwards.',
+    'Five stars without hesitation. Will definitely be returning.',
+    'Outstanding technique and a wonderfully relaxing atmosphere.',
+    'Fantastic session. My chronic pain has improved dramatically.',
+    'Truly exceptional. Professional, attentive, and extremely skilled.',
+    'The best therapist I have found. Highly recommend to everyone.',
+    'Life-changing experience. I have been coming back every month.',
+    'Perfect in every way. The treatment exceeded all expectations.',
+    'Cannot say enough good things. An absolute gem of a therapist.',
+]
+
+REVIEW_COMMENTS_4 = [
+    'Very professional and knowledgeable. Great experience overall.',
+    'Really enjoyable session. Would happily recommend.',
+    'Skilled therapist with a great technique. Minor scheduling hiccup but otherwise perfect.',
+    'Excellent massage. The pressure was just right.',
+    'Very relaxing treatment. Good communication throughout.',
+    'Thoroughly enjoyed it. Will be booking again soon.',
+    'Great technique and friendly manner. Solid experience.',
+    'Left feeling much better. Quality service all around.',
+]
+
+REVIEW_COMMENTS_3 = [
+    'Decent massage but nothing extraordinary. Competent therapist.',
+    'Good session overall, though the room was a bit cold.',
+    'Average experience. The technique was fine but lacked personalisation.',
+    'Okay massage. Expected a bit more for the price.',
+]
+
+REVIEWER_FIRST_NAMES = [
+    'Alice', 'Bob', 'Carol', 'Dan', 'Eve', 'Frank', 'Grace', 'Henry',
+    'Iris', 'Jack', 'Karen', 'Larry', 'Mona', 'Nick', 'Olga', 'Pete',
+    'Quinn', 'Ruth', 'Sam', 'Tina', 'Uma', 'Vince', 'Wendy', 'Xander',
+    'Yara', 'Zach', 'Amy', 'Ben', 'Cleo', 'Drew', 'Elle', 'Gus',
+]
+
+# ── Seed email domain ─────────────────────────────────────────────────────────
+
+SEED_EMAIL_DOMAIN = 'seed.example.com'
 
 
 class Command(BaseCommand):
     help = 'Seed the database with beta test data (providers, services, reviews)'
 
     def add_arguments(self, parser):
+        parser.add_argument(
+            '--count',
+            type=int,
+            default=100,
+            help='Number of providers to create (default: 100)',
+        )
         parser.add_argument(
             '--flush',
             action='store_true',
@@ -130,45 +200,110 @@ class Command(BaseCommand):
         call_command('loaddata', '007_cities_oceania', verbosity=0)
         self.stdout.write(self.style.SUCCESS('Location fixtures loaded.'))
 
-    def _lookup_location(self, country_name, city_name):
-        """Look up Country and City by name. Returns (country, city) or (None, None)."""
-        try:
-            country = Country.objects.get(name=country_name)
-        except Country.DoesNotExist:
-            self.stderr.write(self.style.WARNING(f'  Country not found: {country_name}'))
-            return None, None
+    def _build_cities_list(self):
+        """Return list of (city, country) tuples from database."""
+        return list(
+            City.objects.select_related('country')
+            .filter(country__is_active=True)
+            .values_list('id', 'country_id')
+        )
 
-        city = None
-        if city_name:
-            try:
-                city = City.objects.get(name=city_name, country=country)
-            except City.DoesNotExist:
-                self.stderr.write(self.style.WARNING(f'  City not found: {city_name} in {country_name}'))
+    def _generate_provider_data(self, index, rng, city_country_pairs):
+        """Generate deterministic provider data for a given index."""
+        is_female = rng.random() < 0.5
+        first_name = rng.choice(FIRST_NAMES_F if is_female else FIRST_NAMES_M)
+        last_name = rng.choice(LAST_NAMES)
+        email = f'provider{index:04d}@{SEED_EMAIL_DOMAIN}'
 
-        return country, city
+        years = rng.randint(2, 20)
+        bio = rng.choice(BIO_TEMPLATES).format(
+            years=years,
+            specialty=rng.choice(SPECIALTIES),
+            focus=rng.choice(FOCUSES),
+        )
+
+        city_id, country_id = rng.choice(city_country_pairs)
+        phone_digits = ''.join(str(rng.randint(0, 9)) for _ in range(10))
+        phone = f'+{phone_digits[:2]}-{phone_digits[2:5]}-{phone_digits[5:]}'
+
+        # 1-4 services, unique types
+        num_services = rng.randint(1, 4)
+        service_types = rng.sample(SERVICE_TYPES, min(num_services, len(SERVICE_TYPES)))
+        services = []
+        for stype in service_types:
+            desc = rng.choice(SERVICE_DESCRIPTIONS[stype])
+            base_price = rng.randint(30, 150)
+            price = round(base_price / 5) * 5  # round to nearest 5
+            price = max(price, 5)
+            duration = rng.choice([30, 60, 60, 60, 90])  # weighted toward 60
+            services.append((stype, desc, price, duration))
+
+        return {
+            'email': email,
+            'first_name': first_name,
+            'last_name': last_name,
+            'bio': bio,
+            'phone': phone,
+            'country_id': country_id,
+            'city_id': city_id,
+            'services': services,
+        }
+
+    def _generate_reviews(self, rng, providers):
+        """Generate reviews for providers. Returns count of reviews created."""
+        count = 0
+        for provider in providers:
+            num_reviews = rng.choices([0, 1, 2, 3, 4, 5], weights=[10, 15, 25, 25, 15, 10])[0]
+            for _ in range(num_reviews):
+                rating = rng.choices([3, 4, 5], weights=[10, 30, 60])[0]
+                if rating == 5:
+                    comment = rng.choice(REVIEW_COMMENTS_5)
+                elif rating == 4:
+                    comment = rng.choice(REVIEW_COMMENTS_4)
+                else:
+                    comment = rng.choice(REVIEW_COMMENTS_3)
+
+                reviewer = f'{rng.choice(REVIEWER_FIRST_NAMES)} {rng.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")}.'
+
+                Review.objects.create(
+                    provider=provider,
+                    rating=rating,
+                    client_name=reviewer,
+                    comment=comment,
+                )
+                count += 1
+        return count
 
     def handle(self, *args, **options):
-        seed_emails = [p['email'] for p in PROVIDERS_DATA]
+        count = options['count']
+        rng = random.Random(42)  # deterministic seed for reproducibility
 
         if options['flush']:
             self.stdout.write('Removing existing seed data...')
-            User.objects.filter(email__in=seed_emails).delete()
+            User.objects.filter(email__endswith=f'@{SEED_EMAIL_DOMAIN}').delete()
+            User.objects.filter(email='admin@massagemarketplace.com').delete()
             self.stdout.write(self.style.SUCCESS('Seed data removed.'))
 
         self._ensure_fixtures_loaded()
 
+        city_country_pairs = self._build_cities_list()
+        if not city_country_pairs:
+            self.stderr.write(self.style.ERROR('No cities found in database. Cannot seed providers.'))
+            return
+
+        self.stdout.write(f'Generating {count} providers...')
+
         providers = []
-        for data in PROVIDERS_DATA:
+        created_count = 0
+        service_count = 0
+
+        for i in range(1, count + 1):
+            data = self._generate_provider_data(i, rng, city_country_pairs)
+
             if User.objects.filter(email=data['email']).exists():
-                self.stdout.write(f"  Skipping {data['email']} (already exists)")
                 provider = User.objects.get(email=data['email']).provider_profile
                 providers.append(provider)
                 continue
-
-            country, city = self._lookup_location(
-                data.get('country_name', ''),
-                data.get('city_name', ''),
-            )
 
             user = User.objects.create_user(
                 email=data['email'],
@@ -183,11 +318,11 @@ class Command(BaseCommand):
                 user=user,
                 bio=data['bio'],
                 phone=data['phone'],
-                country=country,
-                city=city,
+                country_id=data['country_id'],
+                city_id=data['city_id'],
                 subscription_status='active',
-                subscription_payment_method='bank_transfer',
-                subscription_renewal_date=timezone.now().date() + timedelta(days=30),
+                subscription_payment_method=rng.choice(['bank_transfer', 'crypto']),
+                subscription_renewal_date=timezone.now().date() + timedelta(days=rng.randint(1, 30)),
             )
 
             for stype, desc, price, duration in data['services']:
@@ -199,21 +334,20 @@ class Command(BaseCommand):
                     duration_minutes=duration,
                     is_active=True,
                 )
+                service_count += 1
 
-            self.stdout.write(f"  Created provider: {data['first_name']} {data['last_name']} ({data['email']})")
             providers.append(provider)
+            created_count += 1
 
-        # Create reviews
-        for provider_idx, rating, client_name, comment in REVIEWS_DATA:
-            provider = providers[provider_idx]
-            if Review.objects.filter(provider=provider, client_name=client_name).exists():
-                continue
-            Review.objects.create(
-                provider=provider,
-                rating=rating,
-                client_name=client_name,
-                comment=comment,
-            )
+            if created_count % 50 == 0:
+                self.stdout.write(f'  ... {created_count} providers created')
+
+        self.stdout.write(f'  Created {created_count} providers with {service_count} services')
+
+        # Generate reviews
+        self.stdout.write('Generating reviews...')
+        review_count = self._generate_reviews(rng, providers)
+        self.stdout.write(f'  Created {review_count} reviews')
 
         # Create admin user
         admin_email = 'admin@massagemarketplace.com'
@@ -223,20 +357,15 @@ class Command(BaseCommand):
                 password='AdminBeta123!',
                 user_type='admin',
             )
-            self.stdout.write(f"  Created admin: {admin_email}")
+            self.stdout.write(f'  Created admin: {admin_email}')
 
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS(
-            f'Beta data seeded: {len(PROVIDERS_DATA)} providers, '
-            f'{sum(len(p["services"]) for p in PROVIDERS_DATA)} services, '
-            f'{len(REVIEWS_DATA)} reviews'
+            f'Beta data seeded: {created_count} providers, '
+            f'{service_count} services, {review_count} reviews'
         ))
-        # Seed gallery photos for providers
-        self.stdout.write('')
-        self.stdout.write('Seeding gallery photos...')
-        call_command('seed_gallery_photos')
 
         self.stdout.write('')
         self.stdout.write('  Beta login credentials:')
-        self.stdout.write(f'    Provider: {PROVIDERS_DATA[0]["email"]} / BetaTest123!')
+        self.stdout.write(f'    Provider: provider0001@{SEED_EMAIL_DOMAIN} / BetaTest123!')
         self.stdout.write(f'    Admin:    {admin_email} / AdminBeta123!')
