@@ -5,26 +5,40 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('providers', '0005_remove_certification_model'),
+        ("providers", "0005_remove_certification_model"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='ProviderGalleryImage',
+            name="ProviderGalleryImage",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('image', models.ImageField(upload_to='providers/gallery/')),
-                ('caption', models.CharField(blank=True, max_length=200)),
-                ('uploaded_at', models.DateTimeField(auto_now_add=True)),
-                ('provider', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='gallery_images', to='providers.provider')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("image", models.ImageField(upload_to="providers/gallery/")),
+                ("caption", models.CharField(blank=True, max_length=200)),
+                ("uploaded_at", models.DateTimeField(auto_now_add=True)),
+                (
+                    "provider",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="gallery_images",
+                        to="providers.provider",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Gallery Image',
-                'verbose_name_plural': 'Gallery Images',
-                'db_table': 'providers_galleryimage',
-                'ordering': ['-uploaded_at'],
+                "verbose_name": "Gallery Image",
+                "verbose_name_plural": "Gallery Images",
+                "db_table": "providers_galleryimage",
+                "ordering": ["-uploaded_at"],
             },
         ),
     ]

@@ -4,20 +4,29 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('providers', '0003_provider_providers_p_subscri_f71646_idx_and_more'),
+        ("providers", "0003_provider_providers_p_subscri_f71646_idx_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='provider',
-            name='city',
-            field=models.CharField(blank=True, help_text='City where services are provided', max_length=100, null=True),
+            model_name="provider",
+            name="city",
+            field=models.CharField(
+                blank=True,
+                help_text="City where services are provided",
+                max_length=100,
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='provider',
-            name='country',
-            field=models.CharField(blank=True, help_text='Country where services are provided', max_length=100, null=True),
+            model_name="provider",
+            name="country",
+            field=models.CharField(
+                blank=True,
+                help_text="Country where services are provided",
+                max_length=100,
+                null=True,
+            ),
         ),
     ]

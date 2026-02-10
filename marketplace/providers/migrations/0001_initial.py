@@ -6,7 +6,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
@@ -15,26 +14,83 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Provider',
+            name="Provider",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('bio', models.TextField(blank=True, null=True)),
-                ('phone', models.CharField(max_length=20)),
-                ('photo', models.ImageField(blank=True, null=True, upload_to='providers/photos/')),
-                ('subscription_status', models.CharField(choices=[('active', 'Active'), ('inactive', 'Inactive'), ('suspended', 'Suspended')], default='inactive', max_length=20)),
-                ('subscription_payment_method', models.CharField(blank=True, choices=[('crypto', 'Cryptocurrency'), ('bank_transfer', 'Bank Transfer')], max_length=20, null=True)),
-                ('subscription_renewal_date', models.DateField(blank=True, null=True)),
-                ('crypto_address', models.CharField(blank=True, help_text='Bitcoin/Ethereum address', max_length=255, null=True)),
-                ('bank_account_encrypted', models.TextField(blank=True, help_text='Encrypted bank account details', null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='provider_profile', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("bio", models.TextField(blank=True, null=True)),
+                ("phone", models.CharField(max_length=20)),
+                (
+                    "photo",
+                    models.ImageField(
+                        blank=True, null=True, upload_to="providers/photos/"
+                    ),
+                ),
+                (
+                    "subscription_status",
+                    models.CharField(
+                        choices=[
+                            ("active", "Active"),
+                            ("inactive", "Inactive"),
+                            ("suspended", "Suspended"),
+                        ],
+                        default="inactive",
+                        max_length=20,
+                    ),
+                ),
+                (
+                    "subscription_payment_method",
+                    models.CharField(
+                        blank=True,
+                        choices=[
+                            ("crypto", "Cryptocurrency"),
+                            ("bank_transfer", "Bank Transfer"),
+                        ],
+                        max_length=20,
+                        null=True,
+                    ),
+                ),
+                ("subscription_renewal_date", models.DateField(blank=True, null=True)),
+                (
+                    "crypto_address",
+                    models.CharField(
+                        blank=True,
+                        help_text="Bitcoin/Ethereum address",
+                        max_length=255,
+                        null=True,
+                    ),
+                ),
+                (
+                    "bank_account_encrypted",
+                    models.TextField(
+                        blank=True,
+                        help_text="Encrypted bank account details",
+                        null=True,
+                    ),
+                ),
+                ("created_at", models.DateTimeField(auto_now_add=True)),
+                ("updated_at", models.DateTimeField(auto_now=True)),
+                (
+                    "user",
+                    models.OneToOneField(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="provider_profile",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Provider',
-                'verbose_name_plural': 'Providers',
-                'db_table': 'providers_provider',
-                'ordering': ['-created_at'],
+                "verbose_name": "Provider",
+                "verbose_name_plural": "Providers",
+                "db_table": "providers_provider",
+                "ordering": ["-created_at"],
             },
         ),
     ]

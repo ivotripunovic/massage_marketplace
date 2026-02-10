@@ -9,64 +9,71 @@ Blockchain APIs used:
     - Bitcoin: Blockchain.com API
     - Ethereum/USDC: Etherscan API
 """
+
 import logging
 from django.core.management.base import BaseCommand
 from django.core.mail import send_mail
-from django.conf import settings
-from django.utils import timezone
 from payments.models import SubscriptionPayment
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = 'Monitor pending crypto payments and verify against blockchain APIs'
+    help = "Monitor pending crypto payments and verify against blockchain APIs"
 
     def add_arguments(self, parser):
         parser.add_argument(
-            '--dry-run',
-            action='store_true',
-            help='Check payments without updating status',
+            "--dry-run",
+            action="store_true",
+            help="Check payments without updating status",
         )
 
     def handle(self, *args, **options):
-        dry_run = options['dry_run']
+        dry_run = options["dry_run"]
 
-        pending_crypto = SubscriptionPayment.objects.filter(
-            status='pending',
-            payment_method__startswith='crypto_',
-            reference_id__isnull=False,
-        ).exclude(reference_id='').select_related('provider__user')
+        pending_crypto = (
+            SubscriptionPayment.objects.filter(
+                status="pending",
+                payment_method__startswith="crypto_",
+                reference_id__isnull=False,
+            )
+            .exclude(reference_id="")
+            .select_related("provider__user")
+        )
 
         count = pending_crypto.count()
-        self.stdout.write(f'Found {count} pending crypto payment(s) to check.')
+        self.stdout.write(f"Found {count} pending crypto payment(s) to check.")
 
         verified = 0
         for payment in pending_crypto:
             result = self.verify_payment(payment)
 
-            if result['verified']:
+            if result["verified"]:
                 if not dry_run:
                     payment.mark_completed()
                     self.send_confirmation_email(payment)
                     verified += 1
-                    self.stdout.write(self.style.SUCCESS(
-                        f'  Payment #{payment.pk} ({payment.provider.user.email}): VERIFIED'
-                    ))
+                    self.stdout.write(
+                        self.style.SUCCESS(
+                            f"  Payment #{payment.pk} ({payment.provider.user.email}): VERIFIED"
+                        )
+                    )
                 else:
                     self.stdout.write(
-                        f'  Payment #{payment.pk} ({payment.provider.user.email}): '
-                        f'Would be verified (dry run)'
+                        f"  Payment #{payment.pk} ({payment.provider.user.email}): "
+                        f"Would be verified (dry run)"
                     )
             else:
                 self.stdout.write(
-                    f'  Payment #{payment.pk} ({payment.provider.user.email}): '
-                    f'Not yet confirmed - {result.get("reason", "pending")}'
+                    f"  Payment #{payment.pk} ({payment.provider.user.email}): "
+                    f"Not yet confirmed - {result.get('reason', 'pending')}"
                 )
 
-        self.stdout.write(self.style.SUCCESS(
-            f'\nDone. {verified} payment(s) verified out of {count} checked.'
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"\nDone. {verified} payment(s) verified out of {count} checked."
+            )
+        )
 
     def verify_payment(self, payment):
         """
@@ -83,18 +90,18 @@ class Command(BaseCommand):
         method = payment.payment_method
 
         if not tx_hash:
-            return {'verified': False, 'reason': 'No transaction hash provided'}
+            return {"verified": False, "reason": "No transaction hash provided"}
 
         try:
-            if method == 'crypto_bitcoin':
+            if method == "crypto_bitcoin":
                 return self._check_bitcoin_transaction(tx_hash, payment.amount)
-            elif method in ('crypto_ethereum', 'crypto_usdc'):
+            elif method in ("crypto_ethereum", "crypto_usdc"):
                 return self._check_ethereum_transaction(tx_hash, payment.amount)
             else:
-                return {'verified': False, 'reason': f'Unknown method: {method}'}
+                return {"verified": False, "reason": f"Unknown method: {method}"}
         except Exception as e:
-            logger.error(f'Error verifying payment #{payment.pk}: {e}')
-            return {'verified': False, 'reason': str(e)}
+            logger.error(f"Error verifying payment #{payment.pk}: {e}")
+            return {"verified": False, "reason": str(e)}
 
     def _check_bitcoin_transaction(self, tx_hash, expected_amount):
         """
@@ -108,8 +115,8 @@ class Command(BaseCommand):
         # Stub: In production, call blockchain.info API
         # For now, return not verified (manual admin approval required)
         return {
-            'verified': False,
-            'reason': 'Blockchain API check not configured - use admin approval',
+            "verified": False,
+            "reason": "Blockchain API check not configured - use admin approval",
         }
 
     def _check_ethereum_transaction(self, tx_hash, expected_amount):
@@ -124,23 +131,25 @@ class Command(BaseCommand):
         """
         # Stub: In production, call Etherscan API
         return {
-            'verified': False,
-            'reason': 'Etherscan API check not configured - use admin approval',
+            "verified": False,
+            "reason": "Etherscan API check not configured - use admin approval",
         }
 
     def send_confirmation_email(self, payment):
         """Send payment confirmation email to provider."""
         try:
             send_mail(
-                'Payment Confirmed - Massage Marketplace',
-                f'Your {payment.get_payment_method_display()} payment of '
-                f'${payment.amount} has been verified and confirmed.\n\n'
-                f'Your subscription is active until '
-                f'{payment.provider.subscription_renewal_date}.\n\n'
-                f'Thank you for using Massage Marketplace!',
-                'noreply@massagemarketplace.com',
+                "Payment Confirmed - Massage Marketplace",
+                f"Your {payment.get_payment_method_display()} payment of "
+                f"${payment.amount} has been verified and confirmed.\n\n"
+                f"Your subscription is active until "
+                f"{payment.provider.subscription_renewal_date}.\n\n"
+                f"Thank you for using Massage Marketplace!",
+                "noreply@massagemarketplace.com",
                 [payment.provider.user.email],
                 fail_silently=True,
             )
         except Exception as e:
-            logger.error(f'Failed to send confirmation email for payment #{payment.pk}: {e}')
+            logger.error(
+                f"Failed to send confirmation email for payment #{payment.pk}: {e}"
+            )

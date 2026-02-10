@@ -25,15 +25,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 SECRET_KEY = os.getenv(
-    'SECRET_KEY',
-    'django-insecure-o8-@8*q)qqzrymf)ol9box6j=ca6ez@j=ld&e_q5)9u7d$4-6('
+    "SECRET_KEY", "django-insecure-o8-@8*q)qqzrymf)ol9box6j=ca6ez@j=ld&e_q5)9u7d$4-6("
 )
 
-DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes')
+DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = [
     h.strip()
-    for h in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    for h in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
     if h.strip()
 ]
 
@@ -41,64 +40,63 @@ ALLOWED_HOSTS = [
 # Application definition
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
     # Local apps
-    'users',
-    'providers',
-    'clients',
-    'reviews',
-    'payments',
+    "users",
+    "providers",
+    "clients",
+    "reviews",
+    "payments",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'marketplace.middleware.RateLimitMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "marketplace.middleware.RateLimitMiddleware",
 ]
 
-ROOT_URLCONF = 'marketplace.urls'
+ROOT_URLCONF = "marketplace.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [BASE_DIR / "templates"],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.debug",
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'marketplace.wsgi.application'
+WSGI_APPLICATION = "marketplace.wsgi.application"
 
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.getenv('DB_NAME', str(BASE_DIR / 'db.sqlite3')),
-        'USER': os.getenv('DB_USER', ''),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', ''),
-        'PORT': os.getenv('DB_PORT', ''),
+    "default": {
+        "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.sqlite3"),
+        "NAME": os.getenv("DB_NAME", str(BASE_DIR / "db.sqlite3")),
+        "USER": os.getenv("DB_USER", ""),
+        "PASSWORD": os.getenv("DB_PASSWORD", ""),
+        "HOST": os.getenv("DB_HOST", ""),
+        "PORT": os.getenv("DB_PORT", ""),
     }
 }
 
@@ -108,16 +106,16 @@ DATABASES = {
 
 AUTH_PASSWORD_VALIDATORS = [
     {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
@@ -125,9 +123,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = "en-us"
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = "UTC"
 
 USE_I18N = True
 
@@ -137,37 +135,36 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = 'static/'
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [
-    BASE_DIR / 'static',
+    BASE_DIR / "static",
 ]
-MEDIA_URL = 'media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.0/ref/settings/#default-auto-field
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # Custom User Model
-AUTH_USER_MODEL = 'users.User'
+AUTH_USER_MODEL = "users.User"
 
 # Email Configuration
 EMAIL_BACKEND = os.getenv(
-    'EMAIL_BACKEND',
-    'django.core.mail.backends.console.EmailBackend'
+    "EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
 )
-EMAIL_HOST = os.getenv('EMAIL_HOST', 'localhost')
-EMAIL_PORT = int(os.getenv('EMAIL_PORT', '25'))
-EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'False').lower() in ('true', '1', 'yes')
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@massagemarketplace.com')
+EMAIL_HOST = os.getenv("EMAIL_HOST", "localhost")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "25"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "False").lower() in ("true", "1", "yes")
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@massagemarketplace.com")
 
 # Authentication
 AUTHENTICATION_BACKENDS = [
-    'users.backends.EmailBackend',
+    "users.backends.EmailBackend",
 ]
 
 # Subscription Settings
@@ -175,33 +172,30 @@ SUBSCRIPTION_AMOUNT = 29.99
 
 # Platform Crypto Wallet Addresses
 PLATFORM_CRYPTO_ADDRESSES = {
-    'crypto_bitcoin': os.getenv(
-        'CRYPTO_BITCOIN_ADDRESS',
-        '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
+    "crypto_bitcoin": os.getenv(
+        "CRYPTO_BITCOIN_ADDRESS", "1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa"
     ),
-    'crypto_ethereum': os.getenv(
-        'CRYPTO_ETHEREUM_ADDRESS',
-        '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18'
+    "crypto_ethereum": os.getenv(
+        "CRYPTO_ETHEREUM_ADDRESS", "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18"
     ),
-    'crypto_usdc': os.getenv(
-        'CRYPTO_USDC_ADDRESS',
-        '0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18'
+    "crypto_usdc": os.getenv(
+        "CRYPTO_USDC_ADDRESS", "0x742d35Cc6634C0532925a3b844Bc9e7595f2bD18"
     ),
 }
 
 # Platform Bank Details
 PLATFORM_BANK_DETAILS = {
-    'bank_name': os.getenv('BANK_NAME', 'First National Bank'),
-    'account_name': os.getenv('BANK_ACCOUNT_NAME', 'Massage Marketplace LLC'),
-    'account_number': os.getenv('BANK_ACCOUNT_NUMBER', '****7890'),
-    'routing_number': os.getenv('BANK_ROUTING_NUMBER', '021000021'),
-    'swift_code': os.getenv('BANK_SWIFT_CODE', 'FNBOUS33'),
+    "bank_name": os.getenv("BANK_NAME", "First National Bank"),
+    "account_name": os.getenv("BANK_ACCOUNT_NAME", "Massage Marketplace LLC"),
+    "account_number": os.getenv("BANK_ACCOUNT_NUMBER", "****7890"),
+    "routing_number": os.getenv("BANK_ROUTING_NUMBER", "021000021"),
+    "swift_code": os.getenv("BANK_SWIFT_CODE", "FNBOUS33"),
 }
 
 # Admin notification emails
 ADMIN_EMAILS = [
     e.strip()
-    for e in os.getenv('ADMIN_EMAILS', 'admin@massagemarketplace.com').split(',')
+    for e in os.getenv("ADMIN_EMAILS", "admin@massagemarketplace.com").split(",")
     if e.strip()
 ]
 
@@ -210,17 +204,17 @@ ADMIN_EMAILS = [
 # ---------------------------------------------------------------------------
 
 # Clickjacking protection
-X_FRAME_OPTIONS = 'DENY'
+X_FRAME_OPTIONS = "DENY"
 
 # Session security
 SESSION_COOKIE_HTTPONLY = True
-SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_AGE = 60 * 60 * 24 * 7  # 1 week
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
 # CSRF security
 CSRF_COOKIE_HTTPONLY = True
-CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = "Lax"
 
 # Production-only security settings (activated when DEBUG=False)
 if not DEBUG:
@@ -230,7 +224,7 @@ if not DEBUG:
     SECURE_HSTS_PRELOAD = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_BROWSER_XSS_FILTER = True
 
@@ -240,27 +234,27 @@ if not DEBUG:
 
 # Format: {url_name: (max_requests, window_seconds)}
 RATE_LIMIT_RULES = {
-    'login': (5, 60),           # 5 attempts per minute
-    'signup': (5, 3600),        # 5 signups per hour
-    'password_reset': (3, 3600),  # 3 reset requests per hour
+    "login": (5, 60),  # 5 attempts per minute
+    "signup": (5, 3600),  # 5 signups per hour
+    "password_reset": (3, 3600),  # 3 reset requests per hour
 }
 LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
         },
     },
-    'loggers': {
-        'django.core.mail': {
-            'handlers': ['console'],
-            'level': 'DEBUG', # This will log SMTP conversations
-            'propagate': False,
+    "loggers": {
+        "django.core.mail": {
+            "handlers": ["console"],
+            "level": "DEBUG",  # This will log SMTP conversations
+            "propagate": False,
         },
     },
-    'root': {
-        'handlers': ['console'],
-        'level': 'WARNING',
+    "root": {
+        "handlers": ["console"],
+        "level": "WARNING",
     },
 }

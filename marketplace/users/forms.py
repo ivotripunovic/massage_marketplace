@@ -6,194 +6,195 @@ from users.models import User
 
 class SignupForm(forms.Form):
     """Form for user signup."""
-    
+
     email = forms.EmailField(
-        label='Email Address',
+        label="Email Address",
         required=True,
-        widget=forms.EmailInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'your@email.com'
-        })
+        widget=forms.EmailInput(
+            attrs={"class": "form-control", "placeholder": "your@email.com"}
+        ),
     )
-    
+
     password = forms.CharField(
-        label='Password',
+        label="Password",
         required=True,
         min_length=8,
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'At least 8 characters'
-        })
+        widget=forms.PasswordInput(
+            attrs={"class": "form-control", "placeholder": "At least 8 characters"}
+        ),
     )
-    
+
     password_confirm = forms.CharField(
-        label='Confirm Password',
+        label="Confirm Password",
         required=True,
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Repeat your password'
-        })
+        widget=forms.PasswordInput(
+            attrs={"class": "form-control", "placeholder": "Repeat your password"}
+        ),
     )
-    
+
     user_type = forms.ChoiceField(
-        label='Account Type',
+        label="Account Type",
         required=True,
-        initial='provider',
-        choices=[('provider', 'I am a Service Provider')],
-        widget=forms.RadioSelect()
+        initial="provider",
+        choices=[("provider", "I am a Service Provider")],
+        widget=forms.RadioSelect(),
     )
 
     accept_terms = forms.BooleanField(
-        label='I agree to the Terms of Service and Privacy Policy',
+        label="I agree to the Terms of Service and Privacy Policy",
         required=True,
         error_messages={
-            'required': 'You must accept the Terms of Service and Privacy Policy to create an account.'
-        }
+            "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+        },
     )
-    
+
     def clean_email(self):
         """Validate email is unique."""
-        email = self.cleaned_data.get('email', '').lower()
-        
+        email = self.cleaned_data.get("email", "").lower()
+
         if User.objects.filter(email__iexact=email).exists():
-            raise ValidationError('An account with this email already exists.')
-        
+            raise ValidationError("An account with this email already exists.")
+
         return email
-    
+
     def clean(self):
         """Validate password confirmation."""
         cleaned_data = super().clean()
-        password = cleaned_data.get('password')
-        password_confirm = cleaned_data.get('password_confirm')
-        
+        password = cleaned_data.get("password")
+        password_confirm = cleaned_data.get("password_confirm")
+
         if password and password_confirm:
             if password != password_confirm:
-                raise ValidationError('Passwords do not match.')
-        
+                raise ValidationError("Passwords do not match.")
+
         return cleaned_data
-    
+
     def clean_password(self):
         """Validate password length."""
-        password = self.cleaned_data.get('password', '')
-        
+        password = self.cleaned_data.get("password", "")
+
         if len(password) < 8:
-            raise ValidationError('Password must be at least 8 characters long.')
-        
+            raise ValidationError("Password must be at least 8 characters long.")
+
         return password
 
 
 class LoginForm(forms.Form):
     """Form for user login."""
-    
+
     email = forms.EmailField(
-        label='Email Address',
+        label="Email Address",
         required=True,
-        widget=forms.EmailInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'your@email.com',
-            'autofocus': True
-        })
+        widget=forms.EmailInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "your@email.com",
+                "autofocus": True,
+            }
+        ),
     )
-    
+
     password = forms.CharField(
-        label='Password',
+        label="Password",
         required=True,
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Your password'
-        })
+        widget=forms.PasswordInput(
+            attrs={"class": "form-control", "placeholder": "Your password"}
+        ),
     )
-    
+
     def clean(self):
         """Validate credentials."""
         cleaned_data = super().clean()
-        email = cleaned_data.get('email', '').lower()
-        password = cleaned_data.get('password')
-        
+        email = cleaned_data.get("email", "").lower()
+        password = cleaned_data.get("password")
+
         if email and password:
             # Try to authenticate
             user = authenticate(email=email, password=password)
             if user is None:
-                raise ValidationError('Invalid email or password.')
+                raise ValidationError("Invalid email or password.")
 
             # Block admin users from client-facing login
-            if user.user_type == 'admin':
-                raise ValidationError('Invalid email or password.')
+            if user.user_type == "admin":
+                raise ValidationError("Invalid email or password.")
 
             # Check if email is verified
             if not user.is_email_verified:
-                raise ValidationError('Please verify your email before logging in.')
+                raise ValidationError("Please verify your email before logging in.")
 
             # Check if user is active
             if not user.is_active:
-                raise ValidationError('This account has been deactivated.')
-        
+                raise ValidationError("This account has been deactivated.")
+
         return cleaned_data
 
 
 class PasswordResetForm(forms.Form):
     """Form for requesting password reset."""
-    
+
     email = forms.EmailField(
-        label='Email Address',
+        label="Email Address",
         required=True,
-        widget=forms.EmailInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'your@email.com',
-            'autofocus': True
-        })
+        widget=forms.EmailInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "your@email.com",
+                "autofocus": True,
+            }
+        ),
     )
-    
+
     def clean_email(self):
         """Validate email exists."""
-        email = self.cleaned_data.get('email', '').lower()
-        
+        email = self.cleaned_data.get("email", "").lower()
+
         if not User.objects.filter(email__iexact=email).exists():
-            raise ValidationError('No account found with this email address.')
-        
+            raise ValidationError("No account found with this email address.")
+
         return email
 
 
 class PasswordResetConfirmForm(forms.Form):
     """Form for setting new password."""
-    
+
     password = forms.CharField(
-        label='New Password',
+        label="New Password",
         required=True,
         min_length=8,
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'At least 8 characters',
-            'autofocus': True
-        })
+        widget=forms.PasswordInput(
+            attrs={
+                "class": "form-control",
+                "placeholder": "At least 8 characters",
+                "autofocus": True,
+            }
+        ),
     )
-    
+
     password_confirm = forms.CharField(
-        label='Confirm Password',
+        label="Confirm Password",
         required=True,
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Repeat your password'
-        })
+        widget=forms.PasswordInput(
+            attrs={"class": "form-control", "placeholder": "Repeat your password"}
+        ),
     )
-    
+
     def clean(self):
         """Validate password confirmation."""
         cleaned_data = super().clean()
-        password = cleaned_data.get('password')
-        password_confirm = cleaned_data.get('password_confirm')
-        
+        password = cleaned_data.get("password")
+        password_confirm = cleaned_data.get("password_confirm")
+
         if password and password_confirm:
             if password != password_confirm:
-                raise ValidationError('Passwords do not match.')
-        
+                raise ValidationError("Passwords do not match.")
+
         return cleaned_data
-    
+
     def clean_password(self):
         """Validate password length."""
-        password = self.cleaned_data.get('password', '')
-        
+        password = self.cleaned_data.get("password", "")
+
         if len(password) < 8:
-            raise ValidationError('Password must be at least 8 characters long.')
-        
+            raise ValidationError("Password must be at least 8 characters long.")
+
         return password

@@ -5,19 +5,23 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('providers', '0002_certification_service'),
+        ("providers", "0002_certification_service"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.AddIndex(
-            model_name='provider',
-            index=models.Index(fields=['subscription_status'], name='providers_p_subscri_f71646_idx'),
+            model_name="provider",
+            index=models.Index(
+                fields=["subscription_status"], name="providers_p_subscri_f71646_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='provider',
-            index=models.Index(fields=['subscription_status', 'created_at'], name='providers_p_subscri_22f8cd_idx'),
+            model_name="provider",
+            index=models.Index(
+                fields=["subscription_status", "created_at"],
+                name="providers_p_subscri_22f8cd_idx",
+            ),
         ),
     ]

@@ -5,21 +5,20 @@ from django.utils.text import slugify
 
 
 def populate_slugs(apps, schema_editor):
-    Provider = apps.get_model('providers', 'Provider')
-    for provider in Provider.objects.select_related('user').all():
+    Provider = apps.get_model("providers", "Provider")
+    for provider in Provider.objects.select_related("user").all():
         user = provider.user
         if user.first_name or user.last_name:
             name = f"{user.first_name} {user.last_name}".strip()
         else:
-            name = user.email.split('@')[0]
-        provider.slug = slugify(name) + '-' + str(provider.pk)
-        provider.save(update_fields=['slug'])
+            name = user.email.split("@")[0]
+        provider.slug = slugify(name) + "-" + str(provider.pk)
+        provider.save(update_fields=["slug"])
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('providers', '0010_provider_slug'),
+        ("providers", "0010_provider_slug"),
     ]
 
     operations = [

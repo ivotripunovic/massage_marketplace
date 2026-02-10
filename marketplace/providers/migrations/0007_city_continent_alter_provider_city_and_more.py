@@ -5,105 +5,235 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('providers', '0006_providergalleryimage'),
+        ("providers", "0006_providergalleryimage"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='City',
+            name="City",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=100)),
-                ('population', models.IntegerField(blank=True, help_text='City population', null=True)),
-                ('is_capital', models.BooleanField(default=False, help_text='Whether this is a capital city')),
-                ('is_major_city', models.BooleanField(default=False, help_text='Whether this is a major city (pop > 500k or important)')),
-                ('latitude', models.DecimalField(blank=True, decimal_places=6, help_text='Latitude coordinate', max_digits=9, null=True)),
-                ('longitude', models.DecimalField(blank=True, decimal_places=6, help_text='Longitude coordinate', max_digits=9, null=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=100)),
+                (
+                    "population",
+                    models.IntegerField(
+                        blank=True, help_text="City population", null=True
+                    ),
+                ),
+                (
+                    "is_capital",
+                    models.BooleanField(
+                        default=False, help_text="Whether this is a capital city"
+                    ),
+                ),
+                (
+                    "is_major_city",
+                    models.BooleanField(
+                        default=False,
+                        help_text="Whether this is a major city (pop > 500k or important)",
+                    ),
+                ),
+                (
+                    "latitude",
+                    models.DecimalField(
+                        blank=True,
+                        decimal_places=6,
+                        help_text="Latitude coordinate",
+                        max_digits=9,
+                        null=True,
+                    ),
+                ),
+                (
+                    "longitude",
+                    models.DecimalField(
+                        blank=True,
+                        decimal_places=6,
+                        help_text="Longitude coordinate",
+                        max_digits=9,
+                        null=True,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'City',
-                'verbose_name_plural': 'Cities',
-                'db_table': 'providers_city',
-                'ordering': ['-is_capital', '-is_major_city', '-population', 'name'],
+                "verbose_name": "City",
+                "verbose_name_plural": "Cities",
+                "db_table": "providers_city",
+                "ordering": ["-is_capital", "-is_major_city", "-population", "name"],
             },
         ),
         migrations.CreateModel(
-            name='Continent',
+            name="Continent",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=50, unique=True)),
-                ('code', models.CharField(help_text='2-character continent code', max_length=2, unique=True)),
-                ('display_order', models.IntegerField(default=0, help_text='Order for display in lists')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=50, unique=True)),
+                (
+                    "code",
+                    models.CharField(
+                        help_text="2-character continent code",
+                        max_length=2,
+                        unique=True,
+                    ),
+                ),
+                (
+                    "display_order",
+                    models.IntegerField(
+                        default=0, help_text="Order for display in lists"
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Continent',
-                'verbose_name_plural': 'Continents',
-                'db_table': 'providers_continent',
-                'ordering': ['display_order', 'name'],
+                "verbose_name": "Continent",
+                "verbose_name_plural": "Continents",
+                "db_table": "providers_continent",
+                "ordering": ["display_order", "name"],
             },
         ),
         migrations.AlterField(
-            model_name='provider',
-            name='city',
-            field=models.CharField(blank=True, help_text='City where services are provided (deprecated, use city_new)', max_length=100, null=True),
+            model_name="provider",
+            name="city",
+            field=models.CharField(
+                blank=True,
+                help_text="City where services are provided (deprecated, use city_new)",
+                max_length=100,
+                null=True,
+            ),
         ),
         migrations.AlterField(
-            model_name='provider',
-            name='country',
-            field=models.CharField(blank=True, help_text='Country where services are provided (deprecated, use country_new)', max_length=100, null=True),
+            model_name="provider",
+            name="country",
+            field=models.CharField(
+                blank=True,
+                help_text="Country where services are provided (deprecated, use country_new)",
+                max_length=100,
+                null=True,
+            ),
         ),
         migrations.AddField(
-            model_name='provider',
-            name='city_new',
-            field=models.ForeignKey(blank=True, help_text='City where services are provided', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='providers', to='providers.city'),
+            model_name="provider",
+            name="city_new",
+            field=models.ForeignKey(
+                blank=True,
+                help_text="City where services are provided",
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="providers",
+                to="providers.city",
+            ),
         ),
         migrations.CreateModel(
-            name='Country',
+            name="Country",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=100, unique=True)),
-                ('code', models.CharField(help_text='ISO 3166-1 alpha-2 country code', max_length=2, unique=True)),
-                ('is_active', models.BooleanField(default=True, help_text='Whether this country is available for selection')),
-                ('display_order', models.IntegerField(default=0, help_text='Order for display within continent')),
-                ('continent', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='countries', to='providers.continent')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=100, unique=True)),
+                (
+                    "code",
+                    models.CharField(
+                        help_text="ISO 3166-1 alpha-2 country code",
+                        max_length=2,
+                        unique=True,
+                    ),
+                ),
+                (
+                    "is_active",
+                    models.BooleanField(
+                        default=True,
+                        help_text="Whether this country is available for selection",
+                    ),
+                ),
+                (
+                    "display_order",
+                    models.IntegerField(
+                        default=0, help_text="Order for display within continent"
+                    ),
+                ),
+                (
+                    "continent",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="countries",
+                        to="providers.continent",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Country',
-                'verbose_name_plural': 'Countries',
-                'db_table': 'providers_country',
-                'ordering': ['continent', 'display_order', 'name'],
+                "verbose_name": "Country",
+                "verbose_name_plural": "Countries",
+                "db_table": "providers_country",
+                "ordering": ["continent", "display_order", "name"],
             },
         ),
         migrations.AddField(
-            model_name='city',
-            name='country',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='cities', to='providers.country'),
+            model_name="city",
+            name="country",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="cities",
+                to="providers.country",
+            ),
         ),
         migrations.AddField(
-            model_name='provider',
-            name='country_new',
-            field=models.ForeignKey(blank=True, help_text='Country where services are provided', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='providers', to='providers.country'),
+            model_name="provider",
+            name="country_new",
+            field=models.ForeignKey(
+                blank=True,
+                help_text="Country where services are provided",
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="providers",
+                to="providers.country",
+            ),
         ),
         migrations.AddIndex(
-            model_name='country',
-            index=models.Index(fields=['continent', 'name'], name='providers_c_contine_582a60_idx'),
+            model_name="country",
+            index=models.Index(
+                fields=["continent", "name"], name="providers_c_contine_582a60_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='country',
-            index=models.Index(fields=['is_active'], name='providers_c_is_acti_02e607_idx'),
+            model_name="country",
+            index=models.Index(
+                fields=["is_active"], name="providers_c_is_acti_02e607_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='city',
-            index=models.Index(fields=['country', 'name'], name='providers_c_country_be272e_idx'),
+            model_name="city",
+            index=models.Index(
+                fields=["country", "name"], name="providers_c_country_be272e_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='city',
-            index=models.Index(fields=['is_major_city'], name='providers_c_is_majo_ac49d9_idx'),
+            model_name="city",
+            index=models.Index(
+                fields=["is_major_city"], name="providers_c_is_majo_ac49d9_idx"
+            ),
         ),
         migrations.AlterUniqueTogether(
-            name='city',
-            unique_together={('name', 'country')},
+            name="city",
+            unique_together={("name", "country")},
         ),
     ]
