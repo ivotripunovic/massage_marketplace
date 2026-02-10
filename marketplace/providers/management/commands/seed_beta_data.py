@@ -499,9 +499,14 @@ class Command(BaseCommand):
 
         if options["flush"]:
             self.stdout.write("Removing existing seed data...")
-            User.objects.filter(email__endswith=f"@{SEED_EMAIL_DOMAIN}").delete()
-            User.objects.filter(email="admin@massagemarketplace.com").delete()
-            self.stdout.write(self.style.SUCCESS("Seed data removed."))
+            seed_users = User.objects.filter(email__endswith=f"@{SEED_EMAIL_DOMAIN}")
+            # Cascade: User → Provider → Services, Reviews, Attributes, Gallery
+            deleted = seed_users.delete()
+            admin_deleted = User.objects.filter(
+                email="admin@massagemarketplace.com"
+            ).delete()
+            total = deleted[0] + admin_deleted[0]
+            self.stdout.write(self.style.SUCCESS(f"Seed data removed ({total} rows)."))
 
         self._ensure_fixtures_loaded()
 
