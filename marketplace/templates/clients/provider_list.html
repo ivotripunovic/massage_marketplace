@@ -117,71 +117,75 @@
 
             <!-- Provider Info -->
             <div class="p-3 w-2/3 sm:w-full order-1 sm:order-2">
-                <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
-                    <div class="space-y-2">
-                        <!-- Name -->
-                        <h3 class="font-semibold text-base text-text-primary group-hover:text-gold transition-colors truncate">
-                            {{ provider.get_name }}
-                        </h3>
+                <!-- Name -->
+                <h3 class="font-semibold text-base text-text-primary group-hover:text-gold transition-colors truncate mb-1">
+                    {{ provider.get_name }}
+                </h3>
 
-                        <!-- Location -->
-                        {% if provider.city_new or provider.country_new %}
-                        <div class="flex items-center gap-1 text-text-muted text-xs mb-2 truncate">
-                            <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                            </svg>
-                            <span class="truncate">{% if provider.city_new %}{{ provider.city_new.name }}{% endif %}{% if provider.city_new and provider.country_new %}, {% endif %}{% if provider.country_new %}{{ provider.country_new.name }}{% endif %}</span>
-                        </div>
-                        {% elif provider.city or provider.country %}
-                        <div class="flex items-center gap-1 text-text-muted text-xs mb-2 truncate">
-                            <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
-                            </svg>
-                            <span class="truncate">{% if provider.city %}{{ provider.city }}{% endif %}{% if provider.city and provider.country %}, {% endif %}{% if provider.country %}{{ provider.country }}{% endif %}</span>
-                        </div>
-                        {% endif %}
+                <!-- Location -->
+                {% if provider.city_new or provider.country_new %}
+                <div class="flex items-center gap-1 text-text-muted text-xs mb-2 truncate">
+                    <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                    </svg>
+                    <span class="truncate">{% if provider.city_new %}{{ provider.city_new.name }}{% endif %}{% if provider.city_new and provider.country_new %}, {% endif %}{% if provider.country_new %}{{ provider.country_new.name }}{% endif %}</span>
+                </div>
+                {% elif provider.city or provider.country %}
+                <div class="flex items-center gap-1 text-text-muted text-xs mb-2 truncate">
+                    <svg class="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                    </svg>
+                    <span class="truncate">{% if provider.city %}{{ provider.city }}{% endif %}{% if provider.city and provider.country %}, {% endif %}{% if provider.country %}{{ provider.country }}{% endif %}</span>
+                </div>
+                {% endif %}
 
+                <!-- Two-column: Attributes (left) | Services (right) -->
+                <div class="flex gap-3 mt-2">
+                    <!-- Left: Attributes -->
+                    <div class="flex-1 min-w-0">
                         {% if item.card_attributes %}
-                        <div class="flex flex-wrap gap-2 text-xs">
+                        <div class="flex flex-col gap-1 text-xs">
                             {% for attr in item.card_attributes %}
-                            <span class="flex items-center gap-1 rounded-full px-2 py-1 bg-dark-200 text-text-secondary">
+                            <div class="flex items-center gap-1">
                                 <span class="font-semibold text-text-primary">{{ attr.name }}:</span>
-                                <span class="text-text-muted">{{ attr.value }}</span>
-                            </span>
+                                <span class="text-text-muted truncate">{{ attr.value }}</span>
+                            </div>
                             {% endfor %}
                         </div>
                         {% endif %}
+                    </div>
 
-                        <!-- Description -->
-                        {% if provider.bio %}
-                        <p class="text-text-secondary text-xs leading-relaxed">
-                            {{ provider.bio|truncatechars:150 }}
-                        </p>
-                        {% endif %}
-
-                        <!-- Services -->
-                        {% if item.services %}
-                        <div class="flex flex-wrap gap-1">
-                            {% for service in item.services|slice:":2" %}
-                            <span class="service-tag">{{ service.get_service_type_display }}</span>
+                    <!-- Right: Services list -->
+                    {% if item.services %}
+                    <div class="flex-shrink-0">
+                        <div class="flex flex-col gap-1 text-xs">
+                            {% for service in item.services|slice:":3" %}
+                            <div class="flex items-baseline justify-between gap-2">
+                                <span class="text-text-secondary truncate">{{ service.get_service_type_display }}</span>
+                                <span class="text-gold font-semibold whitespace-nowrap">${{ service.price|floatformat:0 }}</span>
+                            </div>
                             {% endfor %}
-                            {% if item.service_count > 2 %}
-                            <span class="service-tag bg-dark-300 text-text-muted">+{{ item.service_count|add:"-2" }}</span>
+                            {% if item.service_count > 3 %}
+                            <span class="text-text-muted text-xs">+{{ item.service_count|add:"-3" }} more</span>
                             {% endif %}
                         </div>
-                        {% endif %}
                     </div>
-                    <div class="flex flex-col items-end gap-2 text-right">
-                        <div class="flex flex-col gap-1">
-                            {% if item.min_price %}
-                            <span class="text-gold font-semibold text-sm">
-                                ${{ item.min_price|floatformat:0 }}{% if item.min_price != item.max_price %}+{% endif %}
-                            </span>
-                            <span class="text-text-muted text-xs">Price listing</span>
-                            {% endif %}
-                        </div>
-                        <span class="btn-accent text-xs py-1 px-3">View</span>
-                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Separator -->
+                <hr class="border-dark-300 my-2">
+
+                <!-- Description -->
+                {% if provider.bio %}
+                <p class="text-text-secondary text-xs leading-relaxed">
+                    {{ provider.bio|truncatechars:100 }}
+                </p>
+                {% endif %}
+
+                <!-- View button -->
+                <div class="flex justify-end mt-2">
+                    <span class="btn-accent text-xs py-1 px-3">View</span>
                 </div>
             </div>
         </a>
