@@ -15,6 +15,7 @@ from django.core.management import call_command
 from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils import timezone
+from django.utils.text import slugify
 
 from providers.models import (
     Provider,
@@ -526,77 +527,87 @@ class Command(BaseCommand):
             all_data.append(self._generate_provider_data(i, rng, city_country_pairs))
 
         today = timezone.now().date()
-        providers = []
-        created_count = 0
-        service_objects = []
 
         # Hash the shared password once instead of per-user (PBKDF2 is slow)
         hashed_password = make_password("BetaTest123!")
 
+        # Split data into new vs existing
+        new_data = [d for d in all_data if d["email"] not in existing_emails]
+
         with transaction.atomic():
-            # Load existing providers for emails that already exist
+            # Collect existing providers
             if existing_emails:
-                existing_providers = {
-                    p.user.email: p
-                    for p in Provider.objects.select_related("user").filter(
+                providers = list(
+                    Provider.objects.select_related("user").filter(
                         user__email__in=existing_emails
                     )
-                }
+                )
             else:
-                existing_providers = {}
+                providers = []
 
-            for data in all_data:
-                if data["email"] in existing_emails:
-                    provider = existing_providers.get(data["email"])
-                    if provider:
-                        providers.append(provider)
-                    continue
-
-                user = User(
-                    email=User.objects.normalize_email(data["email"]),
-                    password=hashed_password,
-                    user_type="provider",
-                    is_email_verified=True,
-                    first_name=data["first_name"],
-                    last_name=data["last_name"],
-                )
-                user.save()
-
-                provider = Provider(
-                    user=user,
-                    bio=data["bio"],
-                    phone=data["phone"],
-                    country_id=data["country_id"],
-                    city_id=data["city_id"],
-                    subscription_status="active",
-                    subscription_payment_method=data["payment_method"],
-                    subscription_renewal_date=today
-                    + timedelta(days=data["renewal_days"]),
-                )
-                # Save triggers slug generation (two-step: insert then update)
-                provider.save()
-
-                for stype, desc, price, duration in data["services"]:
-                    service_objects.append(
-                        Service(
-                            provider=provider,
-                            service_type=stype,
-                            description=desc,
-                            price=Decimal(str(price)),
-                            duration_minutes=duration,
-                            is_active=True,
-                        )
+            if new_data:
+                # 1) Bulk-create all User objects
+                user_objects = [
+                    User(
+                        email=User.objects.normalize_email(d["email"]),
+                        password=hashed_password,
+                        user_type="provider",
+                        is_email_verified=True,
+                        first_name=d["first_name"],
+                        last_name=d["last_name"],
                     )
+                    for d in new_data
+                ]
+                User.objects.bulk_create(user_objects, batch_size=BATCH_SIZE)
 
-                providers.append(provider)
-                created_count += 1
+                # 2) Bulk-create all Provider objects with temporary unique slugs
+                provider_objects = [
+                    Provider(
+                        user=user,
+                        slug=f"_tmp-{i}",
+                        bio=data["bio"],
+                        phone=data["phone"],
+                        country_id=data["country_id"],
+                        city_id=data["city_id"],
+                        subscription_status="active",
+                        subscription_payment_method=data["payment_method"],
+                        subscription_renewal_date=today
+                        + timedelta(days=data["renewal_days"]),
+                    )
+                    for i, (user, data) in enumerate(zip(user_objects, new_data))
+                ]
+                Provider.objects.bulk_create(provider_objects, batch_size=BATCH_SIZE)
 
-                if created_count % 50 == 0:
-                    self.stdout.write(f"  ... {created_count} providers created")
+                # 3) Compute final slugs from PKs and bulk-update
+                for provider in provider_objects:
+                    name = provider.get_name()
+                    provider.slug = slugify(name) + "-" + str(provider.pk)
+                Provider.objects.bulk_update(
+                    provider_objects, ["slug"], batch_size=BATCH_SIZE
+                )
 
-            # Bulk-create all services at once
-            Service.objects.bulk_create(service_objects, batch_size=BATCH_SIZE)
-            service_count = len(service_objects)
+                # 4) Collect Service objects for bulk-create
+                service_objects = []
+                for provider, data in zip(provider_objects, new_data):
+                    for stype, desc, price, duration in data["services"]:
+                        service_objects.append(
+                            Service(
+                                provider=provider,
+                                service_type=stype,
+                                description=desc,
+                                price=Decimal(str(price)),
+                                duration_minutes=duration,
+                                is_active=True,
+                            )
+                        )
+                Service.objects.bulk_create(service_objects, batch_size=BATCH_SIZE)
+                service_count = len(service_objects)
+
+                providers.extend(provider_objects)
+            else:
+                service_count = 0
+
+        created_count = len(new_data)
 
         self.stdout.write(
             f"  Created {created_count} providers with {service_count} services"
