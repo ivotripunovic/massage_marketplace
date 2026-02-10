@@ -138,9 +138,8 @@ Same as input-dark with custom dropdown arrow styling.
 - `latitude/longitude` - Coordinates
 
 ### Provider Location Fields
-- `country_new` - ForeignKey to Country (nullable during migration)
-- `city_new` - ForeignKey to City (nullable during migration)
-- Old CharField fields (`country`, `city`) are deprecated
+- `country` - ForeignKey to Country (nullable)
+- `city` - ForeignKey to City (nullable)
 
 ## Autocomplete API Endpoints
 

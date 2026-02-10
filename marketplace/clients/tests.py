@@ -749,8 +749,8 @@ class ProviderLocationFKFilterTests(TestCase):
             user=user,
             phone='+1234567890',
             subscription_status='active',
-            country_new=country,
-            city_new=city
+            country=country,
+            city=city
         )
         return provider
 

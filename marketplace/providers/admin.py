@@ -78,8 +78,8 @@ class ProviderAdmin(admin.ModelAdmin):
     list_filter = (
         'subscription_status',
         'subscription_payment_method',
-        'country_new__continent',
-        'country_new',
+        'country__continent',
+        'country',
         'created_at',
         'updated_at'
     )
@@ -88,12 +88,12 @@ class ProviderAdmin(admin.ModelAdmin):
         'user__first_name',
         'user__last_name',
         'phone',
-        'country_new__name',
-        'city_new__name'
+        'country__name',
+        'city__name'
     )
     readonly_fields = ('created_at', 'updated_at')
     inlines = [ServiceInline, GalleryImageInline]
-    autocomplete_fields = ('country_new', 'city_new')
+    autocomplete_fields = ('country', 'city')
 
     fieldsets = (
         ('User Information', {
@@ -103,8 +103,7 @@ class ProviderAdmin(admin.ModelAdmin):
             'fields': ('bio', 'phone', 'photo')
         }),
         ('Location', {
-            'fields': ('country_new', 'city_new', 'country', 'city'),
-            'description': 'Use country_new and city_new fields (the old country/city fields are deprecated)'
+            'fields': ('country', 'city'),
         }),
         ('Subscription', {
             'fields': (
@@ -125,12 +124,10 @@ class ProviderAdmin(admin.ModelAdmin):
 
     def location_display(self, obj):
         """Display location in list view."""
-        if obj.city_new and obj.country_new:
-            return f"{obj.city_new.name}, {obj.country_new.name}"
-        elif obj.country_new:
-            return obj.country_new.name
-        elif obj.city and obj.country:
-            return f"{obj.city}, {obj.country}"
+        if obj.city and obj.country:
+            return f"{obj.city.name}, {obj.country.name}"
+        elif obj.country:
+            return obj.country.name
         return '-'
     location_display.short_description = 'Location'
     

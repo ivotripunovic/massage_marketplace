@@ -138,22 +138,8 @@ class Provider(models.Model):
         null=True
     )
 
-    # Location fields (old CharField - will be deprecated)
-    country = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        help_text='Country where services are provided (deprecated, use country_new)'
-    )
-    city = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        help_text='City where services are provided (deprecated, use city_new)'
-    )
-
-    # New ForeignKey location fields
-    country_new = models.ForeignKey(
+    # Location fields (ForeignKey)
+    country = models.ForeignKey(
         Country,
         on_delete=models.SET_NULL,
         null=True,
@@ -161,7 +147,7 @@ class Provider(models.Model):
         related_name='providers',
         help_text='Country where services are provided'
     )
-    city_new = models.ForeignKey(
+    city = models.ForeignKey(
         City,
         on_delete=models.SET_NULL,
         null=True,

@@ -2609,12 +2609,12 @@ class LocationModelTests(TestCase):
         provider = Provider.objects.create(
             user=user,
             phone='+1234567890',
-            country_new=uk,
-            city_new=london
+            country=uk,
+            city=london
         )
 
-        self.assertEqual(provider.country_new.name, 'United Kingdom')
-        self.assertEqual(provider.city_new.name, 'London')
+        self.assertEqual(provider.country.name, 'United Kingdom')
+        self.assertEqual(provider.city.name, 'London')
 
     def test_us_not_in_fixtures(self):
         """Test that United States is not in the country fixtures."""

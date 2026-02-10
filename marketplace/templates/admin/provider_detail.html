@@ -34,7 +34,7 @@
             </div>
             <div>
                 <p class="text-gray-500">Location</p>
-                <p class="font-medium">{{ provider.city|default:"—" }}{% if provider.country %}, {{ provider.country }}{% endif %}</p>
+                <p class="font-medium">{% if provider.city %}{{ provider.city.name }}{% else %}—{% endif %}{% if provider.country %}, {{ provider.country.name }}{% endif %}</p>
             </div>
             <div>
                 <p class="text-gray-500">Joined</p>

@@ -24,8 +24,8 @@ def country_search_api(request):
         Provider.objects.filter(
             subscription_status='active',
             user__is_email_verified=True,
-            country_new__isnull=False
-        ).values('country_new').annotate(count=Count('id')).values_list('country_new', 'count')
+            country__isnull=False
+        ).values('country').annotate(count=Count('id')).values_list('country', 'count')
     )
 
     if list_all or len(query) >= 1:
@@ -84,9 +84,9 @@ def city_search_api(request):
         Provider.objects.filter(
             subscription_status='active',
             user__is_email_verified=True,
-            city_new__isnull=False,
-            country_new_id=country_id
-        ).values('city_new').annotate(count=Count('id')).values_list('city_new', 'count')
+            city__isnull=False,
+            country_id=country_id
+        ).values('city').annotate(count=Count('id')).values_list('city', 'count')
     )
 
     cities_qs = City.objects.filter(country_id=country_id).select_related('country')
@@ -132,7 +132,7 @@ class ProviderDirectoryView(ListView):
         queryset = Provider.objects.filter(
             subscription_status='active',
             user__is_email_verified=True
-        ).select_related('user', 'country_new', 'city_new').prefetch_related(
+        ).select_related('user', 'country', 'city').prefetch_related(
             'services',
             'reviews',
             attribute_values_prefetch
@@ -153,12 +153,12 @@ class ProviderDirectoryView(ListView):
         # Filter by location using ForeignKey fields
         if country_id:
             try:
-                queryset = queryset.filter(country_new_id=int(country_id))
+                queryset = queryset.filter(country_id=int(country_id))
             except ValueError:
                 pass
         if city_id:
             try:
-                queryset = queryset.filter(city_new_id=int(city_id))
+                queryset = queryset.filter(city_id=int(city_id))
             except ValueError:
                 pass
 
