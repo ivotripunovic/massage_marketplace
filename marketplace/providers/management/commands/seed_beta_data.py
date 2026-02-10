@@ -319,6 +319,35 @@ REVIEWER_FIRST_NAMES = [
 
 SEED_EMAIL_DOMAIN = "seed.example.com"
 
+# ── Provider attribute definitions to seed ────────────────────────────────────
+
+SEED_ATTRIBUTE_DEFINITIONS = [
+    {
+        "name": "Height",
+        "data_type": "int",
+        "display_order": 1,
+        "show_on_card": True,
+    },
+    {
+        "name": "Weight",
+        "data_type": "int",
+        "display_order": 2,
+        "show_on_card": True,
+    },
+    {
+        "name": "Established at",
+        "data_type": "int",
+        "display_order": 3,
+        "show_on_card": False,
+    },
+    {
+        "name": "Working with eldery",
+        "data_type": "bool",
+        "display_order": 4,
+        "show_on_card": False,
+    },
+]
+
 # ── Bulk-create batch size ────────────────────────────────────────────────────
 
 BATCH_SIZE = 500
@@ -434,6 +463,22 @@ class Command(BaseCommand):
 
         Review.objects.bulk_create(review_objects, batch_size=BATCH_SIZE)
         return len(review_objects)
+
+    def _ensure_attribute_definitions(self):
+        """Create provider attribute definitions if they don't already exist."""
+        created = 0
+        for defn_data in SEED_ATTRIBUTE_DEFINITIONS:
+            _, was_created = ProviderAttributeDefinition.objects.get_or_create(
+                name=defn_data["name"],
+                defaults={
+                    "data_type": defn_data["data_type"],
+                    "display_order": defn_data["display_order"],
+                    "show_on_card": defn_data["show_on_card"],
+                },
+            )
+            if was_created:
+                created += 1
+        return created
 
     def _generate_attributes(self, rng, providers):
         """Generate attribute values for providers via bulk_create. Returns count."""
@@ -623,6 +668,11 @@ class Command(BaseCommand):
         with transaction.atomic():
             review_count = self._generate_reviews(rng, providers)
         self.stdout.write(f"  Created {review_count} reviews")
+
+        # Ensure attribute definitions exist
+        defn_created = self._ensure_attribute_definitions()
+        if defn_created:
+            self.stdout.write(f"  Created {defn_created} attribute definitions")
 
         # Generate provider attributes in bulk
         self.stdout.write("Generating provider attributes...")
