@@ -1,7 +1,6 @@
 from django.views.generic import (
     TemplateView,
     FormView,
-    UpdateView,
     CreateView,
     DeleteView,
     ListView,
@@ -11,18 +10,16 @@ from django.shortcuts import redirect, get_object_or_404
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django import forms
-from django.db.models import Count, Avg
+from django.db.models import Avg
 from django.http import HttpResponseForbidden
 from providers.models import (
     Provider,
-    Service,
     ProviderGalleryImage,
     ProviderAttributeDefinition,
     ProviderAttributeValue,
     ProviderPricing,
 )
 from providers.forms import (
-    ServiceForm,
     SubscriptionSettingsForm,
     CryptoPaymentForm,
     BankTransferForm,
@@ -57,10 +54,6 @@ class ProviderDashboardView(ProviderRequiredMixin, TemplateView):
         try:
             provider = Provider.objects.get(user=self.request.user)
             context["provider"] = provider
-            # Use direct query for related objects
-            context["services"] = Service.objects.filter(
-                provider=provider, is_active=True
-            )
             # Calculate stats
             from reviews.models import Review
 
@@ -423,149 +416,6 @@ class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
         return context
 
 
-class ServiceListView(ProviderRequiredMixin, ListView):
-    """View for listing provider's services."""
-
-    model = Service
-    template_name = "providers/service_list.html"
-    context_object_name = "services"
-    paginate_by = 20
-
-    def get_queryset(self):
-        """Get services for current provider."""
-        try:
-            provider = Provider.objects.get(user=self.request.user)
-            return Service.objects.filter(provider=provider).order_by("-created_at")
-        except Provider.DoesNotExist:
-            return Service.objects.none()
-
-    def get_context_data(self, **kwargs):
-        """Add provider to context."""
-        context = super().get_context_data(**kwargs)
-        context["provider"] = Provider.objects.get(user=self.request.user)
-        return context
-
-
-class ServiceCreateView(ProviderRequiredMixin, CreateView):
-    """View for creating a new service."""
-
-    model = Service
-    form_class = ServiceForm
-    template_name = "providers/service_form.html"
-    success_url = reverse_lazy("provider_dashboard")
-
-    def form_valid(self, form):
-        """Handle valid form - assign to current provider."""
-        try:
-            provider = Provider.objects.get(user=self.request.user)
-            form.instance.provider = provider
-            messages.success(self.request, "Service created successfully.")
-        except Provider.DoesNotExist:
-            messages.error(self.request, "Provider profile not found.")
-            return redirect("provider_dashboard")
-
-        return super().form_valid(form)
-
-    def get_context_data(self, **kwargs):
-        """Add provider to context."""
-        context = super().get_context_data(**kwargs)
-        context["provider"] = Provider.objects.get(user=self.request.user)
-        context["action"] = "Create Service"
-        return context
-
-
-class ServiceUpdateView(ProviderRequiredMixin, UpdateView):
-    """View for updating a service."""
-
-    model = Service
-    form_class = ServiceForm
-    template_name = "providers/service_form.html"
-    success_url = reverse_lazy("provider_dashboard")
-    pk_url_kwarg = "pk"
-
-    def get_object(self, queryset=None):
-        """Get service and verify ownership."""
-        service = super().get_object(queryset)
-
-        # Verify the service belongs to the current provider
-        try:
-            provider = Provider.objects.get(user=self.request.user)
-            if service.provider != provider:
-                messages.error(
-                    self.request, "You do not have permission to edit this service."
-                )
-                raise PermissionError("Service does not belong to this provider")
-        except Provider.DoesNotExist:
-            messages.error(self.request, "Provider profile not found.")
-            raise PermissionError("Provider profile not found")
-
-        return service
-
-    def form_valid(self, form):
-        """Handle valid form."""
-        try:
-            messages.success(self.request, "Service updated successfully.")
-        except Exception:
-            pass
-
-        return super().form_valid(form)
-
-    def post(self, request, *args, **kwargs):
-        """Handle POST with error handling."""
-        try:
-            return super().post(request, *args, **kwargs)
-        except (PermissionError, Service.DoesNotExist):
-            return redirect("provider_dashboard")
-
-    def get_context_data(self, **kwargs):
-        """Add provider to context for service update."""
-        context = super().get_context_data(**kwargs)
-        context["provider"] = Provider.objects.get(user=self.request.user)
-        context["action"] = "Edit Service"
-        return context
-
-
-class ServiceDeleteView(ProviderRequiredMixin, DeleteView):
-    """View for deleting a service."""
-
-    model = Service
-    success_url = reverse_lazy("provider_dashboard")
-    pk_url_kwarg = "pk"
-    http_method_names = ["post"]
-
-    def get_object(self, queryset=None):
-        """Get service and verify ownership."""
-        service = super().get_object(queryset)
-
-        # Verify the service belongs to the current provider
-        try:
-            provider = Provider.objects.get(user=self.request.user)
-            if service.provider != provider:
-                messages.error(
-                    self.request, "You do not have permission to delete this service."
-                )
-                raise PermissionError("Service does not belong to this provider")
-        except Provider.DoesNotExist:
-            messages.error(self.request, "Provider profile not found.")
-            raise PermissionError("Provider profile not found")
-
-        return service
-
-    def post(self, request, *args, **kwargs):
-        """Handle deletion with message."""
-        try:
-            messages.success(request, "Service deleted successfully.")
-            return super().post(request, *args, **kwargs)
-        except (PermissionError, Service.DoesNotExist):
-            return redirect("provider_dashboard")
-
-    def get_context_data(self, **kwargs):
-        """Add provider to context for service delete."""
-        context = super().get_context_data(**kwargs)
-        context["provider"] = Provider.objects.get(user=self.request.user)
-        return context
-
-
 class AdminRequiredMixin(LoginRequiredMixin):
     """Mixin to require admin user type."""
 
@@ -594,9 +444,6 @@ class AdminProviderListView(AdminRequiredMixin, ListView):
         """Get all providers with annotations."""
 
         queryset = Provider.objects.select_related("user").all()
-
-        # Add service count
-        queryset = queryset.annotate(service_count=Count("services", distinct=True))
 
         # Search by email
         search = self.request.GET.get("search", "").strip()

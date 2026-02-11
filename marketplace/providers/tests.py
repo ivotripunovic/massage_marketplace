@@ -1,12 +1,10 @@
 from django.test import TestCase, Client
-from django.core.exceptions import ValidationError
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from users.models import User
 from reviews.models import Review
 from .models import (
     Provider,
-    Service,
     ProviderGalleryImage,
     ProviderAttributeDefinition,
     ProviderAttributeValue,
@@ -181,114 +179,6 @@ class ProviderModelTests(TestCase):
         self.assertGreaterEqual(provider.updated_at, provider.created_at)
 
 
-class ServiceModelTests(TestCase):
-    """Test Service model functionality."""
-
-    def setUp(self):
-        """Set up test provider for service creation."""
-        self.user = User.objects.create_user(
-            email="provider@test.com", password="pass", user_type="provider"
-        )
-        self.provider = Provider.objects.create(user=self.user, phone="+1234567890")
-
-    def test_create_service(self):
-        """Test creating a service."""
-        service = Service.objects.create(
-            provider=self.provider,
-            service_type="swedish",
-            price=75.00,
-            duration_minutes=60,
-        )
-        self.assertEqual(service.price, 75.00)
-        self.assertEqual(service.duration_minutes, 60)
-        self.assertTrue(service.is_active)
-
-    def test_service_price_validation(self):
-        """Test service price validation."""
-        with self.assertRaises(ValidationError):
-            service = Service(
-                provider=self.provider,
-                service_type="swedish",
-                price=2.00,
-                duration_minutes=60,
-            )
-            service.full_clean()
-
-    def test_service_price_minimum_valid(self):
-        """Test minimum valid price."""
-        service = Service.objects.create(
-            provider=self.provider,
-            service_type="swedish",
-            price=5.00,
-            duration_minutes=60,
-        )
-        self.assertEqual(service.price, 5.00)
-
-    def test_service_duration_validation(self):
-        """Test service duration validation."""
-        with self.assertRaises(ValidationError):
-            service = Service(
-                provider=self.provider,
-                service_type="swedish",
-                price=75.00,
-                duration_minutes=45,  # Invalid duration
-            )
-            service.full_clean()
-
-    def test_valid_service_durations(self):
-        """Test all valid durations."""
-        service_types = ["swedish", "deep_tissue", "thai"]
-        for i, duration in enumerate([30, 60, 90]):
-            service = Service.objects.create(
-                provider=self.provider,
-                service_type=service_types[i],
-                price=75.00,
-                duration_minutes=duration,
-            )
-            self.assertEqual(service.duration_minutes, duration)
-
-    def test_service_string_representation(self):
-        """Test service __str__ method."""
-        service = Service.objects.create(
-            provider=self.provider,
-            service_type="deep_tissue",
-            price=85.00,
-            duration_minutes=60,
-        )
-        self.assertIn(self.user.email, str(service))
-        self.assertIn("85", str(service))
-
-    def test_service_with_description(self):
-        """Test service with description."""
-        service = Service.objects.create(
-            provider=self.provider,
-            service_type="aromatherapy",
-            price=65.00,
-            duration_minutes=60,
-            description="Relaxing aromatherapy massage",
-        )
-        self.assertEqual(service.description, "Relaxing aromatherapy massage")
-
-    def test_service_all_types(self):
-        """Test all service types."""
-        service_types = [
-            "swedish",
-            "deep_tissue",
-            "thai",
-            "reflexology",
-            "hot_stone",
-            "aromatherapy",
-        ]
-        for i, service_type in enumerate(service_types):
-            service = Service.objects.create(
-                provider=self.provider,
-                service_type=service_type,
-                price=50.00 + i,
-                duration_minutes=60,
-            )
-            self.assertEqual(service.service_type, service_type)
-
-
 class ProviderDashboardViewTests(TestCase):
     """Test Provider Dashboard view functionality."""
 
@@ -309,13 +199,6 @@ class ProviderDashboardViewTests(TestCase):
         )
 
         # Create test data
-        self.service = Service.objects.create(
-            provider=self.provider,
-            service_type="swedish",
-            price=75.00,
-            duration_minutes=60,
-            is_active=True,
-        )
         self.review = Review.objects.create(
             provider=self.provider,
             rating=5,
@@ -356,13 +239,6 @@ class ProviderDashboardViewTests(TestCase):
         response = self.client.get(reverse("provider_dashboard"))
         self.assertContains(response, self.user.email)
 
-    def test_dashboard_displays_services(self):
-        """Test that dashboard displays provider's services."""
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.get(reverse("provider_dashboard"))
-        # Check that services section is displayed
-        self.assertIn("services", response.context)
-
     def test_dashboard_displays_subscription_status(self):
         """Test that dashboard displays subscription status."""
         self.client.login(email=self.user.email, password="testpass123")
@@ -373,7 +249,6 @@ class ProviderDashboardViewTests(TestCase):
         """Test that dashboard displays statistics."""
         self.client.login(email=self.user.email, password="testpass123")
         response = self.client.get(reverse("provider_dashboard"))
-        self.assertContains(response, "Active Services")
         self.assertContains(response, "Total Reviews")
 
     def test_dashboard_calculates_average_rating(self):
@@ -391,44 +266,12 @@ class ProviderDashboardViewTests(TestCase):
         # Average should be (5 + 4) / 2 = 4.5
         self.assertContains(response, "4.5")
 
-    def test_dashboard_shows_empty_state_for_no_services(self):
-        """Test dashboard when provider has no services."""
-        # Delete all services
-        Service.objects.all().delete()
-
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.get(reverse("provider_dashboard"))
-        self.assertEqual(response.status_code, 200)
-
     def test_dashboard_context_has_provider_data(self):
         """Test that dashboard context contains provider data."""
         self.client.login(email=self.user.email, password="testpass123")
         response = self.client.get(reverse("provider_dashboard"))
         self.assertIn("provider", response.context)
         self.assertEqual(response.context["provider"], self.provider)
-
-    def test_dashboard_context_has_services(self):
-        """Test that dashboard context contains services list."""
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.get(reverse("provider_dashboard"))
-        self.assertIn("services", response.context)
-        self.assertIn(self.service, response.context["services"])
-
-    def test_dashboard_only_shows_active_services(self):
-        """Test that dashboard filters services properly."""
-        # Create an inactive service
-        Service.objects.create(
-            provider=self.provider,
-            service_type="deep_tissue",
-            price=85.00,
-            duration_minutes=60,
-            is_active=False,
-        )
-
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.get(reverse("provider_dashboard"))
-        # Should have context with services
-        self.assertEqual(len(response.context["services"]), 1)  # Only active service
 
 
 class BaseTemplateTests(TestCase):
@@ -474,7 +317,6 @@ class BaseTemplateTests(TestCase):
         response = self.client.get(reverse("provider_dashboard"))
         self.assertContains(response, "Dashboard")
         self.assertContains(response, "Profile")
-        self.assertContains(response, "Services")
 
     def test_responsive_design_included(self):
         """Test that responsive design meta tag is included."""
@@ -1032,299 +874,6 @@ class ProviderPhotoUploadTests(TestCase):
         self.assertEqual(response.status_code, 302)  # Redirect on success
 
 
-class ServiceCRUDTests(TestCase):
-    """Test Service CRUD functionality."""
-
-    def setUp(self):
-        """Set up test client and provider."""
-        self.client = Client()
-        self.user = User.objects.create_user(
-            email="provider@test.com",
-            password="testpass123",
-            user_type="provider",
-            is_email_verified=True,
-        )
-        self.provider = Provider.objects.create(user=self.user, phone="+1234567890")
-
-        self.other_user = User.objects.create_user(
-            email="other@test.com",
-            password="testpass123",
-            user_type="provider",
-            is_email_verified=True,
-        )
-        self.other_provider = Provider.objects.create(
-            user=self.other_user, phone="+9876543210"
-        )
-
-    def test_service_list_requires_login(self):
-        """Test that service list requires login."""
-        response = self.client.get(reverse("services_list"))
-        self.assertEqual(response.status_code, 302)  # Redirect to login
-
-    def test_service_list_requires_provider_type(self):
-        """Test that non-provider users cannot access service list."""
-        client_user = User.objects.create_user(
-            email="client@test.com",
-            password="testpass123",
-            user_type="client",
-            is_email_verified=True,
-        )
-        self.client.login(email=client_user.email, password="testpass123")
-        response = self.client.get(reverse("services_list"))
-        self.assertEqual(response.status_code, 302)  # Redirect
-
-    def test_service_list_loads(self):
-        """Test that service list page loads."""
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.get(reverse("services_list"))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "providers/service_list.html")
-
-    def test_create_service_page_loads(self):
-        """Test that service create page loads."""
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.get(reverse("service_create"))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "providers/service_form.html")
-
-    def test_create_service_valid(self):
-        """Test creating a valid service."""
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.post(
-            reverse("service_create"),
-            {
-                "service_type": "swedish",
-                "description": "Relaxing Swedish massage",
-                "price": "75.00",
-                "duration_minutes": 60,
-            },
-        )
-
-        self.assertEqual(response.status_code, 302)  # Redirect on success
-        self.assertTrue(
-            Service.objects.filter(
-                provider=self.provider, service_type="swedish", price=75.00
-            ).exists()
-        )
-
-    def test_create_service_price_validation(self):
-        """Test that service price must be >= $5.00."""
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.post(
-            reverse("service_create"),
-            {
-                "service_type": "swedish",
-                "description": "Cheap massage",
-                "price": "2.00",  # Below minimum
-                "duration_minutes": 60,
-            },
-        )
-
-        # Form should be invalid
-        self.assertIn("form", response.context)
-        self.assertFalse(response.context["form"].is_valid())
-
-    def test_create_service_all_types(self):
-        """Test creating services of all types."""
-        self.client.login(email=self.user.email, password="testpass123")
-
-        service_types = [
-            "swedish",
-            "deep_tissue",
-            "thai",
-            "reflexology",
-            "hot_stone",
-            "aromatherapy",
-        ]
-
-        for service_type in service_types:
-            response = self.client.post(
-                reverse("service_create"),
-                {
-                    "service_type": service_type,
-                    "description": f"{service_type} massage",
-                    "price": "75.00",
-                    "duration_minutes": 60,
-                },
-            )
-            self.assertEqual(response.status_code, 302)
-
-        self.assertEqual(self.provider.services.count(), 6)
-
-    def test_service_edit_page_loads(self):
-        """Test that service edit page loads."""
-        service = Service.objects.create(
-            provider=self.provider,
-            service_type="swedish",
-            price=75.00,
-            duration_minutes=60,
-        )
-
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.get(reverse("service_edit", args=[service.id]))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "providers/service_form.html")
-
-    def test_service_edit_valid(self):
-        """Test updating a service."""
-        service = Service.objects.create(
-            provider=self.provider,
-            service_type="swedish",
-            price=75.00,
-            duration_minutes=60,
-        )
-
-        self.client.login(email=self.user.email, password="testpass123")
-        self.client.post(
-            reverse("service_edit", args=[service.id]),
-            {
-                "service_type": "swedish",
-                "description": "Updated description",
-                "price": "85.00",
-                "duration_minutes": 90,
-            },
-        )
-
-        service.refresh_from_db()
-        self.assertEqual(service.price, 85.00)
-        self.assertEqual(service.duration_minutes, 90)
-
-    def test_service_edit_ownership(self):
-        """Test that providers can only edit their own services."""
-        service = Service.objects.create(
-            provider=self.other_provider,
-            service_type="swedish",
-            price=75.00,
-            duration_minutes=60,
-        )
-
-        self.client.login(email=self.user.email, password="testpass123")
-        self.client.post(
-            reverse("service_edit", args=[service.id]),
-            {
-                "service_type": "swedish",
-                "description": "Hacked!",
-                "price": "999.00",
-                "duration_minutes": 60,
-            },
-        )
-
-        service.refresh_from_db()
-        self.assertEqual(service.price, 75.00)  # Should not have changed
-
-    def test_service_delete_success(self):
-        """Test deleting a service."""
-        service = Service.objects.create(
-            provider=self.provider,
-            service_type="swedish",
-            price=75.00,
-            duration_minutes=60,
-        )
-
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.post(reverse("service_delete", args=[service.id]))
-
-        self.assertEqual(response.status_code, 302)  # Redirect on success
-        self.assertFalse(Service.objects.filter(id=service.id).exists())
-
-    def test_service_delete_ownership(self):
-        """Test that providers can only delete their own services."""
-        service = Service.objects.create(
-            provider=self.other_provider,
-            service_type="swedish",
-            price=75.00,
-            duration_minutes=60,
-        )
-
-        self.client.login(email=self.user.email, password="testpass123")
-        self.client.post(reverse("service_delete", args=[service.id]))
-
-        # Service should still exist
-        self.assertTrue(Service.objects.filter(id=service.id).exists())
-
-    def test_service_list_displays_services(self):
-        """Test that service list displays all services."""
-        services = [
-            Service.objects.create(
-                provider=self.provider,
-                service_type="swedish",
-                price=75.00,
-                duration_minutes=60,
-            ),
-            Service.objects.create(
-                provider=self.provider,
-                service_type="deep_tissue",
-                price=85.00,
-                duration_minutes=60,
-            ),
-        ]
-
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.get(reverse("services_list"))
-
-        for service in services:
-            self.assertContains(response, service.get_service_type_display())
-            self.assertContains(response, str(service.price))
-
-    def test_service_create_success_message(self):
-        """Test that success message is shown after creating service."""
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.post(
-            reverse("service_create"),
-            {
-                "service_type": "swedish",
-                "description": "Swedish massage",
-                "price": "75.00",
-                "duration_minutes": 60,
-            },
-            follow=True,
-        )
-
-        messages = list(response.context["messages"])
-        self.assertTrue(any("created successfully" in str(m).lower() for m in messages))
-
-    def test_service_update_success_message(self):
-        """Test that success message is shown after updating service."""
-        service = Service.objects.create(
-            provider=self.provider,
-            service_type="swedish",
-            price=75.00,
-            duration_minutes=60,
-        )
-
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.post(
-            reverse("service_edit", args=[service.id]),
-            {
-                "service_type": "swedish",
-                "description": "Updated",
-                "price": "85.00",
-                "duration_minutes": 90,
-            },
-            follow=True,
-        )
-
-        messages = list(response.context["messages"])
-        self.assertTrue(any("updated successfully" in str(m).lower() for m in messages))
-
-    def test_service_delete_success_message(self):
-        """Test that success message is shown after deleting service."""
-        service = Service.objects.create(
-            provider=self.provider,
-            service_type="swedish",
-            price=75.00,
-            duration_minutes=60,
-        )
-
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.post(
-            reverse("service_delete", args=[service.id]), follow=True
-        )
-
-        messages = list(response.context["messages"])
-        self.assertTrue(any("deleted successfully" in str(m).lower() for m in messages))
-
-
 class ProviderAdminTests(TestCase):
     """Test Provider admin interface functionality."""
 
@@ -1476,18 +1025,6 @@ class ProviderAdminTests(TestCase):
         email = admin_instance.user_email(self.provider1)
         self.assertEqual(email, "provider1@test.com")
 
-    def test_service_inline_exists(self):
-        """Test ServiceInline is configured in ProviderAdmin."""
-        from providers.admin import ProviderAdmin
-
-        admin_instance = ProviderAdmin(Provider, None)
-        self.assertTrue(
-            any(
-                hasattr(inline, "model") and inline.model == Service
-                for inline in admin_instance.inlines
-            )
-        )
-
 
 class AdminProviderListViewTests(TestCase):
     """Test Admin Provider List view functionality."""
@@ -1508,20 +1045,6 @@ class AdminProviderListViewTests(TestCase):
         )
         self.provider_suspended = self._create_provider(
             "suspended@test.com", "suspended", None
-        )
-
-        # Add services to provider_active
-        Service.objects.create(
-            provider=self.provider_active,
-            service_type="swedish",
-            price=75.00,
-            duration_minutes=60,
-        )
-        Service.objects.create(
-            provider=self.provider_active,
-            service_type="deep_tissue",
-            price=85.00,
-            duration_minutes=90,
         )
 
         # Add a review to provider_active
@@ -1604,11 +1127,10 @@ class AdminProviderListViewTests(TestCase):
         self.assertNotContains(response, "inactive@test.com")
         self.assertNotContains(response, "suspended@test.com")
 
-    def test_provider_list_shows_service_count(self):
-        """Test that provider service count is displayed."""
+    def test_provider_list_has_stats(self):
+        """Test that provider stats are included in context."""
         self.client.login(email=self.admin_user.email, password="adminpass123")
         response = self.client.get(reverse("admin_providers"))
-        # Provider_active has 2 services
         context = response.context
         self.assertIn("providers_with_stats", context)
 

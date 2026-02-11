@@ -16,13 +16,6 @@
             aspect-ratio: 4/5;
         }
     }
-    .service-tag {
-        background: rgba(212, 175, 55, 0.15);
-        color: #d4af37;
-        font-size: 0.7rem;
-        padding: 1px 6px;
-        border-radius: 9999px;
-    }
 </style>
 {% endblock %}
 
@@ -194,7 +187,7 @@
     {% if is_paginated %}
     <nav class="flex items-center justify-center gap-2 py-8" aria-label="Pagination">
         {% if page_obj.has_previous %}
-        <a href="?{% if current_keyword %}keyword={{ current_keyword }}&{% endif %}{% if current_country_id %}country_id={{ current_country_id }}&{% endif %}{% if current_city_id %}city_id={{ current_city_id }}&{% endif %}{% if current_service_type %}service_type={{ current_service_type }}&{% endif %}page={{ page_obj.previous_page_number }}"
+        <a href="?{% if current_keyword %}keyword={{ current_keyword }}&{% endif %}{% if current_country_id %}country_id={{ current_country_id }}&{% endif %}{% if current_city_id %}city_id={{ current_city_id }}&{% endif %}page={{ page_obj.previous_page_number }}"
            class="px-4 py-2 bg-dark-200 text-text-secondary rounded-lg hover:bg-dark-300 hover:text-gold transition-colors">
             Previous
         </a>
@@ -205,7 +198,7 @@
                 {% if page_obj.number == num %}
                 <span class="px-4 py-2 bg-gold text-dark font-semibold rounded-lg">{{ num }}</span>
                 {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                <a href="?{% if current_keyword %}keyword={{ current_keyword }}&{% endif %}{% if current_country_id %}country_id={{ current_country_id }}&{% endif %}{% if current_city_id %}city_id={{ current_city_id }}&{% endif %}{% if current_service_type %}service_type={{ current_service_type }}&{% endif %}page={{ num }}"
+                <a href="?{% if current_keyword %}keyword={{ current_keyword }}&{% endif %}{% if current_country_id %}country_id={{ current_country_id }}&{% endif %}{% if current_city_id %}city_id={{ current_city_id }}&{% endif %}page={{ num }}"
                    class="px-4 py-2 bg-dark-200 text-text-secondary rounded-lg hover:bg-dark-300 hover:text-gold transition-colors">
                     {{ num }}
                 </a>
@@ -214,7 +207,7 @@
         </div>
 
         {% if page_obj.has_next %}
-        <a href="?{% if current_keyword %}keyword={{ current_keyword }}&{% endif %}{% if current_country_id %}country_id={{ current_country_id }}&{% endif %}{% if current_city_id %}city_id={{ current_city_id }}&{% endif %}{% if current_service_type %}service_type={{ current_service_type }}&{% endif %}page={{ page_obj.next_page_number }}"
+        <a href="?{% if current_keyword %}keyword={{ current_keyword }}&{% endif %}{% if current_country_id %}country_id={{ current_country_id }}&{% endif %}{% if current_city_id %}city_id={{ current_city_id }}&{% endif %}page={{ page_obj.next_page_number }}"
            class="px-4 py-2 bg-dark-200 text-text-secondary rounded-lg hover:bg-dark-300 hover:text-gold transition-colors">
             Next
         </a>

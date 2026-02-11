@@ -1,6 +1,5 @@
 from django.db import models
 from django.conf import settings
-from django.core.exceptions import ValidationError
 from django.utils.text import slugify
 from datetime import timedelta, date
 
@@ -252,68 +251,6 @@ class ProviderGalleryImage(models.Model):
 
     def __str__(self):
         return f"Gallery image for {self.provider.user.email} ({self.uploaded_at.strftime('%Y-%m-%d')})"
-
-
-class Service(models.Model):
-    """Service offered by a provider."""
-
-    SERVICE_TYPE_CHOICES = (
-        ("swedish", "Swedish Massage"),
-        ("deep_tissue", "Deep Tissue Massage"),
-        ("thai", "Thai Massage"),
-        ("reflexology", "Reflexology"),
-        ("hot_stone", "Hot Stone Massage"),
-        ("aromatherapy", "Aromatherapy Massage"),
-    )
-
-    DURATION_CHOICES = (
-        (30, "30 minutes"),
-        (60, "60 minutes"),
-        (90, "90 minutes"),
-    )
-
-    provider = models.ForeignKey(
-        Provider, on_delete=models.CASCADE, related_name="services"
-    )
-
-    service_type = models.CharField(max_length=20, choices=SERVICE_TYPE_CHOICES)
-
-    description = models.TextField(blank=True, null=True)
-
-    price = models.DecimalField(
-        max_digits=10, decimal_places=2, help_text="Price must be at least $5.00"
-    )
-
-    duration_minutes = models.IntegerField(choices=DURATION_CHOICES)
-
-    is_active = models.BooleanField(default=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        db_table = "providers_service"
-        verbose_name = "Service"
-        verbose_name_plural = "Services"
-        unique_together = ("provider", "service_type")
-
-    def __str__(self):
-        return f"{self.provider.user.email} - {self.get_service_type_display()} - ${self.price}"
-
-    def clean(self):
-        """Validate service fields."""
-        if self.price < 5.00:
-            raise ValidationError({"price": "Price must be at least $5.00"})
-
-        if self.duration_minutes not in dict(self.DURATION_CHOICES).keys():
-            raise ValidationError(
-                {"duration_minutes": "Duration must be 30, 60, or 90 minutes"}
-            )
-
-    def save(self, *args, **kwargs):
-        """Validate before saving."""
-        self.full_clean()
-        super().save(*args, **kwargs)
 
 
 class ProviderAttributeDefinition(models.Model):

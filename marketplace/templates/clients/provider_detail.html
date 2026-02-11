@@ -139,37 +139,6 @@
     </div>
     {% endif %}
 
-    <!-- Services Section -->
-    <div class="card-dark p-6 md:p-8 mb-8">
-        <h2 class="text-2xl font-display font-bold text-gold mb-6">Services</h2>
-
-        {% if services %}
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {% for service in services %}
-            <div class="bg-dark-200 rounded-xl p-5 border border-dark-300 hover:border-gold transition-colors">
-                <div class="flex justify-between items-start mb-3">
-                    <div>
-                        <h3 class="font-semibold text-lg text-text-primary">{{ service.get_service_type_display }}</h3>
-                        <p class="text-text-muted text-sm flex items-center gap-1 mt-1">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                            </svg>
-                            {{ service.duration_minutes }} minutes
-                        </p>
-                    </div>
-                    <span class="text-2xl font-bold text-gold">${{ service.price }}</span>
-                </div>
-                {% if service.description %}
-                <p class="text-text-secondary text-sm">{{ service.description }}</p>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p class="text-text-muted">No services listed yet.</p>
-        {% endif %}
-    </div>
-
     <!-- Gallery Section -->
     {% if gallery_images %}
     <div class="card-dark p-6 md:p-8 mb-8">

@@ -3,7 +3,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect, get_object_or_404
 from django.http import HttpResponseForbidden
 from django.contrib import messages
-from django.db.models import Q, Sum, Count, Avg
+from django.db.models import Q, Sum, Avg
 from django.utils import timezone
 from payments.models import SubscriptionPayment
 from providers.models import Provider
@@ -114,10 +114,7 @@ class AdminDashboardView(AdminRequiredMixin, TemplateView):
             subscription_status="suspended"
         ).count()
 
-        # Service & review metrics
-        from providers.models import Service
-
-        context["total_services"] = Service.objects.count()
+        # Review metrics
         context["total_reviews"] = Review.objects.count()
 
         # Payment metrics
@@ -153,13 +150,12 @@ class AdminProviderDetailView(AdminRequiredMixin, DetailView):
 
     def get_queryset(self):
         return Provider.objects.select_related("user").prefetch_related(
-            "services", "reviews", "subscription_payments"
+            "reviews", "subscription_payments"
         )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         provider = self.object
-        context["services"] = provider.services.all()
         context["reviews"] = provider.reviews.all().order_by("-created_at")[:10]
         context["payments"] = provider.subscription_payments.all().order_by(
             "-created_at"
@@ -249,7 +245,6 @@ class AdminAnalyticsView(AdminRequiredMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         from reviews.models import Review
-        from providers.models import Service
         from datetime import timedelta
 
         now = timezone.now()
@@ -305,14 +300,6 @@ class AdminAnalyticsView(AdminRequiredMixin, TemplateView):
             )
         context["revenue_data"] = revenue_data
 
-        # Service type distribution
-        service_types = (
-            Service.objects.values("service_type")
-            .annotate(count=Count("id"))
-            .order_by("-count")
-        )
-        context["service_type_data"] = list(service_types)
-
         # Key metrics
         total_providers = Provider.objects.count()
         active_providers = Provider.objects.filter(subscription_status="active").count()
@@ -336,7 +323,6 @@ class AdminAnalyticsView(AdminRequiredMixin, TemplateView):
 
         context["active_providers"] = active_providers
         context["total_providers"] = total_providers
-        context["total_services"] = Service.objects.count()
         context["total_reviews"] = Review.objects.count()
         context["avg_rating"] = Review.objects.aggregate(avg=Avg("rating"))["avg"] or 0
 

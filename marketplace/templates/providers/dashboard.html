@@ -57,10 +57,6 @@
         <h3 class="text-lg font-bold mb-4">Statistics</h3>
         <div class="space-y-3">
             <div class="flex justify-between">
-                <span class="text-text-secondary">Active Services:</span>
-                <span class="font-semibold">{{ services.count }}</span>
-            </div>
-            <div class="flex justify-between">
                 <span class="text-text-secondary">Total Reviews:</span>
                 <span class="font-semibold">{{ total_reviews }}</span>
             </div>
@@ -95,27 +91,6 @@
             {% if provider.subscription_status == 'active' %}Manage Subscription{% else %}Activate Subscription{% endif %}
         </a>
     </div>
-</div>
-
-<!-- Services Section -->
-<div class="card-dark p-6 mb-8">
-    <div class="flex justify-between items-center mb-4">
-        <h2 class="text-2xl font-bold">Your Services</h2>
-        <a href="{% url 'service_create' %}" class="btn-accent px-4 py-2 rounded">+ Add Service</a>
-    </div>
-
-    {% if services %}
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {% for service in services %}
-            {% include "includes/_service_card.html" with service=service %}
-        {% endfor %}
-    </div>
-    {% else %}
-    <div class="bg-dark-100 rounded-lg p-8 text-center">
-        <p class="text-text-secondary mb-4">You haven't added any services yet.</p>
-        <a href="{% url 'service_create' %}" class="inline-block btn-accent px-6 py-2 rounded">Add Your First Service</a>
-    </div>
-    {% endif %}
 </div>
 
 <!-- Gallery Section -->

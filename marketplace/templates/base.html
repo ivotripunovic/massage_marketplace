@@ -208,7 +208,6 @@
                         {% if user.user_type == 'provider' %}
                             <a href="{% url 'provider_dashboard' %}" class="nav-link">Dashboard</a>
                             <a href="{% url 'provider_profile' %}" class="nav-link">Profile</a>
-                            <a href="{% url 'services_list' %}" class="nav-link">Services</a>
                         {% elif user.user_type == 'client' %}
                             <a href="/client/dashboard/" class="nav-link">Find Services</a>
                             <a href="/client/bookings/" class="nav-link">My Bookings</a>
@@ -242,7 +241,6 @@
                     {% if user.user_type == 'provider' %}
                         <a href="{% url 'provider_dashboard' %}" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">Dashboard</a>
                         <a href="{% url 'provider_profile' %}" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">Profile</a>
-                        <a href="{% url 'services_list' %}" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">Services</a>
                     {% elif user.user_type == 'client' %}
                         <a href="/client/dashboard/" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">Find Services</a>
                         <a href="/client/bookings/" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">My Bookings</a>

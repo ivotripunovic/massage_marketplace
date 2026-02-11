@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile
 from PIL import Image
 import io
-from providers.models import Provider, Service, ProviderGalleryImage
+from providers.models import Provider, ProviderGalleryImage
 
 
 class ProviderPhotoForm(forms.ModelForm):
@@ -94,48 +94,6 @@ class ProviderPhotoForm(forms.ModelForm):
             img.save(img_io, format=save_format)
             img_io.seek(0)
             provider.photo.save(provider.photo.name, img_io, save=False)
-
-
-class ServiceForm(forms.ModelForm):
-    """Form for creating and updating services."""
-
-    class Meta:
-        model = Service
-        fields = ("service_type", "description", "price", "duration_minutes")
-        labels = {
-            "service_type": "Service Type",
-            "description": "Service Description",
-            "price": "Price (USD)",
-            "duration_minutes": "Duration",
-        }
-        widgets = {
-            "service_type": forms.Select(
-                attrs={
-                    "class": "select-dark w-full",
-                }
-            ),
-            "description": forms.Textarea(
-                attrs={
-                    "class": "input-dark w-full",
-                    "placeholder": "Describe your service",
-                    "rows": 4,
-                }
-            ),
-            "price": forms.NumberInput(
-                attrs={
-                    "class": "input-dark w-full",
-                    "placeholder": "75.00",
-                    "min": "5.00",
-                    "step": "0.01",
-                    "type": "number",
-                }
-            ),
-            "duration_minutes": forms.Select(
-                attrs={
-                    "class": "select-dark w-full",
-                }
-            ),
-        }
 
 
 class SubscriptionSettingsForm(forms.Form):

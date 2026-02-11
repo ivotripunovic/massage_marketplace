@@ -4,7 +4,6 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 from providers.models import (
     Provider,
-    Service,
     ProviderGalleryImage,
     ProviderPricing,
     Country,
@@ -150,24 +149,13 @@ class ProviderDirectoryView(ListView):
                 subscription_status="active", user__is_email_verified=True
             )
             .select_related("user", "country", "city")
-            .prefetch_related(
-                "services", "reviews", "pricing", attribute_values_prefetch
-            )
+            .prefetch_related("reviews", "pricing", attribute_values_prefetch)
         )
 
         # Apply filters from query parameters
-        service_type = self.request.GET.get("service_type", "").strip()
         country_id = self.request.GET.get("country_id", "").strip()
         city_id = self.request.GET.get("city_id", "").strip()
         keyword = self.request.GET.get("keyword", "").strip()
-        price_min = self.request.GET.get("price_min", "").strip()
-        price_max = self.request.GET.get("price_max", "").strip()
-
-        # Filter by service type (providers who offer this service)
-        if service_type:
-            queryset = queryset.filter(
-                services__service_type=service_type, services__is_active=True
-            ).distinct()
 
         # Filter by location using ForeignKey fields
         if country_id:
@@ -181,33 +169,13 @@ class ProviderDirectoryView(ListView):
             except ValueError:
                 pass
 
-        # Filter by keyword (search in bio, user name, services)
+        # Filter by keyword (search in bio, user name)
         if keyword:
             queryset = queryset.filter(
                 Q(bio__icontains=keyword)
                 | Q(user__first_name__icontains=keyword)
                 | Q(user__last_name__icontains=keyword)
-                | Q(services__description__icontains=keyword)
             ).distinct()
-
-        # Filter by price range (providers who have services in this range)
-        if price_min:
-            try:
-                min_price = float(price_min)
-                queryset = queryset.filter(
-                    services__price__gte=min_price, services__is_active=True
-                ).distinct()
-            except ValueError:
-                pass
-
-        if price_max:
-            try:
-                max_price = float(price_max)
-                queryset = queryset.filter(
-                    services__price__lte=max_price, services__is_active=True
-                ).distinct()
-            except ValueError:
-                pass
 
         # Order by created date (newest first)
         queryset = queryset.order_by("-created_at")
@@ -275,13 +243,9 @@ class ProviderDirectoryView(ListView):
         context["providers_with_stats"] = providers_with_stats
 
         # Add filter choices and current values
-        context["service_types"] = Service.SERVICE_TYPE_CHOICES
-        context["current_service_type"] = self.request.GET.get("service_type", "")
         context["current_country_id"] = self.request.GET.get("country_id", "")
         context["current_city_id"] = self.request.GET.get("city_id", "")
         context["current_keyword"] = self.request.GET.get("keyword", "")
-        context["current_price_min"] = self.request.GET.get("price_min", "")
-        context["current_price_max"] = self.request.GET.get("price_max", "")
 
         # Get country and city names for display if IDs are set
         if context["current_country_id"]:
@@ -321,18 +285,13 @@ class ProviderDetailView(DetailView):
                 subscription_status="active", user__is_email_verified=True
             )
             .select_related("user")
-            .prefetch_related("services", "reviews", "gallery_images")
+            .prefetch_related("reviews", "gallery_images")
         )
 
     def get_context_data(self, **kwargs):
         """Add services and reviews to context."""
         context = super().get_context_data(**kwargs)
         provider = context["provider"]
-
-        # Get services
-        context["services"] = Service.objects.filter(
-            provider=provider, is_active=True
-        ).order_by("service_type")
 
         # Get gallery images
         context["gallery_images"] = ProviderGalleryImage.objects.filter(

@@ -19,7 +19,6 @@ from django.utils.text import slugify
 
 from providers.models import (
     Provider,
-    Service,
     Country,
     City,
     ProviderAttributeDefinition,
@@ -205,49 +204,6 @@ FOCUSES = [
     "combining traditional and modern techniques",
 ]
 
-# ── Service descriptions ──────────────────────────────────────────────────────
-
-SERVICE_DESCRIPTIONS = {
-    "swedish": [
-        "Relaxing full-body Swedish massage to improve circulation and reduce stress.",
-        "Gentle Swedish massage for deep relaxation and tension relief.",
-        "Classic Swedish technique with long, flowing strokes for total calm.",
-        "Swedish massage combining gentle pressure with soothing movements.",
-    ],
-    "deep_tissue": [
-        "Targeted deep tissue work for chronic pain relief and muscle recovery.",
-        "Intensive deep tissue massage focusing on problem areas.",
-        "Sports-focused deep tissue massage for athletes and active individuals.",
-        "Deep pressure therapy to release tension and restore movement.",
-    ],
-    "thai": [
-        "Traditional Thai massage with gentle stretching and pressure point work.",
-        "Authentic Thai bodywork combining yoga-like stretches with acupressure.",
-        "Thai massage to improve flexibility and energy flow.",
-        "Ancient Thai techniques for full-body rejuvenation.",
-    ],
-    "reflexology": [
-        "Therapeutic foot reflexology to restore balance and energy flow.",
-        "Full reflexology session focusing on feet and hands.",
-        "Precision reflexology targeting key pressure points for whole-body wellness.",
-        "Relaxing reflexology to ease tension and promote natural healing.",
-    ],
-    "hot_stone": [
-        "Warm stone therapy combined with deep pressure for total relaxation.",
-        "Hot stone massage combining heat therapy with soothing techniques.",
-        "Heated basalt stones placed on key points for deep muscle relief.",
-        "Luxurious hot stone treatment for stress release and warmth.",
-    ],
-    "aromatherapy": [
-        "Customised aromatherapy massage using premium essential oils.",
-        "Relaxing aromatherapy massage with carefully blended essential oils.",
-        "Aromatic essential oil massage tailored to your needs.",
-        "Soothing aromatherapy experience with therapeutic-grade oils.",
-    ],
-}
-
-SERVICE_TYPES = list(SERVICE_DESCRIPTIONS.keys())
-
 # ── Review templates ──────────────────────────────────────────────────────────
 
 REVIEW_COMMENTS_5 = [
@@ -377,7 +333,7 @@ BATCH_SIZE = 500
 
 
 class Command(BaseCommand):
-    help = "Seed the database with beta test data (providers, services, reviews)"
+    help = "Seed the database with beta test data (providers, reviews, pricing)"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -436,18 +392,6 @@ class Command(BaseCommand):
         hour_end = rng.choice([17, 18, 19, 20])
         phone_hours = f"{hour_start}:00 – {hour_end}:00"
 
-        # 1-4 services, unique types
-        num_services = rng.randint(1, 4)
-        service_types = rng.sample(SERVICE_TYPES, min(num_services, len(SERVICE_TYPES)))
-        services = []
-        for stype in service_types:
-            desc = rng.choice(SERVICE_DESCRIPTIONS[stype])
-            base_price = rng.randint(30, 150)
-            price = round(base_price / 5) * 5  # round to nearest 5
-            price = max(price, 5)
-            duration = rng.choice([30, 60, 60, 60, 90])  # weighted toward 60
-            services.append((stype, desc, price, duration))
-
         return {
             "email": email,
             "first_name": first_name,
@@ -457,7 +401,6 @@ class Command(BaseCommand):
             "phone_hours": phone_hours,
             "country_id": country_id,
             "city_id": city_id,
-            "services": services,
             "payment_method": rng.choice(["bank_transfer", "crypto"]),
             "renewal_days": rng.randint(1, 30),
         }
@@ -651,7 +594,7 @@ class Command(BaseCommand):
         if options["flush"]:
             self.stdout.write("Removing existing seed data...")
             seed_users = User.objects.filter(email__endswith=f"@{SEED_EMAIL_DOMAIN}")
-            # Cascade: User → Provider → Services, Reviews, Attributes, Gallery
+            # Cascade: User → Provider → Reviews, Attributes, Gallery, Pricing
             deleted = seed_users.delete()
             admin_deleted = User.objects.filter(
                 email="admin@massagemarketplace.com"
@@ -743,32 +686,11 @@ class Command(BaseCommand):
                     provider_objects, ["slug"], batch_size=BATCH_SIZE
                 )
 
-                # 4) Collect Service objects for bulk-create
-                service_objects = []
-                for provider, data in zip(provider_objects, new_data):
-                    for stype, desc, price, duration in data["services"]:
-                        service_objects.append(
-                            Service(
-                                provider=provider,
-                                service_type=stype,
-                                description=desc,
-                                price=Decimal(str(price)),
-                                duration_minutes=duration,
-                                is_active=True,
-                            )
-                        )
-                Service.objects.bulk_create(service_objects, batch_size=BATCH_SIZE)
-                service_count = len(service_objects)
-
                 providers.extend(provider_objects)
-            else:
-                service_count = 0
 
         created_count = len(new_data)
 
-        self.stdout.write(
-            f"  Created {created_count} providers with {service_count} services"
-        )
+        self.stdout.write(f"  Created {created_count} providers")
 
         # Generate reviews in bulk
         self.stdout.write("Generating reviews...")
@@ -807,7 +729,7 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"Beta data seeded: {created_count} providers, "
-                f"{service_count} services, {review_count} reviews, "
+                f"{review_count} reviews, "
                 f"{attr_count} attribute values, {pricing_count} pricing grids"
             )
         )

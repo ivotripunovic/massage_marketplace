@@ -33,10 +33,6 @@ from users.views import (
 from providers.views import (
     ProviderDashboardView,
     ProviderProfileUpdateView,
-    ServiceListView,
-    ServiceCreateView,
-    ServiceUpdateView,
-    ServiceDeleteView,
     AdminProviderListView,
     ProviderSubscriptionView,
     SubscriptionConfirmView,
@@ -124,20 +120,6 @@ urlpatterns = [
         "provider/subscription/confirm/",
         SubscriptionConfirmView.as_view(),
         name="subscription_confirm",
-    ),
-    path("provider/services/", ServiceListView.as_view(), name="services_list"),
-    path(
-        "provider/services/create/", ServiceCreateView.as_view(), name="service_create"
-    ),
-    path(
-        "provider/services/<int:pk>/edit/",
-        ServiceUpdateView.as_view(),
-        name="service_edit",
-    ),
-    path(
-        "provider/services/<int:pk>/delete/",
-        ServiceDeleteView.as_view(),
-        name="service_delete",
     ),
     path(
         "provider/gallery/upload/",

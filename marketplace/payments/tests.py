@@ -358,7 +358,6 @@ class AdminDashboardViewTests(TestCase):
         self.assertIn("active_providers", response.context)
         self.assertIn("total_revenue", response.context)
         self.assertIn("pending_payments", response.context)
-        self.assertIn("total_services", response.context)
         self.assertIn("total_reviews", response.context)
 
     def test_dashboard_provider_counts(self):
@@ -412,22 +411,6 @@ class AdminProviderDetailViewTests(TestCase):
         )
         self.assertContains(response, self.provider_user.email)
         self.assertContains(response, "+1234567890")
-
-    def test_detail_shows_services(self):
-        from providers.models import Service
-
-        Service.objects.create(
-            provider=self.provider,
-            service_type="swedish",
-            description="Swedish massage",
-            price=60.00,
-            duration_minutes=60,
-        )
-        self.client.login(email="admin@test.com", password="pass")
-        response = self.client.get(
-            reverse("admin_provider_detail", args=[self.provider.pk])
-        )
-        self.assertContains(response, "Swedish")
 
     def test_detail_shows_payments(self):
         SubscriptionPayment.objects.create(
@@ -601,7 +584,6 @@ class AdminAnalyticsViewTests(TestCase):
         self.assertIn("conversion_rate", response.context)
         self.assertIn("signup_data", response.context)
         self.assertIn("revenue_data", response.context)
-        self.assertIn("service_type_data", response.context)
 
     def test_analytics_conversion_rate(self):
         self.client.login(email="admin@test.com", password="pass")

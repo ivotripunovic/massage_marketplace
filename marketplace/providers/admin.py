@@ -1,7 +1,6 @@
 from django.contrib import admin
 from .models import (
     Provider,
-    Service,
     ProviderGalleryImage,
     ProviderAttributeDefinition,
     ProviderAttributeValue,
@@ -9,14 +8,6 @@ from .models import (
     Country,
     City,
 )
-
-
-class ServiceInline(admin.TabularInline):
-    """Inline editor for services."""
-
-    model = Service
-    extra = 1
-    fields = ("service_type", "price", "duration_minutes", "is_active")
 
 
 class GalleryImageInline(admin.TabularInline):
@@ -99,7 +90,7 @@ class ProviderAdmin(admin.ModelAdmin):
         "city__name",
     )
     readonly_fields = ("created_at", "updated_at")
-    inlines = [ServiceInline, GalleryImageInline]
+    inlines = [GalleryImageInline]
     autocomplete_fields = ("country", "city")
 
     fieldsets = (
@@ -181,43 +172,6 @@ class ProviderAdmin(admin.ModelAdmin):
         self.message_user(request, f"{count} provider subscription(s) activated.")
 
     activate_subscriptions.short_description = "Activate selected subscriptions"
-
-
-@admin.register(Service)
-class ServiceAdmin(admin.ModelAdmin):
-    """Admin interface for Service model."""
-
-    list_display = (
-        "provider_email",
-        "service_type",
-        "price",
-        "duration_minutes",
-        "is_active",
-        "created_at",
-    )
-    list_filter = ("service_type", "is_active", "duration_minutes", "created_at")
-    search_fields = ("provider__user__email", "service_type", "description")
-    readonly_fields = ("created_at", "updated_at")
-
-    fieldsets = (
-        ("Provider", {"fields": ("provider",)}),
-        (
-            "Service Information",
-            {"fields": ("service_type", "description", "price", "duration_minutes")},
-        ),
-        ("Status", {"fields": ("is_active",)}),
-        (
-            "Timestamps",
-            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
-        ),
-    )
-
-    def provider_email(self, obj):
-        """Display provider email in list view."""
-        return obj.provider.user.email
-
-    provider_email.short_description = "Provider Email"
-    provider_email.admin_order_field = "provider__user__email"
 
 
 @admin.register(ProviderAttributeDefinition)
