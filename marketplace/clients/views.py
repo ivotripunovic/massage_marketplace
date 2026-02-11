@@ -345,8 +345,10 @@ class ProviderDetailView(DetailView):
         from reviews.forms import ReviewForm
 
         context["form"] = ReviewForm()
-        context["attribute_values"] = ProviderAttributeValue.objects.select_related(
-            "definition"
-        ).filter(provider=provider, definition__is_active=True)
+        context["attribute_values"] = (
+            ProviderAttributeValue.objects.select_related("definition")
+            .filter(provider=provider, definition__is_active=True)
+            .order_by("definition__display_order")
+        )
 
         return context

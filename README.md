@@ -1,7 +1,5 @@
 # Massage Marketplace
 
-Live demo: [https://market.pufna.com](https://market.pufna.com)
-
 A Django-based marketplace platform for massage therapy services.
 
 ## Local Development Setup

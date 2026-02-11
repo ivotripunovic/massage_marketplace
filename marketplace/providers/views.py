@@ -109,10 +109,11 @@ class ProviderProfileForm(forms.ModelForm):
 
     class Meta:
         model = Provider
-        fields = ("bio", "phone", "photo")
+        fields = ("bio", "phone", "phone_hours", "photo")
         labels = {
             "bio": "Bio / About",
             "phone": "Phone Number",
+            "phone_hours": "Good Time to Call",
             "photo": "Profile Photo",
         }
         widgets = {
@@ -128,6 +129,12 @@ class ProviderProfileForm(forms.ModelForm):
                     "class": "input-dark w-full",
                     "placeholder": "+1 (555) 123-4567",
                     "type": "tel",
+                }
+            ),
+            "phone_hours": forms.TextInput(
+                attrs={
+                    "class": "input-dark w-full",
+                    "placeholder": "e.g. 10:00 – 18:00",
                 }
             ),
             "photo": forms.FileInput(

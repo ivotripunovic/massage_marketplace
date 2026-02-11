@@ -126,6 +126,12 @@ class Provider(models.Model):
 
     bio = models.TextField(blank=True, null=True)
     phone = models.CharField(max_length=20)
+    phone_hours = models.CharField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="Good time to call, e.g. 10:00 – 18:00",
+    )
     photo = models.ImageField(upload_to="providers/photos/", blank=True, null=True)
 
     # Location fields (ForeignKey)

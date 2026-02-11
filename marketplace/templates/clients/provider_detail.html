@@ -67,19 +67,6 @@
                     </span>
                 </div>
                 {% endif %}
-                {% if attribute_values %}
-                <div class="flex flex-wrap gap-3 mb-4">
-                    {% for attr in attribute_values %}
-                        {% if attr.formatted_value %}
-                        <div class="inline-flex items-center gap-2 rounded-full bg-dark-200 px-3 py-1 text-xs text-text-primary">
-                            <span class="font-semibold text-text-primary">{{ attr.definition.name }}</span>
-                            <span class="text-text-muted">{{ attr.formatted_value }}</span>
-                        </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-                {% endif %}
-
                 <!-- Rating -->
                 {% if avg_rating > 0 %}
                 <div class="flex items-center gap-3 mb-6">
@@ -118,12 +105,55 @@
             </div>
         </div>
 
-        <!-- Bio -->
+    </div>
+
+    <!-- Attributes Table -->
+    <div class="card-dark p-6 md:p-8 mb-8">
+        <h2 class="text-2xl font-display font-bold text-gold mb-4">{{ provider.get_name }}</h2>
+        <table class="w-full text-sm">
+            <tbody>
+                {% if provider.phone %}
+                <tr class="border-b border-dark-300">
+                    <td class="py-1.5 pr-4 font-semibold text-text-muted w-1/3">Phone</td>
+                    <td class="py-1.5 text-text-primary">{{ provider.phone }}{% if provider.phone_hours %} <span class="text-text-muted text-xs">({{ provider.phone_hours }})</span>{% endif %}</td>
+                </tr>
+                {% endif %}
+                {% if provider.city or provider.country %}
+                <tr class="border-b border-dark-300">
+                    <td class="py-1.5 pr-4 font-semibold text-text-muted w-1/3">City</td>
+                    <td class="py-1.5 text-text-primary">{% if provider.city %}{{ provider.city.name }}{% endif %}{% if provider.city and provider.country %}, {% endif %}{% if provider.country %}{{ provider.country.name }}{% endif %}</td>
+                </tr>
+                {% endif %}
+                {% for attr in attribute_values %}
+                    {% if attr.formatted_value %}
+                <tr class="border-b border-dark-300">
+                    <td class="py-1.5 pr-4 font-semibold text-text-muted w-1/3">{{ attr.definition.name }}</td>
+                    <td class="py-1.5 text-text-primary">{{ attr.formatted_value }}</td>
+                </tr>
+                    {% endif %}
+                {% endfor %}
+                <tr class="border-b border-dark-300">
+                    <td class="py-1.5 pr-4 font-semibold text-text-muted w-1/3">Date of update</td>
+                    <td class="py-1.5 text-text-primary">{{ provider.updated_at|date:"d.m.Y" }}</td>
+                </tr>
+                <tr>
+                    <td class="py-1.5 pr-4 font-semibold text-text-muted w-1/3">Profile url</td>
+                    <td class="py-1.5">
+                        <span class="inline-flex items-center gap-2">
+                            <a href="{{ provider.get_absolute_url }}" class="text-gold hover:underline">...{{ provider.slug }}</a>
+                            <button type="button" onclick="navigator.clipboard.writeText(window.location.origin + '{{ provider.get_absolute_url }}')" title="Copy profile link" class="text-text-muted hover:text-gold transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                </svg>
+                            </button>
+                        </span>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
         {% if provider.bio %}
-        <div class="mt-8 pt-8 border-t border-dark-300">
-            <h2 class="text-xl font-display font-bold text-gold mb-4">About</h2>
-            <p class="text-text-secondary whitespace-pre-line leading-relaxed">{{ provider.bio }}</p>
-        </div>
+        <hr class="border-dark-300 mt-2">
+        <p class="mt-2 text-text-secondary whitespace-pre-line leading-relaxed">{{ provider.bio }}</p>
         {% endif %}
     </div>
 

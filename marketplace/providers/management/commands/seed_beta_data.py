@@ -322,28 +322,50 @@ SEED_EMAIL_DOMAIN = "seed.example.com"
 # ── Provider attribute definitions to seed ────────────────────────────────────
 
 SEED_ATTRIBUTE_DEFINITIONS = [
+    {"name": "Height", "data_type": "int", "display_order": 1, "show_on_card": True},
+    {"name": "Weight", "data_type": "int", "display_order": 2, "show_on_card": True},
     {
-        "name": "Height",
-        "data_type": "int",
-        "display_order": 1,
-        "show_on_card": True,
-    },
-    {
-        "name": "Weight",
-        "data_type": "int",
-        "display_order": 2,
-        "show_on_card": True,
-    },
-    {
-        "name": "Established at",
-        "data_type": "int",
+        "name": "District",
+        "data_type": "string",
         "display_order": 3,
         "show_on_card": False,
     },
+    {"name": "Age", "data_type": "int", "display_order": 4, "show_on_card": True},
+    {"name": "Breasts", "data_type": "int", "display_order": 5, "show_on_card": True},
     {
-        "name": "Working with eldery",
-        "data_type": "bool",
-        "display_order": 4,
+        "name": "Size of clothing",
+        "data_type": "int",
+        "display_order": 6,
+        "show_on_card": False,
+    },
+    {
+        "name": "Size of shoes",
+        "data_type": "int",
+        "display_order": 7,
+        "show_on_card": False,
+    },
+    {
+        "name": "Intimate haircut",
+        "data_type": "string",
+        "display_order": 8,
+        "show_on_card": False,
+    },
+    {
+        "name": "Body Art",
+        "data_type": "string",
+        "display_order": 9,
+        "show_on_card": False,
+    },
+    {
+        "name": "Not younger",
+        "data_type": "int",
+        "display_order": 10,
+        "show_on_card": False,
+    },
+    {
+        "name": "Not older",
+        "data_type": "int",
+        "display_order": 11,
         "show_on_card": False,
     },
 ]
@@ -409,6 +431,10 @@ class Command(BaseCommand):
         phone_digits = "".join(str(rng.randint(0, 9)) for _ in range(10))
         phone = f"+{phone_digits[:2]}-{phone_digits[2:5]}-{phone_digits[5:]}"
 
+        hour_start = rng.choice([8, 9, 10, 11])
+        hour_end = rng.choice([17, 18, 19, 20])
+        phone_hours = f"{hour_start}:00 – {hour_end}:00"
+
         # 1-4 services, unique types
         num_services = rng.randint(1, 4)
         service_types = rng.sample(SERVICE_TYPES, min(num_services, len(SERVICE_TYPES)))
@@ -427,6 +453,7 @@ class Command(BaseCommand):
             "last_name": last_name,
             "bio": bio,
             "phone": phone,
+            "phone_hours": phone_hours,
             "country_id": country_id,
             "city_id": city_id,
             "services": services,
@@ -498,11 +525,32 @@ class Command(BaseCommand):
         )
 
         # Value generators keyed by attribute name
+        districts = [
+            "Central",
+            "Downtown",
+            "Westside",
+            "Eastside",
+            "Old Town",
+            "Riverside",
+            "Midtown",
+            "Northside",
+        ]
         generators = {
             "Height": lambda: str(rng.randint(155, 195)),  # cm
             "Weight": lambda: str(rng.randint(50, 95)),  # kg
-            "Established at": lambda: str(rng.randint(2005, 2024)),
-            "Working with eldery": lambda: rng.choice(["true", "false"]),
+            "District": lambda: rng.choice(districts) if rng.random() > 0.5 else "",
+            "Age": lambda: str(rng.randint(20, 45)),
+            "Breasts": lambda: str(rng.randint(1, 5)),
+            "Size of clothing": lambda: str(rng.randint(18, 24) * 2),  # 36–48 even
+            "Size of shoes": lambda: str(rng.randint(35, 42)),
+            "Intimate haircut": lambda: rng.choice(
+                ["Full depilation", "Trimmed", "Natural"]
+            ),
+            "Body Art": lambda: rng.choice(
+                ["None", "Tattoos", "Piercing", "Tattoos, Piercing"]
+            ),
+            "Not younger": lambda: str(rng.choice([18, 21])),
+            "Not older": lambda: str(rng.randint(55, 70)),
         }
 
         attr_objects = []
@@ -617,6 +665,7 @@ class Command(BaseCommand):
                         slug=f"_tmp-{i}",
                         bio=data["bio"],
                         phone=data["phone"],
+                        phone_hours=data["phone_hours"],
                         country_id=data["country_id"],
                         city_id=data["city_id"],
                         subscription_status="active",
