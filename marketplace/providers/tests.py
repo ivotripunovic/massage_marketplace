@@ -13,6 +13,26 @@ from .models import (
 )
 
 
+def _required_attribute_data():
+    """Return form data dict for all required (show_on_card) attribute fields.
+
+    Data migration 0013 creates ProviderAttributeDefinition rows that are
+    marked ``show_on_card=True``, which makes them required in the profile
+    form.  Tests that POST to the profile view must include these fields.
+    """
+    data = {}
+    for defn in ProviderAttributeDefinition.objects.filter(
+        is_active=True, show_on_card=True
+    ):
+        if defn.data_type == ProviderAttributeDefinition.DATA_TYPE_INTEGER:
+            data[f"attribute_{defn.pk}"] = "1"
+        elif defn.data_type == ProviderAttributeDefinition.DATA_TYPE_BOOLEAN:
+            data[f"attribute_{defn.pk}"] = "on"
+        else:
+            data[f"attribute_{defn.pk}"] = "test"
+    return data
+
+
 class ProviderAttributeSettingsTests(TestCase):
     """Ensure providers can edit their admin-defined attributes."""
 
@@ -43,17 +63,15 @@ class ProviderAttributeSettingsTests(TestCase):
         """Providers should be able to save attribute values via profile form."""
         self.client.login(email=self.user.email, password="testpass123")
         url = reverse("provider_profile")
-        response = self.client.post(
-            url,
-            {
-                "first_name": "Taylor",
-                "last_name": "Doe",
-                "bio": self.provider.bio,
-                "phone": self.provider.phone,
-                f"attribute_{self.attribute_definition.pk}": "8",
-            },
-            follow=True,
-        )
+        data = {
+            "first_name": "Taylor",
+            "last_name": "Doe",
+            "bio": self.provider.bio,
+            "phone": self.provider.phone,
+            **_required_attribute_data(),
+            f"attribute_{self.attribute_definition.pk}": "8",
+        }
+        response = self.client.post(url, data, follow=True)
 
         self.assertRedirects(response, reverse("provider_dashboard"))
         attribute = ProviderAttributeValue.objects.get(
@@ -534,6 +552,7 @@ class ProviderProfileFormTests(TestCase):
             "last_name": "Smith",
             "phone": "+9876543210",
             "bio": "Updated bio",
+            **_required_attribute_data(),
         }
         form = ProviderProfileForm(data=data, instance=self.provider)
         self.assertTrue(form.is_valid())
@@ -551,6 +570,7 @@ class ProviderProfileFormTests(TestCase):
             "last_name": "Smith",
             "phone": "+9876543210",
             "bio": "Updated bio",
+            **_required_attribute_data(),
         }
         form = ProviderProfileForm(data=data, instance=self.provider)
         self.assertTrue(form.is_valid())
@@ -568,6 +588,7 @@ class ProviderProfileFormTests(TestCase):
             "last_name": "Smith",
             "phone": "+9876543210",
             "bio": "Updated bio",
+            **_required_attribute_data(),
         }
         form = ProviderProfileForm(data=data, instance=self.provider)
         self.assertTrue(form.is_valid())
@@ -585,6 +606,7 @@ class ProviderProfileFormTests(TestCase):
             "last_name": "Smith",
             "phone": "+9876543210",
             "bio": "New professional bio",
+            **_required_attribute_data(),
         }
         form = ProviderProfileForm(data=data, instance=self.provider)
         self.assertTrue(form.is_valid())
@@ -602,6 +624,7 @@ class ProviderProfileFormTests(TestCase):
             "last_name": "Smith",
             "phone": "",  # Empty phone
             "bio": "Bio",
+            **_required_attribute_data(),
         }
         form = ProviderProfileForm(data=data, instance=self.provider)
         self.assertFalse(form.is_valid())
@@ -673,6 +696,7 @@ class ProviderProfileUpdateViewTests(TestCase):
                 "last_name": "Doe",
                 "phone": "+1234567890",
                 "bio": "Professional massage therapist",
+                **_required_attribute_data(),
             },
         )
 
@@ -689,6 +713,7 @@ class ProviderProfileUpdateViewTests(TestCase):
                 "last_name": "Doe",
                 "phone": "+9876543210",
                 "bio": "Professional massage therapist",
+                **_required_attribute_data(),
             },
         )
 
@@ -705,6 +730,7 @@ class ProviderProfileUpdateViewTests(TestCase):
                 "last_name": "Doe",
                 "phone": "+1234567890",
                 "bio": "Updated bio text",
+                **_required_attribute_data(),
             },
         )
 
@@ -721,6 +747,7 @@ class ProviderProfileUpdateViewTests(TestCase):
                 "last_name": "Smith",
                 "phone": "+9876543210",
                 "bio": "Updated bio",
+                **_required_attribute_data(),
             },
             follow=False,
         )
@@ -738,6 +765,7 @@ class ProviderProfileUpdateViewTests(TestCase):
                 "last_name": "Smith",
                 "phone": "+9876543210",
                 "bio": "Updated bio",
+                **_required_attribute_data(),
             },
             follow=True,
         )
@@ -815,6 +843,7 @@ class ProviderPhotoUploadTests(TestCase):
                 "phone": "+1234567890",
                 "bio": "Test bio",
                 "photo": photo,
+                **_required_attribute_data(),
             },
         )
 
@@ -835,6 +864,7 @@ class ProviderPhotoUploadTests(TestCase):
                 "phone": "+1234567890",
                 "bio": "Test bio",
                 "photo": photo,
+                **_required_attribute_data(),
             },
         )
 
@@ -859,6 +889,7 @@ class ProviderPhotoUploadTests(TestCase):
                 "phone": "+1234567890",
                 "bio": "Test bio",
                 "photo": invalid_photo,
+                **_required_attribute_data(),
             },
         )
 
@@ -897,6 +928,7 @@ class ProviderPhotoUploadTests(TestCase):
                     "phone": "+1234567890",
                     "bio": "Test bio",
                     "photo": oversized_photo,
+                    **_required_attribute_data(),
                 },
             )
 
@@ -919,6 +951,7 @@ class ProviderPhotoUploadTests(TestCase):
                 "phone": "+1234567890",
                 "bio": "Test bio",
                 "photo": photo,
+                **_required_attribute_data(),
             },
         )
 
@@ -945,6 +978,7 @@ class ProviderPhotoUploadTests(TestCase):
                 "phone": "+1234567890",
                 "bio": "Test bio",
                 "photo": photo,
+                **_required_attribute_data(),
             },
             follow=True,
         )
@@ -969,6 +1003,7 @@ class ProviderPhotoUploadTests(TestCase):
                 "phone": "+1234567890",
                 "bio": "Test bio",
                 # No photo provided
+                **_required_attribute_data(),
             },
         )
 
