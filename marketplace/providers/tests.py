@@ -10,6 +10,7 @@ from .models import (
     ProviderGalleryImage,
     ProviderAttributeDefinition,
     ProviderAttributeValue,
+    ProviderPricing,
 )
 
 
@@ -31,6 +32,26 @@ def _required_attribute_data():
         else:
             data[f"attribute_{defn.pk}"] = "test"
     return data
+
+
+def _pricing_form_data(**overrides):
+    """Return default pricing form data with 'pricing-' prefix for POST."""
+    defaults = {
+        "pricing-apartment_available": "on",
+        "pricing-outside_available": "on",
+        "pricing-apartment_day_1h": "",
+        "pricing-apartment_day_2h": "",
+        "pricing-apartment_night_1h": "",
+        "pricing-apartment_night_whole": "",
+        "pricing-outside_day_1h": "",
+        "pricing-outside_day_2h": "",
+        "pricing-outside_night_1h": "",
+        "pricing-outside_night_whole": "",
+        "pricing-day_note": "",
+        "pricing-night_note": "",
+    }
+    defaults.update(overrides)
+    return defaults
 
 
 class ProviderAttributeSettingsTests(TestCase):
@@ -2724,3 +2745,173 @@ class LocationModelTests(TestCase):
         # Load fixtures in test if they haven't been loaded
         us = Country.objects.filter(code="US").first()
         self.assertIsNone(us)
+
+
+class ProviderPricingModelTests(TestCase):
+    """Tests for the ProviderPricing model."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="pricing@test.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+        )
+        self.provider = Provider.objects.create(
+            user=self.user, phone="+1234567890", bio="Test provider"
+        )
+
+    def test_create_pricing_with_defaults(self):
+        """Test creating pricing with default availability values."""
+        pricing = ProviderPricing.objects.create(provider=self.provider)
+        self.assertTrue(pricing.apartment_available)
+        self.assertTrue(pricing.outside_available)
+        self.assertIsNone(pricing.apartment_day_1h)
+        self.assertEqual(pricing.day_note, "")
+        self.assertEqual(pricing.night_note, "")
+
+    def test_create_pricing_with_prices(self):
+        """Test creating pricing with specific price values."""
+        from decimal import Decimal
+
+        pricing = ProviderPricing.objects.create(
+            provider=self.provider,
+            apartment_day_1h=Decimal("50.00"),
+            apartment_day_2h=Decimal("90.00"),
+            apartment_night_1h=Decimal("70.00"),
+            apartment_night_whole=Decimal("200.00"),
+            day_note="Weekdays only",
+            night_note="After 20:00",
+        )
+        self.assertEqual(pricing.apartment_day_1h, Decimal("50.00"))
+        self.assertEqual(pricing.apartment_night_whole, Decimal("200.00"))
+        self.assertEqual(pricing.day_note, "Weekdays only")
+
+    def test_one_to_one_relationship(self):
+        """Test that a provider can only have one pricing record."""
+        ProviderPricing.objects.create(provider=self.provider)
+        from django.db import IntegrityError
+
+        with self.assertRaises(IntegrityError):
+            ProviderPricing.objects.create(provider=self.provider)
+
+    def test_pricing_str(self):
+        """Test pricing string representation."""
+        pricing = ProviderPricing.objects.create(provider=self.provider)
+        self.assertIn("Pricing for", str(pricing))
+
+    def test_pricing_cascade_delete(self):
+        """Test that pricing is deleted when provider is deleted."""
+        ProviderPricing.objects.create(provider=self.provider)
+        self.provider.delete()
+        self.assertEqual(ProviderPricing.objects.count(), 0)
+
+    def test_unavailable_location(self):
+        """Test setting a location as unavailable."""
+        pricing = ProviderPricing.objects.create(
+            provider=self.provider,
+            apartment_available=False,
+            outside_available=True,
+        )
+        self.assertFalse(pricing.apartment_available)
+        self.assertTrue(pricing.outside_available)
+
+
+class ProviderPricingFormTests(TestCase):
+    """Tests for the ProviderPricingForm via profile update view."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="pricingform@test.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+            first_name="Jane",
+            last_name="Doe",
+        )
+        self.provider = Provider.objects.create(
+            user=self.user, phone="+1234567890", bio="Test provider"
+        )
+        self.client.login(email=self.user.email, password="testpass123")
+
+    def test_profile_edit_shows_pricing_form(self):
+        """Test that pricing form appears on profile edit page."""
+        response = self.client.get(reverse("provider_profile"))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("pricing_form", response.context)
+
+    def test_save_pricing_via_profile_form(self):
+        """Test saving pricing data through the profile form."""
+        data = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "phone": "+1234567890",
+            "bio": "Test provider",
+            **_required_attribute_data(),
+            **_pricing_form_data(
+                **{
+                    "pricing-apartment_day_1h": "60.00",
+                    "pricing-apartment_day_2h": "100.00",
+                    "pricing-apartment_night_1h": "80.00",
+                    "pricing-apartment_night_whole": "250.00",
+                    "pricing-day_note": "Weekdays only",
+                }
+            ),
+        }
+        response = self.client.post(reverse("provider_profile"), data, follow=True)
+        self.assertRedirects(response, reverse("provider_dashboard"))
+
+        pricing = ProviderPricing.objects.get(provider=self.provider)
+        from decimal import Decimal
+
+        self.assertEqual(pricing.apartment_day_1h, Decimal("60.00"))
+        self.assertEqual(pricing.apartment_day_2h, Decimal("100.00"))
+        self.assertEqual(pricing.apartment_night_whole, Decimal("250.00"))
+        self.assertEqual(pricing.day_note, "Weekdays only")
+
+    def test_save_pricing_apartment_not_available(self):
+        """Test saving pricing with apartment unavailable."""
+        data = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "phone": "+1234567890",
+            "bio": "Test provider",
+            **_required_attribute_data(),
+            **_pricing_form_data(),
+        }
+        # Remove the checkbox to simulate unchecked
+        del data["pricing-apartment_available"]
+        response = self.client.post(reverse("provider_profile"), data, follow=True)
+        self.assertRedirects(response, reverse("provider_dashboard"))
+
+        pricing = ProviderPricing.objects.get(provider=self.provider)
+        self.assertFalse(pricing.apartment_available)
+        self.assertTrue(pricing.outside_available)
+
+    def test_pricing_created_on_get(self):
+        """Test that ProviderPricing is get-or-created when loading the form."""
+        self.assertFalse(
+            ProviderPricing.objects.filter(provider=self.provider).exists()
+        )
+        self.client.get(reverse("provider_profile"))
+        self.assertTrue(ProviderPricing.objects.filter(provider=self.provider).exists())
+
+    def test_update_existing_pricing(self):
+        """Test updating already-existing pricing data."""
+        from decimal import Decimal
+
+        ProviderPricing.objects.create(
+            provider=self.provider, apartment_day_1h=Decimal("50.00")
+        )
+        data = {
+            "first_name": "Jane",
+            "last_name": "Doe",
+            "phone": "+1234567890",
+            "bio": "Test provider",
+            **_required_attribute_data(),
+            **_pricing_form_data(**{"pricing-apartment_day_1h": "75.00"}),
+        }
+        self.client.post(reverse("provider_profile"), data, follow=True)
+        pricing = ProviderPricing.objects.get(provider=self.provider)
+        self.assertEqual(pricing.apartment_day_1h, Decimal("75.00"))

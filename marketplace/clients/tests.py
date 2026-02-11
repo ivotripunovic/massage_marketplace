@@ -2,7 +2,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from users.models import User
-from providers.models import Provider, Service, ProviderGalleryImage
+from providers.models import Provider, Service, ProviderGalleryImage, ProviderPricing
 from reviews.models import Review
 
 
@@ -931,3 +931,129 @@ class ProviderLocationFKFilterTests(TestCase):
         self.assertContains(response, "provider1@example.com")
         self.assertContains(response, "provider2@example.com")
         self.assertContains(response, "provider3@example.com")
+
+
+class ProviderDetailPricingTests(TestCase):
+    """Tests for pricing display on provider detail page."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="pricing-detail@example.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+            first_name="Anna",
+            last_name="Test",
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone="+1234567890",
+            bio="Test provider",
+            subscription_status="active",
+        )
+
+    def test_detail_page_with_pricing(self):
+        """Test that pricing is shown on provider detail page."""
+        from decimal import Decimal
+
+        ProviderPricing.objects.create(
+            provider=self.provider,
+            apartment_day_1h=Decimal("50.00"),
+            apartment_day_2h=Decimal("90.00"),
+            apartment_night_1h=Decimal("70.00"),
+            apartment_night_whole=Decimal("200.00"),
+        )
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(response.context["pricing"])
+        self.assertContains(response, "50.00")
+        self.assertContains(response, "200.00")
+
+    def test_detail_page_without_pricing(self):
+        """Test that detail page works when no pricing exists."""
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.context["pricing"])
+
+    def test_detail_page_not_available_row(self):
+        """Test that 'Not available' is shown for unavailable location."""
+        ProviderPricing.objects.create(
+            provider=self.provider,
+            apartment_available=False,
+        )
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        self.assertContains(response, "Not available")
+
+
+class ProviderDirectoryPricingTests(TestCase):
+    """Tests for pricing display on provider card in directory."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="card-pricing@example.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone="+1234567890",
+            bio="Test provider",
+            subscription_status="active",
+        )
+
+    def test_card_pricing_prefers_apartment(self):
+        """Test that card shows apartment prices when available."""
+        from decimal import Decimal
+
+        ProviderPricing.objects.create(
+            provider=self.provider,
+            apartment_available=True,
+            outside_available=True,
+            apartment_day_1h=Decimal("50.00"),
+            outside_day_1h=Decimal("80.00"),
+        )
+        response = self.client.get(reverse("providers"))
+        item = response.context["providers_with_stats"][0]
+        self.assertEqual(item["card_pricing"]["location"], "Apartment")
+        self.assertEqual(item["card_pricing"]["price_1h"], Decimal("50.00"))
+
+    def test_card_pricing_falls_back_to_outside(self):
+        """Test that card shows outside prices when apartment unavailable."""
+        from decimal import Decimal
+
+        ProviderPricing.objects.create(
+            provider=self.provider,
+            apartment_available=False,
+            outside_available=True,
+            outside_day_1h=Decimal("80.00"),
+        )
+        response = self.client.get(reverse("providers"))
+        item = response.context["providers_with_stats"][0]
+        self.assertEqual(item["card_pricing"]["location"], "Outside")
+        self.assertEqual(item["card_pricing"]["price_1h"], Decimal("80.00"))
+
+    def test_card_pricing_none_when_no_pricing(self):
+        """Test that card_pricing is None when no pricing exists."""
+        response = self.client.get(reverse("providers"))
+        item = response.context["providers_with_stats"][0]
+        self.assertIsNone(item["card_pricing"])
+
+    def test_card_pricing_none_when_both_unavailable(self):
+        """Test that card_pricing is None when both locations unavailable."""
+        ProviderPricing.objects.create(
+            provider=self.provider,
+            apartment_available=False,
+            outside_available=False,
+        )
+        response = self.client.get(reverse("providers"))
+        item = response.context["providers_with_stats"][0]
+        self.assertIsNone(item["card_pricing"])
