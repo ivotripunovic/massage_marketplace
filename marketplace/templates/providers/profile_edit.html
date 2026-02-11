@@ -130,6 +130,64 @@
             </div>
             {% endif %}
 
+            <!-- Pricing Grid -->
+            <div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm border-collapse">
+                        <thead>
+                            <tr>
+                                <th class="py-2 px-3 text-left text-text-muted"></th>
+                                <th class="py-2 px-3 text-center text-text-primary border-b border-l border-dark-300" colspan="2">Day</th>
+                                <th class="py-2 px-3 text-center text-text-primary border-b border-l border-dark-300" colspan="2">Night</th>
+                            </tr>
+                            <tr>
+                                <th class="py-2 px-3 text-left text-text-muted"></th>
+                                <th class="py-2 px-3 text-center text-text-muted text-xs border-l border-dark-300">1 hour</th>
+                                <th class="py-2 px-3 text-center text-text-muted text-xs">2 hours</th>
+                                <th class="py-2 px-3 text-center text-text-muted text-xs border-l border-dark-300">1 hour</th>
+                                <th class="py-2 px-3 text-center text-text-muted text-xs">Whole night</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Apartment row -->
+                            <tr class="border-b border-dark-300" id="apartment-row">
+                                <td class="py-2 px-3 font-medium text-text-primary">
+                                    Apartment
+                                    <label class="flex items-center gap-2 mt-1 text-xs text-text-muted">
+                                        {{ pricing_form.apartment_available }}
+                                        Available
+                                    </label>
+                                </td>
+                                <td class="py-2 px-3 border-l border-dark-300">{{ pricing_form.apartment_day_1h }}</td>
+                                <td class="py-2 px-3">{{ pricing_form.apartment_day_2h }}</td>
+                                <td class="py-2 px-3 border-l border-dark-300">{{ pricing_form.apartment_night_1h }}</td>
+                                <td class="py-2 px-3">{{ pricing_form.apartment_night_whole }}</td>
+                            </tr>
+                            <!-- Outside row -->
+                            <tr class="border-b border-dark-300" id="outside-row">
+                                <td class="py-2 px-3 font-medium text-text-primary">
+                                    Outside
+                                    <label class="flex items-center gap-2 mt-1 text-xs text-text-muted">
+                                        {{ pricing_form.outside_available }}
+                                        Available
+                                    </label>
+                                </td>
+                                <td class="py-2 px-3 border-l border-dark-300">{{ pricing_form.outside_day_1h }}</td>
+                                <td class="py-2 px-3">{{ pricing_form.outside_day_2h }}</td>
+                                <td class="py-2 px-3 border-l border-dark-300">{{ pricing_form.outside_night_1h }}</td>
+                                <td class="py-2 px-3">{{ pricing_form.outside_night_whole }}</td>
+                            </tr>
+                            <!-- Notes row -->
+                            <tr>
+                                <td class="py-2 px-3 font-medium text-text-muted text-xs">Notes</td>
+                                <td class="py-2 px-3 border-l border-dark-300" colspan="2">{{ pricing_form.day_note }}</td>
+                                <td class="py-2 px-3 border-l border-dark-300" colspan="2">{{ pricing_form.night_note }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Form Actions -->
             <div class="flex gap-4 pt-6 border-t border-dark-300">
                 <button type="submit" class="flex-1 btn-gold py-2 px-4 rounded-lg">
@@ -153,4 +211,27 @@
         </ul>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function() {
+    function toggleRow(checkboxId) {
+        var cb = document.getElementById(checkboxId);
+        if (!cb) return;
+        var row = cb.closest('tr');
+        var inputs = row.querySelectorAll('input[type="number"]');
+        function update() {
+            inputs.forEach(function(inp) {
+                inp.disabled = !cb.checked;
+                inp.style.opacity = cb.checked ? '1' : '0.4';
+            });
+        }
+        cb.addEventListener('change', update);
+        update();
+    }
+    toggleRow('id_pricing-apartment_available');
+    toggleRow('id_pricing-outside_available');
+})();
+</script>
 {% endblock %}

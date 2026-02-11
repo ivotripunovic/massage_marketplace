@@ -410,3 +410,54 @@ class ProviderAttributeValue(models.Model):
             return "Yes" if typed else "No"
 
         return str(typed)
+
+
+class ProviderPricing(models.Model):
+    """Structured pricing grid for a provider (apartment/outside × day/night × 1h/2h)."""
+
+    provider = models.OneToOneField(
+        Provider, on_delete=models.CASCADE, related_name="pricing"
+    )
+
+    apartment_available = models.BooleanField(default=True)
+    outside_available = models.BooleanField(default=True)
+
+    apartment_day_1h = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+    apartment_day_2h = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+    apartment_night_1h = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+    apartment_night_whole = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+
+    outside_day_1h = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+    outside_day_2h = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+    outside_night_1h = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+    outside_night_whole = models.DecimalField(
+        max_digits=8, decimal_places=2, null=True, blank=True
+    )
+
+    day_note = models.CharField(max_length=120, blank=True, default="")
+    night_note = models.CharField(max_length=120, blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "providers_pricing"
+        verbose_name = "Provider Pricing"
+        verbose_name_plural = "Provider Pricings"
+
+    def __str__(self):
+        return f"Pricing for {self.provider.get_name()}"

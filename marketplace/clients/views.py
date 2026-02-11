@@ -6,6 +6,7 @@ from providers.models import (
     Provider,
     Service,
     ProviderGalleryImage,
+    ProviderPricing,
     Country,
     City,
     ProviderAttributeValue,
@@ -149,7 +150,9 @@ class ProviderDirectoryView(ListView):
                 subscription_status="active", user__is_email_verified=True
             )
             .select_related("user", "country", "city")
-            .prefetch_related("services", "reviews", attribute_values_prefetch)
+            .prefetch_related(
+                "services", "reviews", "pricing", attribute_values_prefetch
+            )
         )
 
         # Apply filters from query parameters
@@ -219,21 +222,7 @@ class ProviderDirectoryView(ListView):
         providers_with_stats = []
         for provider in context["providers"]:
             reviews = Review.objects.filter(provider=provider)
-            service_count = Service.objects.filter(
-                provider=provider, is_active=True
-            ).count()
             avg_rating = provider.average_rating()
-
-            # Get active services for display
-            services = Service.objects.filter(provider=provider, is_active=True)[:3]
-
-            # Get price range
-            all_services = Service.objects.filter(provider=provider, is_active=True)
-            if all_services.exists():
-                min_price = all_services.order_by("price").first().price
-                max_price = all_services.order_by("-price").first().price
-            else:
-                min_price = max_price = None
 
             card_attributes = []
             for attr in getattr(provider, "active_attribute_values", []):
@@ -252,16 +241,34 @@ class ProviderDirectoryView(ListView):
                 )
             card_attributes.sort(key=lambda entry: entry["order"])
 
+            # Build card pricing: prefer apartment (inside), fall back to outside
+            card_pricing = None
+            try:
+                p = provider.pricing
+                if p.apartment_available:
+                    card_pricing = {
+                        "location": "Apartment",
+                        "price_1h": p.apartment_day_1h,
+                        "price_2h": p.apartment_day_2h,
+                        "price_whole": p.apartment_night_whole,
+                    }
+                elif p.outside_available:
+                    card_pricing = {
+                        "location": "Outside",
+                        "price_1h": p.outside_day_1h,
+                        "price_2h": p.outside_day_2h,
+                        "price_whole": p.outside_night_whole,
+                    }
+            except ProviderPricing.DoesNotExist:
+                pass
+
             providers_with_stats.append(
                 {
                     "provider": provider,
-                    "service_count": service_count,
-                    "services": services,
                     "review_count": reviews.count(),
                     "avg_rating": avg_rating,
-                    "min_price": min_price,
-                    "max_price": max_price,
                     "card_attributes": card_attributes,
+                    "card_pricing": card_pricing,
                 }
             )
 
@@ -350,5 +357,10 @@ class ProviderDetailView(DetailView):
             .filter(provider=provider, definition__is_active=True)
             .order_by("definition__display_order")
         )
+
+        try:
+            context["pricing"] = provider.pricing
+        except ProviderPricing.DoesNotExist:
+            context["pricing"] = None
 
         return context

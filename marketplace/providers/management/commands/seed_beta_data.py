@@ -24,6 +24,7 @@ from providers.models import (
     City,
     ProviderAttributeDefinition,
     ProviderAttributeValue,
+    ProviderPricing,
 )
 from reviews.models import Review
 from users.models import User
@@ -586,6 +587,63 @@ class Command(BaseCommand):
         ProviderAttributeValue.objects.bulk_create(attr_objects, batch_size=BATCH_SIZE)
         return len(attr_objects)
 
+    def _generate_pricing(self, rng, providers):
+        """Generate pricing grid data for providers via bulk_create. Returns count."""
+        day_notes = [
+            "",
+            "Weekdays only",
+            "Available Mon-Fri",
+            "By appointment",
+            "10:00-18:00",
+            "Morning preferred",
+        ]
+        night_notes = [
+            "",
+            "After 20:00",
+            "Weekend nights only",
+            "By appointment",
+            "20:00-02:00",
+            "Call first",
+        ]
+
+        existing_provider_ids = set(
+            ProviderPricing.objects.filter(provider__in=providers).values_list(
+                "provider_id", flat=True
+            )
+        )
+
+        pricing_objects = []
+        for provider in providers:
+            if provider.pk in existing_provider_ids:
+                continue
+
+            apartment_available = rng.random() > 0.2
+            outside_available = rng.random() > 0.2
+
+            def rand_price():
+                return Decimal(str(round(rng.randint(30, 200) / 5) * 5))
+
+            pricing_objects.append(
+                ProviderPricing(
+                    provider=provider,
+                    apartment_available=apartment_available,
+                    outside_available=outside_available,
+                    apartment_day_1h=rand_price() if apartment_available else None,
+                    apartment_day_2h=rand_price() if apartment_available else None,
+                    apartment_night_1h=rand_price() if apartment_available else None,
+                    apartment_night_whole=rand_price() if apartment_available else None,
+                    outside_day_1h=rand_price() if outside_available else None,
+                    outside_day_2h=rand_price() if outside_available else None,
+                    outside_night_1h=rand_price() if outside_available else None,
+                    outside_night_whole=rand_price() if outside_available else None,
+                    day_note=rng.choice(day_notes),
+                    night_note=rng.choice(night_notes),
+                )
+            )
+
+        ProviderPricing.objects.bulk_create(pricing_objects, batch_size=BATCH_SIZE)
+        return len(pricing_objects)
+
     def handle(self, *args, **options):
         count = options["count"]
         rng = random.Random(42)  # deterministic seed for reproducibility
@@ -729,6 +787,12 @@ class Command(BaseCommand):
             attr_count = self._generate_attributes(rng, providers)
         self.stdout.write(f"  Created {attr_count} attribute values")
 
+        # Generate pricing grids in bulk
+        self.stdout.write("Generating pricing grids...")
+        with transaction.atomic():
+            pricing_count = self._generate_pricing(rng, providers)
+        self.stdout.write(f"  Created {pricing_count} pricing grids")
+
         # Create admin user
         admin_email = "admin@massagemarketplace.com"
         if not User.objects.filter(email=admin_email).exists():
@@ -744,7 +808,7 @@ class Command(BaseCommand):
             self.style.SUCCESS(
                 f"Beta data seeded: {created_count} providers, "
                 f"{service_count} services, {review_count} reviews, "
-                f"{attr_count} attribute values"
+                f"{attr_count} attribute values, {pricing_count} pricing grids"
             )
         )
 

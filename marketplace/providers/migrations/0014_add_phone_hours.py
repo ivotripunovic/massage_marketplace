@@ -4,15 +4,19 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('providers', '0013_new_attribute_definitions'),
+        ("providers", "0013_new_attribute_definitions"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='provider',
-            name='phone_hours',
-            field=models.CharField(blank=True, default='', help_text='Good time to call, e.g. 10:00 – 18:00', max_length=50),
+            model_name="provider",
+            name="phone_hours",
+            field=models.CharField(
+                blank=True,
+                default="",
+                help_text="Good time to call, e.g. 10:00 – 18:00",
+                max_length=50,
+            ),
         ),
     ]

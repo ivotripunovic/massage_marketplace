@@ -19,6 +19,7 @@ from providers.models import (
     ProviderGalleryImage,
     ProviderAttributeDefinition,
     ProviderAttributeValue,
+    ProviderPricing,
 )
 from providers.forms import (
     ServiceForm,
@@ -337,6 +338,34 @@ class ProviderProfileForm(forms.ModelForm):
             )
 
 
+class ProviderPricingForm(forms.ModelForm):
+    """Form for the provider pricing grid."""
+
+    class Meta:
+        model = ProviderPricing
+        exclude = ("provider", "created_at", "updated_at")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        price_attrs = {
+            "class": "input-dark w-full",
+            "placeholder": "0.00",
+            "step": "0.01",
+            "min": "0",
+        }
+        for field_name, field in self.fields.items():
+            if isinstance(field, forms.DecimalField):
+                field.widget = forms.NumberInput(attrs=price_attrs)
+            elif field_name in ("day_note", "night_note"):
+                field.widget = forms.TextInput(
+                    attrs={
+                        "class": "input-dark w-full",
+                        "placeholder": "Optional note",
+                        "maxlength": "120",
+                    }
+                )
+
+
 class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
     """View for updating provider profile."""
 
@@ -344,29 +373,53 @@ class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
     form_class = ProviderProfileForm
     success_url = reverse_lazy("provider_dashboard")
 
+    def _get_provider(self):
+        try:
+            return Provider.objects.get(user=self.request.user)
+        except Provider.DoesNotExist:
+            return Provider.objects.create(user=self.request.user, phone="")
+
     def get_form_kwargs(self):
         """Pass provider instance to form."""
         kwargs = super().get_form_kwargs()
-        try:
-            provider = Provider.objects.get(user=self.request.user)
-            kwargs["instance"] = provider
-        except Provider.DoesNotExist:
-            # Create new provider if doesn't exist
-            provider = Provider.objects.create(user=self.request.user, phone="")
-            kwargs["instance"] = provider
+        kwargs["instance"] = self._get_provider()
         return kwargs
 
-    def form_valid(self, form):
-        """Handle valid form."""
-        form.save()
-        messages.success(self.request, "Your profile has been updated successfully.")
-        return super().form_valid(form)
+    def _get_pricing_form(self):
+        """Build the pricing form from POST data or existing instance."""
+        provider = self._get_provider()
+        pricing, _ = ProviderPricing.objects.get_or_create(provider=provider)
+        if self.request.method == "POST":
+            return ProviderPricingForm(
+                self.request.POST, instance=pricing, prefix="pricing"
+            )
+        return ProviderPricingForm(instance=pricing, prefix="pricing")
+
+    def post(self, request, *args, **kwargs):
+        """Handle POST: validate both forms together."""
+        form = self.get_form()
+        pricing_form = self._get_pricing_form()
+        if form.is_valid() and pricing_form.is_valid():
+            form.save()
+            pricing_form.save()
+            messages.success(request, "Your profile has been updated successfully.")
+            return self.form_valid_redirect()
+        return self.render_to_response(
+            self.get_context_data(form=form, pricing_form=pricing_form)
+        )
+
+    def form_valid_redirect(self):
+        from django.http import HttpResponseRedirect
+
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_context_data(self, **kwargs):
         """Add provider data to context."""
         context = super().get_context_data(**kwargs)
-        context["provider"] = Provider.objects.get(user=self.request.user)
+        context["provider"] = self._get_provider()
         context["attribute_fields"] = getattr(context["form"], "attribute_fields", [])
+        if "pricing_form" not in context:
+            context["pricing_form"] = self._get_pricing_form()
         return context
 
 

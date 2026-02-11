@@ -20,7 +20,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="mx-auto px-4 sm:px-6 lg:px-8 py-8" style="max-width: 640px">
     <!-- Breadcrumb -->
     <nav class="text-sm mb-6 flex items-center gap-2">
         <a href="{% url 'home' %}" class="text-text-secondary hover:text-gold transition-colors">Home</a>
@@ -83,6 +83,61 @@
         <p class="mt-2 text-text-secondary whitespace-pre-line leading-relaxed">{{ provider.bio }}</p>
         {% endif %}
     </div>
+
+    <!-- Pricing Section -->
+    {% if pricing %}
+    <div class="card-dark p-6 md:p-8 mb-8">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse">
+                <thead>
+                    <tr>
+                        <th class="py-2 px-3 text-left text-text-muted"></th>
+                        <th class="py-2 px-3 text-center text-text-primary border-b border-l border-dark-300" colspan="2">Day</th>
+                        <th class="py-2 px-3 text-center text-text-primary border-b border-l border-dark-300" colspan="2">Night</th>
+                    </tr>
+                    <tr>
+                        <th class="py-2 px-3 text-left text-text-muted"></th>
+                        <th class="py-2 px-3 text-center text-text-muted text-xs border-l border-dark-300">1 hour</th>
+                        <th class="py-2 px-3 text-center text-text-muted text-xs">2 hours</th>
+                        <th class="py-2 px-3 text-center text-text-muted text-xs border-l border-dark-300">1 hour</th>
+                        <th class="py-2 px-3 text-center text-text-muted text-xs">Whole night</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="border-b border-dark-300">
+                        <td class="py-2 px-3 font-medium text-text-primary">Apartment</td>
+                        {% if pricing.apartment_available %}
+                        <td class="py-2 px-3 text-center text-text-primary border-l border-dark-300">{% if pricing.apartment_day_1h %}{{ pricing.apartment_day_1h }}{% else %}&ndash;{% endif %}</td>
+                        <td class="py-2 px-3 text-center text-text-primary">{% if pricing.apartment_day_2h %}{{ pricing.apartment_day_2h }}{% else %}&ndash;{% endif %}</td>
+                        <td class="py-2 px-3 text-center text-text-primary border-l border-dark-300">{% if pricing.apartment_night_1h %}{{ pricing.apartment_night_1h }}{% else %}&ndash;{% endif %}</td>
+                        <td class="py-2 px-3 text-center text-text-primary">{% if pricing.apartment_night_whole %}{{ pricing.apartment_night_whole }}{% else %}&ndash;{% endif %}</td>
+                        {% else %}
+                        <td class="py-2 px-3 text-center text-text-muted border-l border-dark-300" colspan="4">Not available</td>
+                        {% endif %}
+                    </tr>
+                    <tr class="border-b border-dark-300">
+                        <td class="py-2 px-3 font-medium text-text-primary">Outside</td>
+                        {% if pricing.outside_available %}
+                        <td class="py-2 px-3 text-center text-text-primary border-l border-dark-300">{% if pricing.outside_day_1h %}{{ pricing.outside_day_1h }}{% else %}&ndash;{% endif %}</td>
+                        <td class="py-2 px-3 text-center text-text-primary">{% if pricing.outside_day_2h %}{{ pricing.outside_day_2h }}{% else %}&ndash;{% endif %}</td>
+                        <td class="py-2 px-3 text-center text-text-primary border-l border-dark-300">{% if pricing.outside_night_1h %}{{ pricing.outside_night_1h }}{% else %}&ndash;{% endif %}</td>
+                        <td class="py-2 px-3 text-center text-text-primary">{% if pricing.outside_night_whole %}{{ pricing.outside_night_whole }}{% else %}&ndash;{% endif %}</td>
+                        {% else %}
+                        <td class="py-2 px-3 text-center text-text-muted border-l border-dark-300" colspan="4">Not available</td>
+                        {% endif %}
+                    </tr>
+                    {% if pricing.day_note or pricing.night_note %}
+                    <tr>
+                        <td class="py-2 px-3 text-text-muted text-xs">Notes</td>
+                        <td class="py-2 px-3 text-text-secondary text-xs border-l border-dark-300" colspan="2">{{ pricing.day_note|default:"" }}</td>
+                        <td class="py-2 px-3 text-text-secondary text-xs border-l border-dark-300" colspan="2">{{ pricing.night_note|default:"" }}</td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Services Section -->
     <div class="card-dark p-6 md:p-8 mb-8">
