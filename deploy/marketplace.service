@@ -14,11 +14,11 @@ Requires=postgresql.service
 
 [Service]
 Type=notify
-User=marketplace
+User=deploy
 Group=www-data
 RuntimeDirectory=marketplace
 WorkingDirectory=/opt/marketplace
-EnvironmentFile=/opt/marketplace/.env
+EnvironmentFile=/opt/marketplace/venv
 ExecStart=/opt/marketplace/venv/bin/gunicorn \
     --config /opt/marketplace/deploy/gunicorn.conf.py
 ExecReload=/bin/kill -s HUP $MAINPID
