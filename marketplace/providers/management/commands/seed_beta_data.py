@@ -24,6 +24,11 @@ from providers.models import (
     ProviderAttributeDefinition,
     ProviderAttributeValue,
     ProviderPricing,
+    PreferenceGroup,
+    PreferenceSubgroup,
+    PreferenceSubgroupOption,
+    ProviderPreference,
+    ProviderPreferenceCustomOption,
 )
 from reviews.models import Review
 from users.models import User
@@ -327,6 +332,33 @@ SEED_ATTRIBUTE_DEFINITIONS = [
     },
 ]
 
+# ── Preference group definitions to seed ──────────────────────────────────────
+
+SEED_PREFERENCE_GROUPS = [
+    {
+        "name": "Massage",
+        "display_order": 1,
+        "subgroups": [
+            {"name": "Classical", "options": []},
+            {"name": "Erotic", "options": ["+10$ for 30min more"]},
+            {"name": "Relaxing", "options": []},
+            {"name": "Thai", "options": []},
+            {"name": "Tantric", "options": ["+20$ surcharge"]},
+            {"name": "Nuru", "options": ["+15$ gel included"]},
+        ],
+    },
+    {
+        "name": "Extra Services",
+        "display_order": 2,
+        "subgroups": [
+            {"name": "Sauna", "options": ["Available on request"]},
+            {"name": "Jacuzzi", "options": ["Available on request"]},
+            {"name": "Shower together", "options": []},
+            {"name": "Couples", "options": ["+50% for second person"]},
+        ],
+    },
+]
+
 # ── Bulk-create batch size ────────────────────────────────────────────────────
 
 BATCH_SIZE = 500
@@ -587,6 +619,87 @@ class Command(BaseCommand):
         ProviderPricing.objects.bulk_create(pricing_objects, batch_size=BATCH_SIZE)
         return len(pricing_objects)
 
+    def _ensure_preference_definitions(self):
+        """Ensure preference groups, subgroups, and options exist. Returns count created."""
+        created = 0
+        for group_def in SEED_PREFERENCE_GROUPS:
+            group, g_created = PreferenceGroup.objects.get_or_create(
+                name=group_def["name"],
+                defaults={
+                    "display_order": group_def["display_order"],
+                    "is_active": True,
+                },
+            )
+            if g_created:
+                created += 1
+            for i, sg_def in enumerate(group_def["subgroups"]):
+                subgroup, sg_created = PreferenceSubgroup.objects.get_or_create(
+                    group=group,
+                    name=sg_def["name"],
+                    defaults={"display_order": i, "is_active": True},
+                )
+                if sg_created:
+                    created += 1
+                for j, opt_text in enumerate(sg_def.get("options", [])):
+                    _, opt_created = PreferenceSubgroupOption.objects.get_or_create(
+                        subgroup=subgroup,
+                        text=opt_text,
+                        defaults={"display_order": j},
+                    )
+                    if opt_created:
+                        created += 1
+        return created
+
+    def _generate_preferences(self, rng, providers):
+        """Generate preference toggles and custom options for providers. Returns count."""
+        subgroups = list(PreferenceSubgroup.objects.filter(is_active=True))
+        if not subgroups:
+            return 0
+
+        existing_pairs = set(
+            ProviderPreference.objects.filter(provider__in=providers).values_list(
+                "provider_id", "subgroup_id"
+            )
+        )
+
+        custom_texts = [
+            "By appointment only",
+            "Ask for details",
+            "Weekend special",
+            "First-time discount",
+            "Premium option",
+        ]
+
+        pref_objects = []
+        custom_objects = []
+        for provider in providers:
+            for sg in subgroups:
+                if (provider.pk, sg.pk) in existing_pairs:
+                    continue
+                is_checked = rng.random() > 0.35
+                pref_objects.append(
+                    ProviderPreference(
+                        provider=provider,
+                        subgroup=sg,
+                        is_checked=is_checked,
+                    )
+                )
+                if is_checked and rng.random() > 0.6:
+                    custom_objects.append(
+                        ProviderPreferenceCustomOption(
+                            provider=provider,
+                            subgroup=sg,
+                            text=rng.choice(custom_texts),
+                            display_order=0,
+                        )
+                    )
+
+        ProviderPreference.objects.bulk_create(pref_objects, batch_size=BATCH_SIZE)
+        ProviderPreferenceCustomOption.objects.bulk_create(
+            custom_objects, batch_size=BATCH_SIZE
+        )
+        return len(pref_objects)
+
     def handle(self, *args, **options):
         count = options["count"]
         rng = random.Random(42)  # deterministic seed for reproducibility
@@ -714,6 +827,17 @@ class Command(BaseCommand):
         with transaction.atomic():
             pricing_count = self._generate_pricing(rng, providers)
         self.stdout.write(f"  Created {pricing_count} pricing grids")
+
+        # Ensure preference definitions exist
+        pref_defn_created = self._ensure_preference_definitions()
+        if pref_defn_created:
+            self.stdout.write(f"  Created {pref_defn_created} preference definitions")
+
+        # Generate provider preferences in bulk
+        self.stdout.write("Generating provider preferences...")
+        with transaction.atomic():
+            pref_count = self._generate_preferences(rng, providers)
+        self.stdout.write(f"  Created {pref_count} provider preferences")
 
         # Create admin user
         admin_email = "admin@massagemarketplace.com"

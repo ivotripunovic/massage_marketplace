@@ -7,6 +7,9 @@ from .models import (
     Continent,
     Country,
     City,
+    PreferenceGroup,
+    PreferenceSubgroup,
+    PreferenceSubgroupOption,
 )
 
 
@@ -232,3 +235,37 @@ class GalleryImageAdmin(admin.ModelAdmin):
 
     provider_email.short_description = "Provider Email"
     provider_email.admin_order_field = "provider__user__email"
+
+
+class PreferenceSubgroupInline(admin.TabularInline):
+    model = PreferenceSubgroup
+    extra = 1
+    fields = ("name", "display_order", "is_active")
+
+
+class PreferenceSubgroupOptionInline(admin.TabularInline):
+    model = PreferenceSubgroupOption
+    extra = 1
+    fields = ("text", "display_order")
+
+
+@admin.register(PreferenceGroup)
+class PreferenceGroupAdmin(admin.ModelAdmin):
+    list_display = ("name", "display_order", "is_active", "subgroup_count")
+    list_editable = ("display_order", "is_active")
+    ordering = ("display_order", "name")
+    inlines = [PreferenceSubgroupInline]
+
+    def subgroup_count(self, obj):
+        return obj.subgroups.count()
+
+    subgroup_count.short_description = "Subgroups"
+
+
+@admin.register(PreferenceSubgroup)
+class PreferenceSubgroupAdmin(admin.ModelAdmin):
+    list_display = ("name", "group", "display_order", "is_active")
+    list_filter = ("group",)
+    list_editable = ("display_order", "is_active")
+    ordering = ("group__display_order", "display_order", "name")
+    inlines = [PreferenceSubgroupOptionInline]

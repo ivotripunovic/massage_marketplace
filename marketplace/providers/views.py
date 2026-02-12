@@ -18,6 +18,9 @@ from providers.models import (
     ProviderAttributeDefinition,
     ProviderAttributeValue,
     ProviderPricing,
+    PreferenceGroup,
+    ProviderPreference,
+    ProviderPreferenceCustomOption,
 )
 from providers.forms import (
     SubscriptionSettingsForm,
@@ -359,6 +362,126 @@ class ProviderPricingForm(forms.ModelForm):
                 )
 
 
+class ProviderPreferencesForm(forms.Form):
+    """Dynamic form for provider preferences: checkbox per subgroup + custom text."""
+
+    preference_comment = forms.CharField(
+        required=False,
+        widget=forms.Textarea(
+            attrs={
+                "class": "input-dark w-full",
+                "rows": 3,
+                "placeholder": "General comment about your preferences",
+            }
+        ),
+        label="Preference Comment",
+    )
+
+    def __init__(self, *args, provider=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.provider = provider
+        self._groups = []
+
+        if provider:
+            self.fields["preference_comment"].initial = provider.preference_comment
+
+        # Fetch active groups/subgroups
+        groups = (
+            PreferenceGroup.objects.filter(is_active=True)
+            .prefetch_related("subgroups")
+            .order_by("display_order", "name")
+        )
+
+        # Bulk fetch existing preferences
+        pref_map = {}
+        custom_map = {}
+        if provider and provider.pk:
+            for pref in ProviderPreference.objects.filter(provider=provider):
+                pref_map[pref.subgroup_id] = pref.is_checked
+            for custom in ProviderPreferenceCustomOption.objects.filter(
+                provider=provider
+            ).order_by("display_order"):
+                custom_map.setdefault(custom.subgroup_id, []).append(custom.text)
+
+        for group in groups:
+            group_fields = []
+            for sg in group.subgroups.filter(is_active=True).order_by(
+                "display_order", "name"
+            ):
+                # Checkbox field
+                cb_name = f"pref_check_{sg.pk}"
+                self.fields[cb_name] = forms.BooleanField(
+                    required=False,
+                    label=sg.name,
+                    initial=pref_map.get(sg.pk, False),
+                    widget=forms.CheckboxInput(
+                        attrs={"class": "form-checkbox h-4 w-4 text-gold"}
+                    ),
+                )
+
+                # Custom options textarea
+                txt_name = f"pref_custom_{sg.pk}"
+                custom_texts = custom_map.get(sg.pk, [])
+                self.fields[txt_name] = forms.CharField(
+                    required=False,
+                    label=f"{sg.name} custom options",
+                    initial="\n".join(custom_texts),
+                    widget=forms.Textarea(
+                        attrs={
+                            "class": "input-dark w-full",
+                            "rows": 2,
+                            "placeholder": "One per line",
+                        }
+                    ),
+                )
+
+                group_fields.append(
+                    {
+                        "subgroup": sg,
+                        "checkbox": self[cb_name],
+                        "custom_textarea": self[txt_name],
+                    }
+                )
+
+            if group_fields:
+                self._groups.append({"group": group, "fields": group_fields})
+
+    @property
+    def grouped_fields(self):
+        return self._groups
+
+    def save(self, provider):
+        """Save preference toggles and custom options."""
+        provider.preference_comment = self.cleaned_data.get("preference_comment", "")
+        provider.save(update_fields=["preference_comment"])
+
+        for group_data in self._groups:
+            for field_data in group_data["fields"]:
+                sg = field_data["subgroup"]
+                is_checked = self.cleaned_data.get(f"pref_check_{sg.pk}", False)
+                custom_text = self.cleaned_data.get(f"pref_custom_{sg.pk}", "")
+
+                ProviderPreference.objects.update_or_create(
+                    provider=provider,
+                    subgroup=sg,
+                    defaults={"is_checked": is_checked},
+                )
+
+                # Replace custom options
+                ProviderPreferenceCustomOption.objects.filter(
+                    provider=provider, subgroup=sg
+                ).delete()
+                for i, line in enumerate(custom_text.strip().splitlines()):
+                    line = line.strip()
+                    if line:
+                        ProviderPreferenceCustomOption.objects.create(
+                            provider=provider,
+                            subgroup=sg,
+                            text=line,
+                            display_order=i,
+                        )
+
+
 class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
     """View for updating provider profile."""
 
@@ -388,17 +511,32 @@ class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
             )
         return ProviderPricingForm(instance=pricing, prefix="pricing")
 
+    def _get_preferences_form(self):
+        """Build the preferences form from POST data or existing provider."""
+        provider = self._get_provider()
+        if self.request.method == "POST":
+            return ProviderPreferencesForm(
+                self.request.POST, provider=provider, prefix="prefs"
+            )
+        return ProviderPreferencesForm(provider=provider, prefix="prefs")
+
     def post(self, request, *args, **kwargs):
-        """Handle POST: validate both forms together."""
+        """Handle POST: validate all forms together."""
         form = self.get_form()
         pricing_form = self._get_pricing_form()
-        if form.is_valid() and pricing_form.is_valid():
+        preferences_form = self._get_preferences_form()
+        if form.is_valid() and pricing_form.is_valid() and preferences_form.is_valid():
             form.save()
             pricing_form.save()
+            preferences_form.save(self._get_provider())
             messages.success(request, "Your profile has been updated successfully.")
             return self.form_valid_redirect()
         return self.render_to_response(
-            self.get_context_data(form=form, pricing_form=pricing_form)
+            self.get_context_data(
+                form=form,
+                pricing_form=pricing_form,
+                preferences_form=preferences_form,
+            )
         )
 
     def form_valid_redirect(self):
@@ -413,6 +551,8 @@ class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
         context["attribute_fields"] = getattr(context["form"], "attribute_fields", [])
         if "pricing_form" not in context:
             context["pricing_form"] = self._get_pricing_form()
+        if "preferences_form" not in context:
+            context["preferences_form"] = self._get_preferences_form()
         return context
 
 

@@ -169,6 +169,12 @@ class Provider(models.Model):
         blank=True, null=True, help_text="Encrypted bank account details"
     )
 
+    preference_comment = models.TextField(
+        blank=True,
+        default="",
+        help_text="General comment displayed at bottom of preferences",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -398,3 +404,106 @@ class ProviderPricing(models.Model):
 
     def __str__(self):
         return f"Pricing for {self.provider.get_name()}"
+
+
+class PreferenceGroup(models.Model):
+    """Admin-defined top-level preference group (e.g., 'Massage')."""
+
+    name = models.CharField(max_length=150, unique=True)
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "providers_preference_group"
+        verbose_name = "Preference Group"
+        verbose_name_plural = "Preference Groups"
+        ordering = ["display_order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class PreferenceSubgroup(models.Model):
+    """Admin-defined option within a preference group (e.g., 'Classical', 'Erotic')."""
+
+    group = models.ForeignKey(
+        PreferenceGroup, on_delete=models.CASCADE, related_name="subgroups"
+    )
+    name = models.CharField(max_length=150)
+    display_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "providers_preference_subgroup"
+        verbose_name = "Preference Subgroup"
+        verbose_name_plural = "Preference Subgroups"
+        ordering = ["display_order", "name"]
+        unique_together = ("group", "name")
+
+    def __str__(self):
+        return f"{self.group.name} → {self.name}"
+
+
+class PreferenceSubgroupOption(models.Model):
+    """Admin-defined predefined text for a subgroup (e.g., '+10$ for 30min more')."""
+
+    subgroup = models.ForeignKey(
+        PreferenceSubgroup, on_delete=models.CASCADE, related_name="options"
+    )
+    text = models.CharField(max_length=255)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "providers_preference_subgroup_option"
+        verbose_name = "Preference Subgroup Option"
+        verbose_name_plural = "Preference Subgroup Options"
+        ordering = ["display_order"]
+
+    def __str__(self):
+        return f"{self.subgroup}: {self.text}"
+
+
+class ProviderPreference(models.Model):
+    """Per-provider toggle for each subgroup."""
+
+    provider = models.ForeignKey(
+        Provider, on_delete=models.CASCADE, related_name="preferences"
+    )
+    subgroup = models.ForeignKey(
+        PreferenceSubgroup,
+        on_delete=models.CASCADE,
+        related_name="provider_preferences",
+    )
+    is_checked = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "providers_provider_preference"
+        verbose_name = "Provider Preference"
+        verbose_name_plural = "Provider Preferences"
+        unique_together = ("provider", "subgroup")
+
+    def __str__(self):
+        status = "Yes" if self.is_checked else "No"
+        return f"{self.provider.get_name()} – {self.subgroup.name}: {status}"
+
+
+class ProviderPreferenceCustomOption(models.Model):
+    """Provider free-text option for a subgroup."""
+
+    provider = models.ForeignKey(
+        Provider, on_delete=models.CASCADE, related_name="preference_custom_options"
+    )
+    subgroup = models.ForeignKey(
+        PreferenceSubgroup, on_delete=models.CASCADE, related_name="custom_options"
+    )
+    text = models.CharField(max_length=255)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "providers_preference_custom_option"
+        verbose_name = "Provider Preference Custom Option"
+        verbose_name_plural = "Provider Preference Custom Options"
+        ordering = ["display_order"]
+
+    def __str__(self):
+        return f"{self.provider.get_name()} – {self.subgroup.name}: {self.text}"

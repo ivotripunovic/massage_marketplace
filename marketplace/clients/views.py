@@ -9,6 +9,9 @@ from providers.models import (
     Country,
     City,
     ProviderAttributeValue,
+    PreferenceGroup,
+    ProviderPreference,
+    ProviderPreferenceCustomOption,
 )
 from reviews.models import Review
 
@@ -322,4 +325,52 @@ class ProviderDetailView(DetailView):
         except ProviderPricing.DoesNotExist:
             context["pricing"] = None
 
+        # Build preference display
+        context["preference_display"] = self._build_preference_display(provider)
+        context["preference_comment"] = provider.preference_comment
+
         return context
+
+    def _build_preference_display(self, provider):
+        """Build structured preference data for template rendering."""
+        groups = (
+            PreferenceGroup.objects.filter(is_active=True)
+            .prefetch_related(
+                "subgroups",
+                "subgroups__options",
+            )
+            .order_by("display_order", "name")
+        )
+
+        # Bulk fetch provider's preferences and custom options
+        pref_map = {}
+        for pref in ProviderPreference.objects.filter(provider=provider):
+            pref_map[pref.subgroup_id] = pref.is_checked
+
+        custom_map = {}
+        for custom in ProviderPreferenceCustomOption.objects.filter(
+            provider=provider
+        ).order_by("display_order"):
+            custom_map.setdefault(custom.subgroup_id, []).append(custom.text)
+
+        result = []
+        for group in groups:
+            subgroups = []
+            for sg in group.subgroups.filter(is_active=True).order_by(
+                "display_order", "name"
+            ):
+                is_checked = pref_map.get(sg.pk, False)
+                predefined_options = [opt.text for opt in sg.options.all()]
+                custom_options = custom_map.get(sg.pk, [])
+                subgroups.append(
+                    {
+                        "name": sg.name,
+                        "is_checked": is_checked,
+                        "predefined_options": predefined_options,
+                        "custom_options": custom_options,
+                    }
+                )
+            if subgroups:
+                result.append({"name": group.name, "subgroups": subgroups})
+
+        return result

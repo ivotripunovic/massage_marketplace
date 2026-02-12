@@ -9,6 +9,11 @@ from .models import (
     ProviderAttributeDefinition,
     ProviderAttributeValue,
     ProviderPricing,
+    PreferenceGroup,
+    PreferenceSubgroup,
+    PreferenceSubgroupOption,
+    ProviderPreference,
+    ProviderPreferenceCustomOption,
 )
 
 
@@ -2437,3 +2442,184 @@ class ProviderPricingFormTests(TestCase):
         self.client.post(reverse("provider_profile"), data, follow=True)
         pricing = ProviderPricing.objects.get(provider=self.provider)
         self.assertEqual(pricing.apartment_day_1h, Decimal("75.00"))
+
+
+def _preferences_form_data(**overrides):
+    """Return empty preferences form data with 'prefs-' prefix for POST."""
+    defaults = {
+        "prefs-preference_comment": "",
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+class ProviderPreferencesModelTests(TestCase):
+    """Test preference model creation and constraints."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="pref-provider@test.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone="+15551234567",
+            subscription_status="active",
+        )
+        self.group = PreferenceGroup.objects.create(
+            name="Massage", display_order=1, is_active=True
+        )
+        self.subgroup = PreferenceSubgroup.objects.create(
+            group=self.group, name="Classical", display_order=1, is_active=True
+        )
+
+    def test_preference_group_creation(self):
+        self.assertEqual(str(self.group), "Massage")
+        self.assertTrue(self.group.is_active)
+
+    def test_preference_subgroup_creation(self):
+        self.assertEqual(str(self.subgroup), "Massage → Classical")
+
+    def test_subgroup_unique_together(self):
+        from django.db import IntegrityError
+
+        with self.assertRaises(IntegrityError):
+            PreferenceSubgroup.objects.create(
+                group=self.group, name="Classical", display_order=2
+            )
+
+    def test_subgroup_option_creation(self):
+        opt = PreferenceSubgroupOption.objects.create(
+            subgroup=self.subgroup, text="+10$ for 30min more", display_order=0
+        )
+        self.assertIn("+10$", str(opt))
+
+    def test_provider_preference_creation(self):
+        pref = ProviderPreference.objects.create(
+            provider=self.provider, subgroup=self.subgroup, is_checked=True
+        )
+        self.assertTrue(pref.is_checked)
+        self.assertIn("Yes", str(pref))
+
+    def test_provider_preference_unique_together(self):
+        from django.db import IntegrityError
+
+        ProviderPreference.objects.create(
+            provider=self.provider, subgroup=self.subgroup, is_checked=True
+        )
+        with self.assertRaises(IntegrityError):
+            ProviderPreference.objects.create(
+                provider=self.provider, subgroup=self.subgroup, is_checked=False
+            )
+
+    def test_provider_preference_comment(self):
+        self.provider.preference_comment = "Call before visiting"
+        self.provider.save()
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.preference_comment, "Call before visiting")
+
+    def test_custom_option_creation(self):
+        custom = ProviderPreferenceCustomOption.objects.create(
+            provider=self.provider,
+            subgroup=self.subgroup,
+            text="Weekend only",
+            display_order=0,
+        )
+        self.assertIn("Weekend only", str(custom))
+
+
+class ProviderPreferencesViewTests(TestCase):
+    """Test preference display on detail page and saving from edit form."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="prefview-provider@test.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone="+15551234567",
+            subscription_status="active",
+        )
+        self.group = PreferenceGroup.objects.create(
+            name="Massage", display_order=1, is_active=True
+        )
+        self.subgroup_checked = PreferenceSubgroup.objects.create(
+            group=self.group, name="Classical", display_order=1, is_active=True
+        )
+        self.subgroup_unchecked = PreferenceSubgroup.objects.create(
+            group=self.group, name="Erotic", display_order=2, is_active=True
+        )
+        ProviderPreference.objects.create(
+            provider=self.provider, subgroup=self.subgroup_checked, is_checked=True
+        )
+        ProviderPreference.objects.create(
+            provider=self.provider, subgroup=self.subgroup_unchecked, is_checked=False
+        )
+
+    def test_detail_shows_checked_preference(self):
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        self.assertContains(response, "Classical")
+        # Classical should NOT have line-through
+        self.assertNotContains(response, 'line-through">Classical')
+
+    def test_detail_shows_unchecked_with_strikethrough(self):
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        self.assertContains(response, "line-through")
+        self.assertContains(response, "Erotic")
+
+    def test_detail_shows_preference_comment(self):
+        self.provider.preference_comment = "Please call first"
+        self.provider.save()
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        self.assertContains(response, "Please call first")
+
+    def test_saving_preferences_from_profile(self):
+        self.client.login(email=self.user.email, password="testpass123")
+        url = reverse("provider_profile")
+        data = {
+            "first_name": "Test",
+            "last_name": "Provider",
+            "phone": "+15551234567",
+            "bio": "Test",
+            **_required_attribute_data(),
+            **_pricing_form_data(),
+            **_preferences_form_data(
+                **{
+                    f"prefs-pref_check_{self.subgroup_checked.pk}": "on",
+                    f"prefs-pref_custom_{self.subgroup_checked.pk}": "By appointment",
+                    f"prefs-pref_custom_{self.subgroup_unchecked.pk}": "",
+                    "prefs-preference_comment": "General note",
+                }
+            ),
+        }
+        response = self.client.post(url, data, follow=True)
+        self.assertRedirects(response, reverse("provider_dashboard"))
+
+        # Verify preference was saved
+        pref = ProviderPreference.objects.get(
+            provider=self.provider, subgroup=self.subgroup_checked
+        )
+        self.assertTrue(pref.is_checked)
+
+        # Verify custom option was created
+        custom = ProviderPreferenceCustomOption.objects.filter(
+            provider=self.provider, subgroup=self.subgroup_checked
+        )
+        self.assertEqual(custom.count(), 1)
+        self.assertEqual(custom.first().text, "By appointment")
+
+        # Verify comment
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.preference_comment, "General note")
