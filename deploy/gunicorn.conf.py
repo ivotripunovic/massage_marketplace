@@ -31,5 +31,13 @@ graceful_timeout = 30
 # Working directory.
 chdir = os.getenv("APP_DIR", "/opt/marketplace/marketplace")
 
+# 1GB VPS START
+workers = 1
+worker_class = "sync"
+timeout = 30
+max_requests = 500
+max_requests_jitter = 50
+# START_END
+
 # Django WSGI application.
 wsgi_app = "marketplace.wsgi:application"
