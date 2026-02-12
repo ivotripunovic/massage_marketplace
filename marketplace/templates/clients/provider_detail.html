@@ -142,30 +142,40 @@
     <!-- Preferences Section -->
     {% if preference_display %}
     <div class="card-dark p-6 md:p-8 mb-8">
-        {% for group in preference_display %}
-        <h3 class="text-lg font-display font-bold text-gold mb-3{% if not forloop.first %} mt-6{% endif %}">{{ group.name }}</h3>
-        <ul class="space-y-1">
-            {% for sg in group.subgroups %}
-            <li>
-                {% if sg.is_checked %}
-                <span class="text-text-primary font-medium">{{ sg.name }}</span>
-                {% if sg.predefined_options or sg.custom_options %}
-                <ul class="ml-4 mt-1 space-y-0.5">
-                    {% for opt in sg.predefined_options %}
-                    <li class="text-red-400 text-sm">{{ opt }}</li>
-                    {% endfor %}
-                    {% for opt in sg.custom_options %}
-                    <li class="text-red-400 text-sm">{{ opt }}</li>
+        <div class="grid grid-cols-2 gap-x-6 gap-y-4">
+            {% for group in preference_display %}
+            <div>
+                <h3 class="text-lg font-display font-bold text-gold mb-2">{{ group.name }}</h3>
+                <ul class="space-y-1">
+                    {% for sg in group.subgroups %}
+                    <li>
+                        {% if sg.is_checked %}
+                        <span class="inline-flex items-center gap-2">
+                            <input type="checkbox" checked disabled class="form-checkbox h-4 w-4 text-gold pointer-events-none">
+                            <span class="text-text-primary font-medium">{{ sg.name }}</span>
+                        </span>
+                        {% if sg.predefined_options or sg.custom_options %}
+                        <ul class="ml-6 mt-1 space-y-0.5">
+                            {% for opt in sg.predefined_options %}
+                            <li class="text-red-400 text-sm">{{ opt }}</li>
+                            {% endfor %}
+                            {% for opt in sg.custom_options %}
+                            <li class="text-red-400 text-sm">{{ opt }}</li>
+                            {% endfor %}
+                        </ul>
+                        {% endif %}
+                        {% else %}
+                        <span class="inline-flex items-center gap-2">
+                            <input type="checkbox" disabled class="form-checkbox h-4 w-4 opacity-40 pointer-events-none">
+                            <span class="text-text-muted line-through">{{ sg.name }}</span>
+                        </span>
+                        {% endif %}
+                    </li>
                     {% endfor %}
                 </ul>
-                {% endif %}
-                {% else %}
-                <span class="text-text-muted line-through">{{ sg.name }}</span>
-                {% endif %}
-            </li>
+            </div>
             {% endfor %}
-        </ul>
-        {% endfor %}
+        </div>
         {% if preference_comment %}
         <hr class="border-dark-300 mt-4 mb-3">
         <p class="text-text-secondary text-sm whitespace-pre-line">{{ preference_comment }}</p>

@@ -357,6 +357,37 @@ SEED_PREFERENCE_GROUPS = [
             {"name": "Couples", "options": ["+50% for second person"]},
         ],
     },
+    {
+        "name": "Body Type",
+        "display_order": 3,
+        "subgroups": [
+            {"name": "Slim", "options": []},
+            {"name": "Athletic", "options": []},
+            {"name": "Curvy", "options": []},
+            {"name": "Plus size", "options": []},
+        ],
+    },
+    {
+        "name": "Meeting Place",
+        "display_order": 4,
+        "subgroups": [
+            {"name": "My apartment", "options": []},
+            {"name": "Your place", "options": ["+20$ travel fee"]},
+            {"name": "Hotel", "options": ["+10$ travel fee"]},
+            {"name": "Office", "options": []},
+        ],
+    },
+    {
+        "name": "Languages",
+        "display_order": 5,
+        "subgroups": [
+            {"name": "English", "options": []},
+            {"name": "German", "options": []},
+            {"name": "French", "options": []},
+            {"name": "Spanish", "options": []},
+            {"name": "Russian", "options": []},
+        ],
+    },
 ]
 
 # ── Bulk-create batch size ────────────────────────────────────────────────────
