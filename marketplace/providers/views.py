@@ -175,7 +175,8 @@ class ProviderProfileForm(forms.ModelForm):
         """Validate photo file."""
         photo = self.cleaned_data.get("photo")
 
-        if photo:
+        if photo and hasattr(photo, "content_type"):
+            # Only validate newly uploaded files (not existing ImageFieldFile)
             # Check file size (< 5MB)
             if photo.size > 5 * 1024 * 1024:
                 raise forms.ValidationError("Image must be smaller than 5MB")
