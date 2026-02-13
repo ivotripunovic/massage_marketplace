@@ -187,11 +187,11 @@
     {% if gallery_images %}
     <div class="card-dark p-6 md:p-8 mb-8">
         <h2 class="text-2xl font-display font-bold text-gold mb-6">Photo Gallery</h2>
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div class="space-y-4">
             {% for image in gallery_images %}
             <div class="rounded-xl overflow-hidden bg-dark-200">
                 <img src="{{ image.image.url }}" alt="{{ image.caption|default:'Gallery image' }}"
-                     class="gallery-image w-full h-48 object-cover">
+                     class="gallery-image w-full object-cover">
                 {% if image.caption %}
                 <div class="p-3">
                     <p class="text-sm text-text-secondary">{{ image.caption }}</p>
