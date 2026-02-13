@@ -29,6 +29,7 @@ from providers.models import (
     PreferenceSubgroupOption,
     ProviderPreference,
     ProviderPreferenceCustomOption,
+    ProviderCustomPreference,
 )
 from reviews.models import Review
 from users.models import User
@@ -729,6 +730,41 @@ class Command(BaseCommand):
         ProviderPreferenceCustomOption.objects.bulk_create(
             custom_objects, batch_size=BATCH_SIZE
         )
+
+        # Generate provider custom preferences ("Other" group)
+        other_items = [
+            "Candles & aromatherapy",
+            "Background music",
+            "Hot stones",
+            "Warm towels",
+            "Parking available",
+            "Wi-Fi for clients",
+            "Drinks included",
+            "Wheelchair accessible",
+        ]
+        existing_custom = set(
+            ProviderCustomPreference.objects.filter(provider__in=providers).values_list(
+                "provider_id", flat=True
+            )
+        )
+        custom_pref_objects = []
+        for provider in providers:
+            if provider.pk in existing_custom:
+                continue
+            if rng.random() > 0.5:
+                num_items = rng.randint(1, 3)
+                for i, item in enumerate(rng.sample(other_items, num_items)):
+                    custom_pref_objects.append(
+                        ProviderCustomPreference(
+                            provider=provider,
+                            name=item,
+                            display_order=i,
+                        )
+                    )
+        ProviderCustomPreference.objects.bulk_create(
+            custom_pref_objects, batch_size=BATCH_SIZE
+        )
+
         return len(pref_objects)
 
     def handle(self, *args, **options):

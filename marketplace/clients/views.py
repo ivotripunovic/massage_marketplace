@@ -12,6 +12,7 @@ from providers.models import (
     PreferenceGroup,
     ProviderPreference,
     ProviderPreferenceCustomOption,
+    ProviderCustomPreference,
 )
 from reviews.models import Review
 
@@ -372,5 +373,21 @@ class ProviderDetailView(DetailView):
                 )
             if subgroups:
                 result.append({"name": group.name, "subgroups": subgroups})
+
+        # Append provider's custom preferences as an "Other" group
+        custom_prefs = ProviderCustomPreference.objects.filter(
+            provider=provider
+        ).order_by("display_order", "name")
+        if custom_prefs.exists():
+            other_subgroups = [
+                {
+                    "name": cp.name,
+                    "is_checked": True,
+                    "predefined_options": [],
+                    "custom_options": [],
+                }
+                for cp in custom_prefs
+            ]
+            result.append({"name": "Other", "subgroups": other_subgroups})
 
         return result

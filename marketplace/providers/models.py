@@ -507,3 +507,22 @@ class ProviderPreferenceCustomOption(models.Model):
 
     def __str__(self):
         return f"{self.provider.get_name()} – {self.subgroup.name}: {self.text}"
+
+
+class ProviderCustomPreference(models.Model):
+    """Provider-created preference item shown as its own subgroup in an 'Other' group."""
+
+    provider = models.ForeignKey(
+        Provider, on_delete=models.CASCADE, related_name="custom_preferences"
+    )
+    name = models.CharField(max_length=150)
+    display_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "providers_custom_preference"
+        verbose_name = "Provider Custom Preference"
+        verbose_name_plural = "Provider Custom Preferences"
+        ordering = ["display_order", "name"]
+
+    def __str__(self):
+        return f"{self.provider.get_name()} – {self.name}"

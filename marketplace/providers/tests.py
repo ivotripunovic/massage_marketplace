@@ -14,6 +14,7 @@ from .models import (
     PreferenceSubgroupOption,
     ProviderPreference,
     ProviderPreferenceCustomOption,
+    ProviderCustomPreference,
 )
 
 
@@ -2448,6 +2449,7 @@ def _preferences_form_data(**overrides):
     """Return empty preferences form data with 'prefs-' prefix for POST."""
     defaults = {
         "prefs-preference_comment": "",
+        "prefs-custom_preferences": "",
     }
     defaults.update(overrides)
     return defaults
@@ -2623,3 +2625,39 @@ class ProviderPreferencesViewTests(TestCase):
         # Verify comment
         self.provider.refresh_from_db()
         self.assertEqual(self.provider.preference_comment, "General note")
+
+    def test_detail_shows_custom_preferences_as_other_group(self):
+        ProviderCustomPreference.objects.create(
+            provider=self.provider, name="Hot stones", display_order=0
+        )
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        self.assertContains(response, "Other")
+        self.assertContains(response, "Hot stones")
+
+    def test_saving_custom_preferences_from_profile(self):
+        self.client.login(email=self.user.email, password="testpass123")
+        url = reverse("provider_profile")
+        data = {
+            "first_name": "Test",
+            "last_name": "Provider",
+            "phone": "+15551234567",
+            "bio": "Test",
+            **_required_attribute_data(),
+            **_pricing_form_data(),
+            **_preferences_form_data(
+                **{
+                    f"prefs-pref_custom_{self.subgroup_checked.pk}": "",
+                    f"prefs-pref_custom_{self.subgroup_unchecked.pk}": "",
+                    "prefs-custom_preferences": "Hot stones\nCandles",
+                }
+            ),
+        }
+        response = self.client.post(url, data, follow=True)
+        self.assertRedirects(response, reverse("provider_dashboard"))
+
+        custom = ProviderCustomPreference.objects.filter(provider=self.provider)
+        self.assertEqual(custom.count(), 2)
+        names = list(custom.order_by("display_order").values_list("name", flat=True))
+        self.assertEqual(names, ["Hot stones", "Candles"])

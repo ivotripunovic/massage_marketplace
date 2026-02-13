@@ -21,6 +21,7 @@ from providers.models import (
     PreferenceGroup,
     ProviderPreference,
     ProviderPreferenceCustomOption,
+    ProviderCustomPreference,
 )
 from providers.forms import (
     SubscriptionSettingsForm,
@@ -446,6 +447,27 @@ class ProviderPreferencesForm(forms.Form):
             if group_fields:
                 self._groups.append({"group": group, "fields": group_fields})
 
+        # "Other" — provider's own custom items (one per line)
+        custom_initial = ""
+        if provider and provider.pk:
+            custom_items = ProviderCustomPreference.objects.filter(
+                provider=provider
+            ).order_by("display_order", "name")
+            custom_initial = "\n".join(cp.name for cp in custom_items)
+
+        self.fields["custom_preferences"] = forms.CharField(
+            required=False,
+            label="Other",
+            initial=custom_initial,
+            widget=forms.Textarea(
+                attrs={
+                    "class": "input-dark w-full",
+                    "rows": 4,
+                    "placeholder": "Your own items, one per line",
+                }
+            ),
+        )
+
     @property
     def grouped_fields(self):
         return self._groups
@@ -480,6 +502,18 @@ class ProviderPreferencesForm(forms.Form):
                             text=line,
                             display_order=i,
                         )
+
+        # Save provider's own custom preference items ("Other" group)
+        custom_prefs_text = self.cleaned_data.get("custom_preferences", "")
+        ProviderCustomPreference.objects.filter(provider=provider).delete()
+        for i, line in enumerate(custom_prefs_text.strip().splitlines()):
+            line = line.strip()
+            if line:
+                ProviderCustomPreference.objects.create(
+                    provider=provider,
+                    name=line,
+                    display_order=i,
+                )
 
 
 class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
