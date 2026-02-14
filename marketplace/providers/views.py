@@ -563,7 +563,9 @@ class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
         if form.is_valid() and pricing_form.is_valid() and preferences_form.is_valid():
             form.save()
             pricing_form.save()
-            preferences_form.save(self._get_provider())
+            provider = self._get_provider()
+            preferences_form.save(provider)
+            self._update_map_coordinates(provider)
             messages.success(request, "Your profile has been updated successfully.")
             return self.form_valid_redirect()
         return self.render_to_response(
@@ -578,6 +580,40 @@ class ProviderProfileUpdateView(ProviderRequiredMixin, FormView):
         from django.http import HttpResponseRedirect
 
         return HttpResponseRedirect(self.get_success_url())
+
+    def _update_map_coordinates(self, provider):
+        """Geocode provider location and cache coordinates."""
+        from providers.utils import geocode_location
+
+        # Get district attribute value
+        district = (
+            ProviderAttributeValue.objects.filter(
+                provider=provider,
+                definition__name="District",
+                definition__is_active=True,
+            )
+            .values_list("value_text", flat=True)
+            .first()
+        ) or ""
+
+        city_name = provider.city.name if provider.city else ""
+        country_name = provider.country.name if provider.country else ""
+
+        if district and city_name:
+            result = geocode_location(district, city_name, country_name)
+            if result:
+                provider.map_latitude, provider.map_longitude = result
+                provider.save(update_fields=["map_latitude", "map_longitude"])
+                return
+
+        # Fall back to city coordinates
+        if provider.city and provider.city.latitude and provider.city.longitude:
+            provider.map_latitude = provider.city.latitude
+            provider.map_longitude = provider.city.longitude
+        else:
+            provider.map_latitude = None
+            provider.map_longitude = None
+        provider.save(update_fields=["map_latitude", "map_longitude"])
 
     def get_context_data(self, **kwargs):
         """Add provider data to context."""

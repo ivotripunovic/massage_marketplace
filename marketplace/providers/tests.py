@@ -1,3 +1,6 @@
+from decimal import Decimal
+from unittest.mock import patch, MagicMock
+
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -9,6 +12,9 @@ from .models import (
     ProviderAttributeDefinition,
     ProviderAttributeValue,
     ProviderPricing,
+    Continent,
+    Country,
+    City,
     PreferenceGroup,
     PreferenceSubgroup,
     PreferenceSubgroupOption,
@@ -2661,3 +2667,197 @@ class ProviderPreferencesViewTests(TestCase):
         self.assertEqual(custom.count(), 2)
         names = list(custom.order_by("display_order").values_list("name", flat=True))
         self.assertEqual(names, ["Hot stones", "Candles"])
+
+
+class GeocodeLocationTests(TestCase):
+    """Test the geocode_location utility function."""
+
+    @patch("providers.utils.urllib.request.urlopen")
+    def test_geocode_returns_coords_on_success(self, mock_urlopen):
+        import json
+
+        mock_response = MagicMock()
+        mock_response.read.return_value = json.dumps(
+            [{"lat": "48.8566", "lon": "2.3522"}]
+        ).encode()
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        from providers.utils import geocode_location
+
+        result = geocode_location("Marais", "Paris", "France")
+        self.assertIsNotNone(result)
+        self.assertAlmostEqual(result[0], 48.8566)
+        self.assertAlmostEqual(result[1], 2.3522)
+
+    @patch("providers.utils.urllib.request.urlopen")
+    def test_geocode_returns_none_on_empty_response(self, mock_urlopen):
+        mock_response = MagicMock()
+        mock_response.read.return_value = b"[]"
+        mock_response.__enter__ = lambda s: s
+        mock_response.__exit__ = MagicMock(return_value=False)
+        mock_urlopen.return_value = mock_response
+
+        from providers.utils import geocode_location
+
+        result = geocode_location("Nowhere", "Fakecity", "Fakeland")
+        self.assertIsNone(result)
+
+    @patch("providers.utils.urllib.request.urlopen", side_effect=Exception("timeout"))
+    def test_geocode_returns_none_on_error(self, mock_urlopen):
+        from providers.utils import geocode_location
+
+        result = geocode_location("District", "City", "Country")
+        self.assertIsNone(result)
+
+    def test_geocode_returns_none_for_empty_parts(self):
+        from providers.utils import geocode_location
+
+        result = geocode_location("", "", "")
+        self.assertIsNone(result)
+
+
+class MapCoordinatesIntegrationTests(TestCase):
+    """Test that profile save populates map coordinates."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="maptest@test.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+        )
+        continent = Continent.objects.create(name="Europe", code="EU")
+        self.country = Country.objects.create(
+            name="France", code="FR", continent=continent
+        )
+        self.city = City.objects.create(
+            name="Paris",
+            country=self.country,
+            latitude=Decimal("48.856600"),
+            longitude=Decimal("2.352200"),
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone="+15551234567",
+            country=self.country,
+            city=self.city,
+        )
+        ProviderPricing.objects.create(provider=self.provider)
+        self.district_def = ProviderAttributeDefinition.objects.get_or_create(
+            name="District",
+            defaults={"data_type": "string", "display_order": 3, "show_on_card": False},
+        )[0]
+        self.client_http = Client()
+        self.client_http.login(email="maptest@test.com", password="testpass123")
+
+    @patch("providers.utils.geocode_location", return_value=(48.86, 2.36))
+    def test_profile_save_with_district_geocodes(self, mock_geocode):
+        # Set a District attribute
+        ProviderAttributeValue.objects.create(
+            provider=self.provider,
+            definition=self.district_def,
+            value_text="Marais",
+        )
+        url = reverse("provider_profile")
+        data = {
+            "first_name": "Test",
+            "last_name": "User",
+            "phone": "+15551234567",
+            "bio": "Bio",
+            **_required_attribute_data(),
+            **_pricing_form_data(),
+            **_preferences_form_data(),
+        }
+        # Include district field in form data
+        data[f"attribute_{self.district_def.pk}"] = "Marais"
+        self.client_http.post(url, data, follow=True)
+        self.provider.refresh_from_db()
+        self.assertAlmostEqual(float(self.provider.map_latitude), 48.86)
+        self.assertAlmostEqual(float(self.provider.map_longitude), 2.36)
+
+    @patch("providers.utils.geocode_location", return_value=None)
+    def test_profile_save_falls_back_to_city_coords(self, mock_geocode):
+        ProviderAttributeValue.objects.create(
+            provider=self.provider,
+            definition=self.district_def,
+            value_text="Marais",
+        )
+        url = reverse("provider_profile")
+        data = {
+            "first_name": "Test",
+            "last_name": "User",
+            "phone": "+15551234567",
+            "bio": "Bio",
+            **_required_attribute_data(),
+            **_pricing_form_data(),
+            **_preferences_form_data(),
+        }
+        data[f"attribute_{self.district_def.pk}"] = "Marais"
+        self.client_http.post(url, data, follow=True)
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.map_latitude, self.city.latitude)
+        self.assertEqual(self.provider.map_longitude, self.city.longitude)
+
+    def test_profile_save_no_district_uses_city_coords(self):
+        url = reverse("provider_profile")
+        data = {
+            "first_name": "Test",
+            "last_name": "User",
+            "phone": "+15551234567",
+            "bio": "Bio",
+            **_required_attribute_data(),
+            **_pricing_form_data(),
+            **_preferences_form_data(),
+        }
+        self.client_http.post(url, data, follow=True)
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.map_latitude, self.city.latitude)
+        self.assertEqual(self.provider.map_longitude, self.city.longitude)
+
+
+class ProviderDetailMapTests(TestCase):
+    """Test that detail view uses cached provider coords over city coords."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="detailmap@test.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+        )
+        continent = Continent.objects.create(name="Asia", code="AS")
+        country = Country.objects.create(name="Japan", code="JP", continent=continent)
+        self.city = City.objects.create(
+            name="Tokyo",
+            country=country,
+            latitude=Decimal("35.689500"),
+            longitude=Decimal("139.691700"),
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone="+15551234567",
+            subscription_status="active",
+            country=country,
+            city=self.city,
+            map_latitude=Decimal("35.700000"),
+            map_longitude=Decimal("139.750000"),
+        )
+
+    def test_detail_uses_provider_cached_coords(self):
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        self.assertAlmostEqual(response.context["map_lat"], 35.7)
+        self.assertAlmostEqual(response.context["map_lng"], 139.75)
+
+    def test_detail_falls_back_to_city_when_no_provider_coords(self):
+        self.provider.map_latitude = None
+        self.provider.map_longitude = None
+        self.provider.save(update_fields=["map_latitude", "map_longitude"])
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        self.assertAlmostEqual(response.context["map_lat"], 35.6895)
+        self.assertAlmostEqual(response.context["map_lng"], 139.6917)

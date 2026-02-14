@@ -57,7 +57,7 @@
                placeholder="Country..."
                class="input-dark w-full text-sm py-1 px-2"
                autocomplete="off">
-        <input type="hidden" name="country_id" value="{{ current_country_id }}">
+        <input type="hidden" name="country_id" id="country_id_mobile" value="{{ current_country_id }}">
     </div>
     <div class="relative flex-1">
         <input type="text" id="city-autocomplete-mobile"
@@ -65,7 +65,7 @@
                placeholder="City..."
                class="input-dark w-full text-sm py-1 px-2"
                autocomplete="off">
-        <input type="hidden" name="city_id" value="{{ current_city_id }}">
+        <input type="hidden" name="city_id" id="city_id_mobile" value="{{ current_city_id }}">
     </div>
     <button type="submit" class="bg-gold text-dark p-1 rounded flex-shrink-0">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

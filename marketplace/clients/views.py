@@ -288,7 +288,7 @@ class ProviderDetailView(DetailView):
             Provider.objects.filter(
                 subscription_status="active", user__is_email_verified=True
             )
-            .select_related("user")
+            .select_related("user", "country", "city")
             .prefetch_related("reviews", "gallery_images")
         )
 
@@ -329,6 +329,38 @@ class ProviderDetailView(DetailView):
         # Build preference display
         context["preference_display"] = self._build_preference_display(provider)
         context["preference_comment"] = provider.preference_comment
+
+        # Map data: prefer provider's cached coords, fall back to city
+        map_lat = None
+        map_lng = None
+        if provider.map_latitude and provider.map_longitude:
+            map_lat = float(provider.map_latitude)
+            map_lng = float(provider.map_longitude)
+        elif provider.city and provider.city.latitude and provider.city.longitude:
+            map_lat = float(provider.city.latitude)
+            map_lng = float(provider.city.longitude)
+
+        if map_lat is not None:
+            context["map_lat"] = map_lat
+            context["map_lng"] = map_lng
+            # Build location label: district + city + country
+            parts = []
+            district_attr = (
+                ProviderAttributeValue.objects.filter(
+                    provider=provider,
+                    definition__name="District",
+                    definition__is_active=True,
+                )
+                .values_list("value_text", flat=True)
+                .first()
+            )
+            if district_attr:
+                parts.append(district_attr)
+            if provider.city:
+                parts.append(provider.city.name)
+            if provider.country:
+                parts.append(provider.country.name)
+            context["map_label"] = ", ".join(parts)
 
         return context
 

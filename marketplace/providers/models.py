@@ -169,6 +169,21 @@ class Provider(models.Model):
         blank=True, null=True, help_text="Encrypted bank account details"
     )
 
+    map_latitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Cached latitude for map display (geocoded from district/city)",
+    )
+    map_longitude = models.DecimalField(
+        max_digits=9,
+        decimal_places=6,
+        null=True,
+        blank=True,
+        help_text="Cached longitude for map display (geocoded from district/city)",
+    )
+
     preference_comment = models.TextField(
         blank=True,
         default="",

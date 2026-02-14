@@ -889,6 +889,17 @@ class Command(BaseCommand):
             attr_count = self._generate_attributes(rng, providers)
         self.stdout.write(f"  Created {attr_count} attribute values")
 
+        # Copy city lat/lng to provider map_latitude/map_longitude
+        self.stdout.write("Setting provider map coordinates from city...")
+        updated = 0
+        for provider in providers:
+            if provider.city and provider.city.latitude and provider.city.longitude:
+                provider.map_latitude = provider.city.latitude
+                provider.map_longitude = provider.city.longitude
+                provider.save(update_fields=["map_latitude", "map_longitude"])
+                updated += 1
+        self.stdout.write(f"  Set map coordinates for {updated} providers")
+
         # Generate pricing grids in bulk
         self.stdout.write("Generating pricing grids...")
         with transaction.atomic():

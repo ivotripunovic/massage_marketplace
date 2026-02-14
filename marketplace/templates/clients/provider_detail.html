@@ -3,6 +3,9 @@
 {% block title %}{{ provider.get_name }} - Massage Marketplace{% endblock %}
 
 {% block extra_css %}
+{% if map_lat %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+{% endif %}
 <style>
     .gallery-image {
         transition: transform 0.3s ease;
@@ -15,6 +18,10 @@
     }
     .star-empty {
         color: #3d3d3d;
+    }
+    #provider-map {
+        height: 300px;
+        border-radius: 0.75rem;
     }
 </style>
 {% endblock %}
@@ -203,6 +210,15 @@
     </div>
     {% endif %}
 
+    <!-- Map Section -->
+    {% if map_lat %}
+    <div class="card-dark p-6 md:p-8 mb-8">
+        <h2 class="text-2xl font-display font-bold text-gold mb-4">Location</h2>
+        <p class="text-text-secondary text-sm mb-3">{{ map_label }}</p>
+        <div id="provider-map"></div>
+    </div>
+    {% endif %}
+
     <!-- Reviews Section -->
     <div class="card-dark p-6 md:p-8 mb-8">
         <h2 class="text-2xl font-display font-bold text-gold mb-6">Reviews ({{ total_reviews }})</h2>
@@ -328,3 +344,23 @@
     </div>
 </div>
 {% endblock %}
+
+{% if map_lat %}
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+(function() {
+    var lat = {{ map_lat }};
+    var lng = {{ map_lng }};
+    var map = L.map('provider-map').setView([lat, lng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19
+    }).addTo(map);
+    L.marker([lat, lng]).addTo(map)
+        .bindPopup('{{ map_label|escapejs }}')
+        .openPopup();
+})();
+</script>
+{% endblock %}
+{% endif %}

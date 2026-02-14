@@ -603,7 +603,7 @@
 
         // Mobile country autocomplete
         if (document.getElementById('country-autocomplete-mobile')) {
-            window.countryAutocompleteMobile = new CountryAutocomplete('country-autocomplete-mobile', 'country_id', {
+            window.countryAutocompleteMobile = new CountryAutocomplete('country-autocomplete-mobile', 'country_id_mobile', {
                 onSelect: function() {
                     if (window.cityAutocompleteMobile) {
                         window.cityAutocompleteMobile.enable();
@@ -615,8 +615,8 @@
 
         // Mobile city autocomplete
         if (document.getElementById('city-autocomplete-mobile')) {
-            window.cityAutocompleteMobile = new CityAutocomplete('city-autocomplete-mobile', 'city_id', {
-                countryInputId: 'country_id'
+            window.cityAutocompleteMobile = new CityAutocomplete('city-autocomplete-mobile', 'city_id_mobile', {
+                countryInputId: 'country_id_mobile'
             });
         }
 
