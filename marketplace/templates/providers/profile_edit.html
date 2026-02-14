@@ -43,6 +43,33 @@
                 <p class="text-text-muted text-sm mt-1">JPEG, PNG or GIF. Max 5MB. Image will be resized to 800×800.</p>
             </div>
 
+            <!-- Current Video Display -->
+            {% if provider.profile_video %}
+            <div>
+                <video controls class="w-full rounded-lg max-h-64">
+                    <source src="{{ provider.profile_video.url }}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+                <p class="text-xs text-text-muted mt-1">Current profile video. Upload a new one to replace it.</p>
+            </div>
+            {% endif %}
+
+            <!-- Video Upload -->
+            <div>
+                <label for="{{ form.profile_video.id_for_label }}" class="block text-sm font-medium text-text-primary mb-2">
+                    {{ form.profile_video.label }}
+                </label>
+                {{ form.profile_video }}
+                {% if form.profile_video.errors %}
+                    <div class="text-red-400 text-sm mt-1">
+                        {% for error in form.profile_video.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <p class="text-text-muted text-sm mt-1">MP4 format only. Max 50MB.</p>
+            </div>
+
             <!-- Name Fields -->
             <div class="grid grid-cols-2 gap-6">
                 <div>

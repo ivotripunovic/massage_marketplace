@@ -132,6 +132,9 @@ class Provider(models.Model):
         help_text="Good time to call, e.g. 10:00 – 18:00",
     )
     photo = models.ImageField(upload_to="providers/photos/", blank=True, null=True)
+    profile_video = models.FileField(
+        upload_to="providers/videos/", blank=True, null=True
+    )
 
     # Location fields (ForeignKey)
     country = models.ForeignKey(

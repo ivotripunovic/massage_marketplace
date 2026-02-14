@@ -2861,3 +2861,99 @@ class ProviderDetailMapTests(TestCase):
         )
         self.assertAlmostEqual(response.context["map_lat"], 35.6895)
         self.assertAlmostEqual(response.context["map_lng"], 139.6917)
+
+
+class ProviderProfileVideoTests(TestCase):
+    """Test Provider Profile Video upload functionality."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="videoprovider@test.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+        )
+        self.provider = Provider.objects.create(user=self.user, phone="+1234567890")
+        self.client.login(email=self.user.email, password="testpass123")
+
+    def _base_form_data(self):
+        return {
+            "first_name": "John",
+            "last_name": "Doe",
+            "phone": "+1234567890",
+            "bio": "Test bio",
+            **_required_attribute_data(),
+            **_pricing_form_data(),
+        }
+
+    def test_video_form_field_exists(self):
+        """Test that profile_video field is in the form."""
+        from providers.views import ProviderProfileForm
+
+        form = ProviderProfileForm(instance=self.provider)
+        self.assertIn("profile_video", form.fields)
+
+    def test_valid_mp4_upload(self):
+        """Test uploading a valid MP4 video."""
+        video = SimpleUploadedFile(
+            "intro.mp4", b"\x00" * 1024, content_type="video/mp4"
+        )
+        self.client.post(
+            reverse("provider_profile"),
+            {**self._base_form_data(), "profile_video": video},
+        )
+        self.provider.refresh_from_db()
+        self.assertTrue(
+            self.provider.profile_video.name.startswith("providers/videos/")
+        )
+
+    def test_reject_non_mp4(self):
+        """Test that non-MP4 files are rejected."""
+        video = SimpleUploadedFile(
+            "intro.avi", b"\x00" * 1024, content_type="video/x-msvideo"
+        )
+        response = self.client.post(
+            reverse("provider_profile"),
+            {**self._base_form_data(), "profile_video": video},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.provider.refresh_from_db()
+        self.assertFalse(bool(self.provider.profile_video))
+
+    def test_reject_oversize_video(self):
+        """Test that videos over 50MB are rejected."""
+        from providers.views import ProviderProfileForm
+
+        video = SimpleUploadedFile("big.mp4", b"\x00" * 100, content_type="video/mp4")
+        video.size = 51 * 1024 * 1024  # fake size to 51MB
+
+        form = ProviderProfileForm(
+            data=self._base_form_data(),
+            files={"profile_video": video},
+            instance=self.provider,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn("profile_video", form.errors)
+
+    def test_detail_view_renders_video(self):
+        """Test that detail view renders video tag when video exists."""
+        self.provider.subscription_status = "active"
+        self.provider.profile_video = "providers/videos/intro.mp4"
+        self.provider.save()
+
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        self.assertContains(response, "<video")
+        self.assertContains(response, "providers/videos/intro.mp4")
+
+    def test_detail_view_no_video_tag_when_empty(self):
+        """Test that detail view does not render video tag when no video."""
+        self.provider.subscription_status = "active"
+        self.provider.save()
+
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        self.assertNotContains(response, "<video")

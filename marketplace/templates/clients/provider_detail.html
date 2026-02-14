@@ -210,6 +210,16 @@
     </div>
     {% endif %}
 
+    <!-- Video Section -->
+    {% if provider.profile_video %}
+    <div class="card-dark p-6 md:p-8 mb-8">
+        <video controls class="w-full rounded-xl">
+            <source src="{{ provider.profile_video.url }}" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
+    {% endif %}
+
     <!-- Map Section -->
     {% if map_lat %}
     <div class="card-dark p-6 md:p-8 mb-8">

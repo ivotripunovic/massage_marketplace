@@ -107,12 +107,13 @@ class ProviderProfileForm(forms.ModelForm):
 
     class Meta:
         model = Provider
-        fields = ("bio", "phone", "phone_hours", "photo")
+        fields = ("bio", "phone", "phone_hours", "photo", "profile_video")
         labels = {
             "bio": "Bio / About",
             "phone": "Phone Number",
             "phone_hours": "Good Time to Call",
             "photo": "Profile Photo",
+            "profile_video": "Profile Video",
         }
         widgets = {
             "bio": forms.Textarea(
@@ -139,6 +140,12 @@ class ProviderProfileForm(forms.ModelForm):
                 attrs={
                     "class": "block w-full text-sm text-text-primary file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gold file:text-dark cursor-pointer",
                     "accept": "image/jpeg,image/png,image/gif",
+                }
+            ),
+            "profile_video": forms.FileInput(
+                attrs={
+                    "class": "block w-full text-sm text-text-primary file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gold file:text-dark cursor-pointer",
+                    "accept": "video/mp4",
                 }
             ),
         }
@@ -200,6 +207,19 @@ class ProviderProfileForm(forms.ModelForm):
                 raise forms.ValidationError("The uploaded file is not a valid image")
 
         return photo
+
+    def clean_profile_video(self):
+        """Validate profile video file."""
+        video = self.cleaned_data.get("profile_video")
+
+        if video and hasattr(video, "content_type"):
+            if video.size > 50 * 1024 * 1024:
+                raise forms.ValidationError("Video must be smaller than 50MB")
+
+            if video.content_type != "video/mp4":
+                raise forms.ValidationError("Only MP4 videos are allowed")
+
+        return video
 
     def save(self, commit=True):
         """Save form and update user fields."""
