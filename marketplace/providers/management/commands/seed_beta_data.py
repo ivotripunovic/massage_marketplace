@@ -490,13 +490,23 @@ class Command(BaseCommand):
             categories.append(cat)
         return categories
 
-    def _generate_reviews(self, rng, providers):
-        """Generate reviews for providers. Returns count."""
+    def _generate_reviews(self, rng, providers, hashed_password):
+        """Generate reviews for providers using bulk_create. Returns count."""
         categories = self._ensure_review_categories()
 
-        review_count = 0
+        # Skip providers that already have seed reviews
+        existing_reviewed = set(
+            Review.objects.filter(
+                client__email__endswith="@seed.local", provider__in=providers
+            ).values_list("provider_id", flat=True)
+        )
+
+        # First pass: collect review data and build client User objects
+        review_plan = []  # list of (provider, comment, base_rating, reviewer_first)
         client_idx = 0
         for provider in providers:
+            if provider.pk in existing_reviewed:
+                continue
             num_reviews = rng.choices(
                 [0, 1, 2, 3, 4, 5], weights=[10, 15, 25, 25, 15, 10]
             )[0]
@@ -509,28 +519,55 @@ class Command(BaseCommand):
                 else:
                     comment = rng.choice(REVIEW_COMMENTS_3)
 
-                reviewer_first = rng.choice(REVIEWER_FIRST_NAMES)
                 client_idx += 1
-                client_user = User.objects.create_user(
-                    email=f"reviewer{client_idx}@seed.local",
-                    password="seedpass123",
-                    user_type="client",
-                    first_name=reviewer_first,
-                    is_email_verified=True,
+                review_plan.append(
+                    {
+                        "provider": provider,
+                        "comment": comment,
+                        "base_rating": base_rating,
+                        "client_email": f"reviewer{client_idx}@seed.local",
+                        "client_first": rng.choice(REVIEWER_FIRST_NAMES),
+                    }
                 )
-                review = Review.objects.create(
-                    provider=provider,
-                    client=client_user,
-                    comment=comment,
-                )
-                for cat in categories:
-                    cat_rating = max(1, min(5, base_rating + rng.randint(-1, 1)))
-                    ReviewCategoryRating.objects.create(
-                        review=review, category=cat, rating=cat_rating
-                    )
-                review_count += 1
 
-        return review_count
+        if not review_plan:
+            return 0
+
+        # Bulk-create client users
+        client_users = [
+            User(
+                email=User.objects.normalize_email(r["client_email"]),
+                password=hashed_password,
+                user_type="client",
+                first_name=r["client_first"],
+                is_email_verified=True,
+            )
+            for r in review_plan
+        ]
+        User.objects.bulk_create(client_users, batch_size=BATCH_SIZE)
+
+        # Bulk-create reviews (bypass full_clean — data is controlled)
+        review_objects = [
+            Review(
+                provider=r["provider"],
+                client=client_user,
+                comment=r["comment"],
+            )
+            for r, client_user in zip(review_plan, client_users)
+        ]
+        Review.objects.bulk_create(review_objects, batch_size=BATCH_SIZE)
+
+        # Bulk-create category ratings
+        rating_objects = []
+        for r, review in zip(review_plan, review_objects):
+            for cat in categories:
+                cat_rating = max(1, min(5, r["base_rating"] + rng.randint(-1, 1)))
+                rating_objects.append(
+                    ReviewCategoryRating(review=review, category=cat, rating=cat_rating)
+                )
+        ReviewCategoryRating.objects.bulk_create(rating_objects, batch_size=BATCH_SIZE)
+
+        return len(review_objects)
 
     def _ensure_attribute_definitions(self):
         """Create provider attribute definitions if they don't already exist."""
@@ -908,7 +945,7 @@ class Command(BaseCommand):
         # Generate reviews in bulk
         self.stdout.write("Generating reviews...")
         with transaction.atomic():
-            review_count = self._generate_reviews(rng, providers)
+            review_count = self._generate_reviews(rng, providers, hashed_password)
         self.stdout.write(f"  Created {review_count} reviews")
 
         # Ensure attribute definitions exist
@@ -924,14 +961,24 @@ class Command(BaseCommand):
 
         # Copy city lat/lng to provider map_latitude/map_longitude
         self.stdout.write("Setting provider map coordinates from city...")
-        updated = 0
+        cities_by_id = {
+            c.id: c
+            for c in City.objects.filter(
+                id__in=[p.city_id for p in providers if p.city_id]
+            )
+        }
+        to_update = []
         for provider in providers:
-            if provider.city and provider.city.latitude and provider.city.longitude:
-                provider.map_latitude = provider.city.latitude
-                provider.map_longitude = provider.city.longitude
-                provider.save(update_fields=["map_latitude", "map_longitude"])
-                updated += 1
-        self.stdout.write(f"  Set map coordinates for {updated} providers")
+            city = cities_by_id.get(provider.city_id)
+            if city and city.latitude and city.longitude:
+                provider.map_latitude = city.latitude
+                provider.map_longitude = city.longitude
+                to_update.append(provider)
+        if to_update:
+            Provider.objects.bulk_update(
+                to_update, ["map_latitude", "map_longitude"], batch_size=BATCH_SIZE
+            )
+        self.stdout.write(f"  Set map coordinates for {len(to_update)} providers")
 
         # Generate pricing grids in bulk
         self.stdout.write("Generating pricing grids...")
