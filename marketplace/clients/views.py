@@ -157,8 +157,8 @@ class ProviderDirectoryView(ListView):
             Provider.objects.filter(
                 subscription_status="active", user__is_email_verified=True
             )
-            .select_related("user", "country", "city")
-            .prefetch_related("pricing", attribute_values_prefetch)
+            .select_related("user", "country", "city", "pricing")
+            .prefetch_related(attribute_values_prefetch)
             .annotate(
                 review_count=Coalesce(
                     Subquery(
@@ -307,8 +307,7 @@ class ProviderDetailView(DetailView):
             Provider.objects.filter(
                 subscription_status="active", user__is_email_verified=True
             )
-            .select_related("user", "country", "city")
-            .prefetch_related("reviews", "gallery_images")
+            .select_related("user", "country", "city", "pricing")
         )
 
     def get_context_data(self, **kwargs):
@@ -322,16 +321,24 @@ class ProviderDetailView(DetailView):
         )
 
         # Get reviews with category ratings and replies
-        context["reviews"] = (
+        reviews = list(
             Review.objects.filter(provider=provider)
             .select_related("client", "reply")
             .prefetch_related("category_ratings__category")
             .order_by("-created_at")
         )
+        context["reviews"] = reviews
+        context["total_reviews"] = len(reviews)
 
-        # Calculate stats
-        context["avg_rating"] = provider.average_rating()
-        context["total_reviews"] = context["reviews"].count()
+        # Calculate avg rating from prefetched data (no extra query)
+        all_ratings = [
+            cr.rating
+            for review in reviews
+            for cr in review.category_ratings.all()
+        ]
+        context["avg_rating"] = (
+            round(sum(all_ratings) / len(all_ratings), 1) if all_ratings else 0
+        )
 
         # Add review form (auth-aware)
         from reviews.forms import ReviewForm, ReviewReplyForm
@@ -343,7 +350,7 @@ class ProviderDetailView(DetailView):
             context["review_message"] = "log_in"
         elif user.user_type != "client":
             context["review_message"] = "clients_only"
-        elif Review.objects.filter(provider=provider, client=user).exists():
+        elif any(r.client_id == user.pk for r in reviews):
             context["review_message"] = "already_reviewed"
         else:
             context["can_review"] = True
@@ -384,19 +391,12 @@ class ProviderDetailView(DetailView):
         if map_lat is not None:
             context["map_lat"] = map_lat
             context["map_lng"] = map_lng
-            # Build location label: district + city + country
+            # Build location label from already-fetched attribute_values
             parts = []
-            district_attr = (
-                ProviderAttributeValue.objects.filter(
-                    provider=provider,
-                    definition__name="District",
-                    definition__is_active=True,
-                )
-                .values_list("value_text", flat=True)
-                .first()
-            )
-            if district_attr:
-                parts.append(district_attr)
+            for av in context["attribute_values"]:
+                if av.definition.name == "District" and av.value_text:
+                    parts.append(av.value_text)
+                    break
             if provider.city:
                 parts.append(provider.city.name)
             if provider.country:
@@ -416,7 +416,7 @@ class ProviderDetailView(DetailView):
             .order_by("display_order", "name")
         )
 
-        # Bulk fetch provider's preferences and custom options
+        # Bulk fetch provider's preferences and custom options (2 queries)
         pref_map = {}
         for pref in ProviderPreference.objects.filter(provider=provider):
             pref_map[pref.subgroup_id] = pref.is_checked
@@ -430,8 +430,10 @@ class ProviderDetailView(DetailView):
         result = []
         for group in groups:
             subgroups = []
-            for sg in group.subgroups.filter(is_active=True).order_by(
-                "display_order", "name"
+            # Filter in Python to use the prefetched data (not .filter() which hits DB)
+            for sg in sorted(
+                (s for s in group.subgroups.all() if s.is_active),
+                key=lambda s: (s.display_order, s.name),
             ):
                 is_checked = pref_map.get(sg.pk, False)
                 predefined_options = [opt.text for opt in sg.options.all()]
@@ -448,10 +450,12 @@ class ProviderDetailView(DetailView):
                 result.append({"name": group.name, "subgroups": subgroups})
 
         # Append provider's custom preferences as an "Other" group
-        custom_prefs = ProviderCustomPreference.objects.filter(
-            provider=provider
-        ).order_by("display_order", "name")
-        if custom_prefs.exists():
+        custom_prefs = list(
+            ProviderCustomPreference.objects.filter(provider=provider).order_by(
+                "display_order", "name"
+            )
+        )
+        if custom_prefs:
             other_subgroups = [
                 {
                     "name": cp.name,
