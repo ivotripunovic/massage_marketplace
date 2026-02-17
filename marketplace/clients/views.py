@@ -2,7 +2,8 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect
 from django.views.generic import ListView, DetailView, FormView
-from django.db.models import Count, Q, Prefetch
+from django.db.models import Avg, Count, OuterRef, Q, Prefetch, Subquery
+from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_GET
@@ -157,7 +158,24 @@ class ProviderDirectoryView(ListView):
                 subscription_status="active", user__is_email_verified=True
             )
             .select_related("user", "country", "city")
-            .prefetch_related("reviews", "pricing", attribute_values_prefetch)
+            .prefetch_related("pricing", attribute_values_prefetch)
+            .annotate(
+                review_count=Coalesce(
+                    Subquery(
+                        Review.objects.filter(provider=OuterRef("pk"))
+                        .values("provider")
+                        .annotate(cnt=Count("id"))
+                        .values("cnt")[:1]
+                    ),
+                    0,
+                ),
+                avg_rating=Subquery(
+                    Review.objects.filter(provider=OuterRef("pk"))
+                    .values("provider")
+                    .annotate(avg=Avg("category_ratings__rating"))
+                    .values("avg")[:1]
+                ),
+            )
         )
 
         # Apply filters from query parameters
@@ -194,12 +212,9 @@ class ProviderDirectoryView(ListView):
         """Add provider stats and filter choices to context."""
         context = super().get_context_data(**kwargs)
 
-        # Calculate statistics for each provider
+        # Build stats from annotated queryset (no extra queries)
         providers_with_stats = []
         for provider in context["providers"]:
-            reviews = Review.objects.filter(provider=provider)
-            avg_rating = provider.average_rating()
-
             card_attributes = []
             for attr in getattr(provider, "active_attribute_values", []):
                 definition = attr.definition
@@ -241,8 +256,8 @@ class ProviderDirectoryView(ListView):
             providers_with_stats.append(
                 {
                     "provider": provider,
-                    "review_count": reviews.count(),
-                    "avg_rating": avg_rating,
+                    "review_count": provider.review_count,
+                    "avg_rating": round(provider.avg_rating, 1) if provider.avg_rating else 0,
                     "card_attributes": card_attributes,
                     "card_pricing": card_pricing,
                 }
