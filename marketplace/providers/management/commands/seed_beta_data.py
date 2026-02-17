@@ -533,8 +533,14 @@ class Command(BaseCommand):
         if not review_plan:
             return 0
 
-        # Bulk-create client users
-        client_users = [
+        # Collect emails and check which already exist
+        all_emails = [r["client_email"] for r in review_plan]
+        existing_emails = set(
+            User.objects.filter(email__in=all_emails).values_list("email", flat=True)
+        )
+
+        # Bulk-create only new client users
+        new_client_users = [
             User(
                 email=User.objects.normalize_email(r["client_email"]),
                 password=hashed_password,
@@ -543,8 +549,20 @@ class Command(BaseCommand):
                 is_email_verified=True,
             )
             for r in review_plan
+            if r["client_email"] not in existing_emails
         ]
-        User.objects.bulk_create(client_users, batch_size=BATCH_SIZE)
+        if new_client_users:
+            User.objects.bulk_create(new_client_users, batch_size=BATCH_SIZE)
+
+        # Fetch all client users (both new and existing) to map emails to objects
+        email_to_user = dict(
+            User.objects.filter(email__in=all_emails).values_list("email", "pk")
+        )
+        # Set pk on User references for review creation
+        client_users = []
+        for r in review_plan:
+            u = User(pk=email_to_user[r["client_email"]])
+            client_users.append(u)
 
         # Bulk-create reviews (bypass full_clean — data is controlled)
         review_objects = [
