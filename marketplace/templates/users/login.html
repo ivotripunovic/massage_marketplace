@@ -20,6 +20,9 @@
 
             <form method="post">
                 {% csrf_token %}
+                {% if request.GET.next %}
+                <input type="hidden" name="next" value="{{ request.GET.next }}">
+                {% endif %}
 
                 {% if form.non_field_errors %}
                 <div class="bg-red-900/50 border border-red-700 text-red-300 rounded-lg p-3 mb-6">

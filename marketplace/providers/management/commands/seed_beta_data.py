@@ -31,7 +31,7 @@ from providers.models import (
     ProviderPreferenceCustomOption,
     ProviderCustomPreference,
 )
-from reviews.models import Review
+from reviews.models import Review, ReviewCategory, ReviewCategoryRating
 from users.models import User
 
 # ── Name pools ────────────────────────────────────────────────────────────────
@@ -278,6 +278,16 @@ REVIEWER_FIRST_NAMES = [
     "Gus",
 ]
 
+# ── Review categories ────────────────────────────────────────────────────────
+
+SEED_REVIEW_CATEGORIES = [
+    {"name": "Professionalism", "display_order": 1},
+    {"name": "Skill & Technique", "display_order": 2},
+    {"name": "Communication", "display_order": 3},
+    {"name": "Cleanliness & Hygiene", "display_order": 4},
+    {"name": "Value for Money", "display_order": 5},
+]
+
 # ── Seed email domain ─────────────────────────────────────────────────────────
 
 SEED_EMAIL_DOMAIN = "seed.example.com"
@@ -469,35 +479,58 @@ class Command(BaseCommand):
             "renewal_days": rng.randint(1, 30),
         }
 
+    def _ensure_review_categories(self):
+        """Create review categories if they don't exist. Returns list of categories."""
+        categories = []
+        for cat_data in SEED_REVIEW_CATEGORIES:
+            cat, _ = ReviewCategory.objects.get_or_create(
+                name=cat_data["name"],
+                defaults={"display_order": cat_data["display_order"]},
+            )
+            categories.append(cat)
+        return categories
+
     def _generate_reviews(self, rng, providers):
-        """Generate reviews for providers via bulk_create. Returns count."""
-        review_objects = []
+        """Generate reviews for providers. Returns count."""
+        categories = self._ensure_review_categories()
+
+        review_count = 0
+        client_idx = 0
         for provider in providers:
             num_reviews = rng.choices(
                 [0, 1, 2, 3, 4, 5], weights=[10, 15, 25, 25, 15, 10]
             )[0]
             for _ in range(num_reviews):
-                rating = rng.choices([3, 4, 5], weights=[10, 30, 60])[0]
-                if rating == 5:
+                base_rating = rng.choices([3, 4, 5], weights=[10, 30, 60])[0]
+                if base_rating == 5:
                     comment = rng.choice(REVIEW_COMMENTS_5)
-                elif rating == 4:
+                elif base_rating == 4:
                     comment = rng.choice(REVIEW_COMMENTS_4)
                 else:
                     comment = rng.choice(REVIEW_COMMENTS_3)
 
-                reviewer = f"{rng.choice(REVIEWER_FIRST_NAMES)} {rng.choice('ABCDEFGHIJKLMNOPQRSTUVWXYZ')}."
-
-                review_objects.append(
-                    Review(
-                        provider=provider,
-                        rating=rating,
-                        client_name=reviewer,
-                        comment=comment,
-                    )
+                reviewer_first = rng.choice(REVIEWER_FIRST_NAMES)
+                client_idx += 1
+                client_user = User.objects.create_user(
+                    email=f"reviewer{client_idx}@seed.local",
+                    password="seedpass123",
+                    user_type="client",
+                    first_name=reviewer_first,
+                    is_email_verified=True,
                 )
+                review = Review.objects.create(
+                    provider=provider,
+                    client=client_user,
+                    comment=comment,
+                )
+                for cat in categories:
+                    cat_rating = max(1, min(5, base_rating + rng.randint(-1, 1)))
+                    ReviewCategoryRating.objects.create(
+                        review=review, category=cat, rating=cat_rating
+                    )
+                review_count += 1
 
-        Review.objects.bulk_create(review_objects, batch_size=BATCH_SIZE)
-        return len(review_objects)
+        return review_count
 
     def _ensure_attribute_definitions(self):
         """Create provider attribute definitions if they don't already exist."""

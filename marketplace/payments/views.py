@@ -150,13 +150,20 @@ class AdminProviderDetailView(AdminRequiredMixin, DetailView):
 
     def get_queryset(self):
         return Provider.objects.select_related("user").prefetch_related(
-            "reviews", "subscription_payments"
+            "reviews__client",
+            "reviews__reply",
+            "reviews__category_ratings__category",
+            "subscription_payments",
         )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         provider = self.object
-        context["reviews"] = provider.reviews.all().order_by("-created_at")[:10]
+        context["reviews"] = (
+            provider.reviews.select_related("client", "reply")
+            .prefetch_related("category_ratings__category")
+            .order_by("-created_at")[:10]
+        )
         context["payments"] = provider.subscription_payments.all().order_by(
             "-created_at"
         )[:10]
@@ -324,6 +331,10 @@ class AdminAnalyticsView(AdminRequiredMixin, TemplateView):
         context["active_providers"] = active_providers
         context["total_providers"] = total_providers
         context["total_reviews"] = Review.objects.count()
-        context["avg_rating"] = Review.objects.aggregate(avg=Avg("rating"))["avg"] or 0
+        from reviews.models import ReviewCategoryRating
+
+        context["avg_rating"] = (
+            ReviewCategoryRating.objects.aggregate(avg=Avg("rating"))["avg"] or 0
+        )
 
         return context

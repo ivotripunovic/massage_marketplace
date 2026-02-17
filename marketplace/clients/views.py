@@ -1,6 +1,10 @@
-from django.views.generic import ListView, DetailView
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.shortcuts import redirect
+from django.views.generic import ListView, DetailView, FormView
 from django.db.models import Count, Q, Prefetch
 from django.http import JsonResponse
+from django.urls import reverse_lazy
 from django.views.decorators.http import require_GET
 from providers.models import (
     Provider,
@@ -302,19 +306,41 @@ class ProviderDetailView(DetailView):
             provider=provider
         )
 
-        # Get reviews
-        context["reviews"] = Review.objects.filter(provider=provider).order_by(
-            "-created_at"
+        # Get reviews with category ratings and replies
+        context["reviews"] = (
+            Review.objects.filter(provider=provider)
+            .select_related("client", "reply")
+            .prefetch_related("category_ratings__category")
+            .order_by("-created_at")
         )
 
         # Calculate stats
         context["avg_rating"] = provider.average_rating()
         context["total_reviews"] = context["reviews"].count()
 
-        # Add review form
-        from reviews.forms import ReviewForm
+        # Add review form (auth-aware)
+        from reviews.forms import ReviewForm, ReviewReplyForm
 
+        user = self.request.user
+        context["can_review"] = False
+        context["review_message"] = None
+        if not user.is_authenticated:
+            context["review_message"] = "log_in"
+        elif user.user_type != "client":
+            context["review_message"] = "clients_only"
+        elif Review.objects.filter(provider=provider, client=user).exists():
+            context["review_message"] = "already_reviewed"
+        else:
+            context["can_review"] = True
         context["form"] = ReviewForm()
+
+        # Reply form for the provider
+        context["is_owner"] = (
+            user.is_authenticated
+            and hasattr(user, "provider_profile")
+            and user.provider_profile == provider
+        )
+        context["reply_form"] = ReviewReplyForm()
         context["attribute_values"] = (
             ProviderAttributeValue.objects.select_related("definition")
             .filter(provider=provider, definition__is_active=True)
@@ -423,3 +449,61 @@ class ProviderDetailView(DetailView):
             result.append({"name": "Other", "subgroups": other_subgroups})
 
         return result
+
+
+class ClientRequiredMixin(LoginRequiredMixin):
+    """Mixin to require client user type."""
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("login")
+        if request.user.user_type != "client":
+            messages.error(request, "This page is only available to clients.")
+            return redirect("login")
+        return super().dispatch(request, *args, **kwargs)
+
+
+class ClientProfileView(ClientRequiredMixin, FormView):
+    """Edit client profile (first_name, last_name)."""
+
+    template_name = "clients/client_profile.html"
+    success_url = reverse_lazy("client_profile")
+
+    def get_form_class(self):
+        from django import forms
+
+        class _Form(forms.Form):
+            first_name = forms.CharField(max_length=150, required=False)
+            last_name = forms.CharField(max_length=150, required=False)
+
+        return _Form
+
+    def get_initial(self):
+        return {
+            "first_name": self.request.user.first_name,
+            "last_name": self.request.user.last_name,
+        }
+
+    def form_valid(self, form):
+        user = self.request.user
+        user.first_name = form.cleaned_data["first_name"]
+        user.last_name = form.cleaned_data["last_name"]
+        user.save(update_fields=["first_name", "last_name"])
+        messages.success(self.request, "Profile updated successfully.")
+        return super().form_valid(form)
+
+
+class ClientReviewsView(ClientRequiredMixin, ListView):
+    """List reviews written by the current client."""
+
+    template_name = "clients/client_reviews.html"
+    context_object_name = "reviews"
+    paginate_by = 10
+
+    def get_queryset(self):
+        return (
+            Review.objects.filter(client=self.request.user)
+            .select_related("provider__user")
+            .prefetch_related("category_ratings__category", "reply")
+            .order_by("-created_at")
+        )

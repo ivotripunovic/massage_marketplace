@@ -3,7 +3,7 @@ from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from users.models import User
 from providers.models import Provider, ProviderGalleryImage, ProviderPricing
-from reviews.models import Review
+from reviews.models import Review, ReviewCategory, ReviewCategoryRating
 
 
 class ProviderDirectoryViewTests(TestCase):
@@ -77,10 +77,18 @@ class ProviderDirectoryViewTests(TestCase):
     def test_provider_card_shows_info(self):
         """Test that provider cards show correct information."""
         # Add reviews
-        Review.objects.create(
-            provider=self.active_provider, rating=5, comment="Great service!"
+        client1 = User.objects.create_user(
+            email="c1@example.com", password="testpass123", user_type="client"
         )
-        Review.objects.create(provider=self.active_provider, rating=4, comment="Good")
+        client2 = User.objects.create_user(
+            email="c2@example.com", password="testpass123", user_type="client"
+        )
+        Review.objects.create(
+            provider=self.active_provider, client=client1, comment="Great service!"
+        )
+        Review.objects.create(
+            provider=self.active_provider, client=client2, comment="Good"
+        )
 
         response = self.client.get(reverse("providers"))
 
@@ -140,12 +148,22 @@ class ProviderDetailViewTests(TestCase):
             subscription_status="active",
         )
 
-        # Create reviews
+        # Create client user and review
+        self.client_user = User.objects.create_user(
+            email="client@example.com",
+            password="testpass123",
+            user_type="client",
+            first_name="Jane",
+            last_name="Smith",
+        )
         self.review = Review.objects.create(
             provider=self.provider,
-            rating=5,
-            client_name="Jane Smith",
+            client=self.client_user,
             comment="Excellent service!",
+        )
+        self.category = ReviewCategory.objects.create(name="Quality")
+        ReviewCategoryRating.objects.create(
+            review=self.review, category=self.category, rating=5
         )
 
     def test_provider_detail_loads(self):
@@ -183,11 +201,11 @@ class ProviderDetailViewTests(TestCase):
         # Should show review content
         self.assertContains(response, "Excellent service!")
 
-        # Should show reviewer name
-        self.assertContains(response, "Jane Smith")
+        # Should show reviewer first name
+        self.assertContains(response, "Jane")
 
-        # Should show rating (5 stars)
-        self.assertContains(response, "★")
+        # Should show category name
+        self.assertContains(response, "Quality")
 
     def test_inactive_provider_returns_404(self):
         """Test that inactive provider returns 404."""
@@ -232,10 +250,23 @@ class ProviderModelHelperTests(TestCase):
         self.provider = Provider.objects.create(user=self.user, phone="+1234567890")
 
     def test_average_rating_with_reviews(self):
-        """Test average rating calculation with reviews."""
-        Review.objects.create(provider=self.provider, rating=5, comment="Great!")
-        Review.objects.create(provider=self.provider, rating=4, comment="Good")
-        Review.objects.create(provider=self.provider, rating=3, comment="OK")
+        """Test average rating calculation with category ratings."""
+        cat = ReviewCategory.objects.create(name="Quality")
+        c1 = User.objects.create_user(
+            email="c1@example.com", password="testpass123", user_type="client"
+        )
+        c2 = User.objects.create_user(
+            email="c2@example.com", password="testpass123", user_type="client"
+        )
+        c3 = User.objects.create_user(
+            email="c3@example.com", password="testpass123", user_type="client"
+        )
+        r1 = Review.objects.create(provider=self.provider, client=c1, comment="Great!")
+        r2 = Review.objects.create(provider=self.provider, client=c2, comment="Good")
+        r3 = Review.objects.create(provider=self.provider, client=c3, comment="OK")
+        ReviewCategoryRating.objects.create(review=r1, category=cat, rating=5)
+        ReviewCategoryRating.objects.create(review=r2, category=cat, rating=4)
+        ReviewCategoryRating.objects.create(review=r3, category=cat, rating=3)
 
         avg = self.provider.average_rating()
         self.assertEqual(avg, 4.0)
@@ -367,7 +398,7 @@ class ProviderSlugTests(TestCase):
 
     def test_review_submit_uses_slug(self):
         """Test that review submission works with slug-based URL."""
-        user = User.objects.create_user(
+        provider_user = User.objects.create_user(
             email="reviewed@example.com",
             password="testpass123",
             user_type="provider",
@@ -376,15 +407,21 @@ class ProviderSlugTests(TestCase):
             is_email_verified=True,
         )
         provider = Provider.objects.create(
-            user=user, phone="+1234567890", subscription_status="active"
+            user=provider_user, phone="+1234567890", subscription_status="active"
         )
+        User.objects.create_user(
+            email="slug-client@example.com",
+            password="testpass123",
+            user_type="client",
+        )
+        cat = ReviewCategory.objects.create(name="SlugCat")
 
+        self.client.login(email="slug-client@example.com", password="testpass123")
         response = self.client.post(
             reverse("review_submit", kwargs={"slug": provider.slug}),
             {
-                "rating": 5,
                 "comment": "Slug-based review!",
-                "client_email": "client@example.com",
+                f"category_{cat.pk}": 5,
             },
         )
         self.assertEqual(response.status_code, 302)
@@ -923,3 +960,174 @@ class ProviderDirectoryPricingTests(TestCase):
         response = self.client.get(reverse("providers"))
         item = response.context["providers_with_stats"][0]
         self.assertIsNone(item["card_pricing"])
+
+
+class ClientRequiredMixinTests(TestCase):
+    """Tests for ClientRequiredMixin access control."""
+
+    def setUp(self):
+        self.client_obj = Client()
+        self.client_user = User.objects.create_user(
+            email="client@example.com",
+            password="testpass123",
+            user_type="client",
+        )
+        self.provider_user = User.objects.create_user(
+            email="provider@example.com",
+            password="testpass123",
+            user_type="provider",
+        )
+
+    def test_anonymous_redirected_to_login(self):
+        response = self.client_obj.get(reverse("client_profile"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
+
+    def test_provider_redirected_to_login(self):
+        self.client_obj.login(email="provider@example.com", password="testpass123")
+        response = self.client_obj.get(reverse("client_profile"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)
+
+    def test_client_can_access(self):
+        self.client_obj.login(email="client@example.com", password="testpass123")
+        response = self.client_obj.get(reverse("client_profile"))
+        self.assertEqual(response.status_code, 200)
+
+
+class ClientProfileViewTests(TestCase):
+    """Tests for the client profile view."""
+
+    def setUp(self):
+        self.client_obj = Client()
+        self.user = User.objects.create_user(
+            email="client@example.com",
+            password="testpass123",
+            user_type="client",
+            first_name="Jane",
+            last_name="Doe",
+        )
+        self.client_obj.login(email="client@example.com", password="testpass123")
+
+    def test_profile_get_shows_current_values(self):
+        response = self.client_obj.get(reverse("client_profile"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Jane")
+        self.assertContains(response, "Doe")
+
+    def test_profile_post_updates_name(self):
+        response = self.client_obj.post(
+            reverse("client_profile"),
+            {"first_name": "Alice", "last_name": "Smith"},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, "Alice")
+        self.assertEqual(self.user.last_name, "Smith")
+
+    def test_profile_post_allows_empty_names(self):
+        response = self.client_obj.post(
+            reverse("client_profile"),
+            {"first_name": "", "last_name": ""},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.user.refresh_from_db()
+        self.assertEqual(self.user.first_name, "")
+        self.assertEqual(self.user.last_name, "")
+
+    def test_profile_uses_correct_template(self):
+        response = self.client_obj.get(reverse("client_profile"))
+        self.assertTemplateUsed(response, "clients/client_profile.html")
+
+
+class ClientReviewsViewTests(TestCase):
+    """Tests for the client reviews list view."""
+
+    def setUp(self):
+        self.client_obj = Client()
+        self.user = User.objects.create_user(
+            email="client@example.com",
+            password="testpass123",
+            user_type="client",
+        )
+        self.provider_user = User.objects.create_user(
+            email="provider@example.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+            first_name="John",
+            last_name="Provider",
+        )
+        self.provider = Provider.objects.create(
+            user=self.provider_user,
+            phone="+1234567890",
+            subscription_status="active",
+        )
+        self.client_obj.login(email="client@example.com", password="testpass123")
+
+    def test_reviews_page_loads(self):
+        response = self.client_obj.get(reverse("client_reviews"))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, "clients/client_reviews.html")
+
+    def test_empty_state_shown(self):
+        response = self.client_obj.get(reverse("client_reviews"))
+        self.assertContains(response, "haven&#x27;t written any reviews yet")
+
+    def test_reviews_listed(self):
+        Review.objects.create(
+            provider=self.provider,
+            client=self.user,
+            comment="Great massage!",
+        )
+        response = self.client_obj.get(reverse("client_reviews"))
+        self.assertContains(response, "Great massage!")
+        self.assertContains(response, "John Provider")
+
+    def test_only_own_reviews_shown(self):
+        other_client = User.objects.create_user(
+            email="other@example.com",
+            password="testpass123",
+            user_type="client",
+        )
+        Review.objects.create(
+            provider=self.provider,
+            client=other_client,
+            comment="Not my review",
+        )
+        response = self.client_obj.get(reverse("client_reviews"))
+        self.assertNotContains(response, "Not my review")
+
+    def test_pagination(self):
+        # Create 12 providers with reviews to exceed paginate_by=10
+        for i in range(12):
+            puser = User.objects.create_user(
+                email=f"prov{i}@example.com",
+                password="testpass123",
+                user_type="provider",
+                is_email_verified=True,
+            )
+            prov = Provider.objects.create(
+                user=puser,
+                phone=f"+123456789{i}",
+                subscription_status="active",
+            )
+            Review.objects.create(
+                provider=prov,
+                client=self.user,
+                comment=f"Review {i}",
+            )
+
+        response = self.client_obj.get(reverse("client_reviews"))
+        self.assertTrue(response.context["is_paginated"])
+        self.assertEqual(len(response.context["reviews"]), 10)
+
+        # Page 2
+        response = self.client_obj.get(reverse("client_reviews") + "?page=2")
+        self.assertEqual(len(response.context["reviews"]), 2)
+
+    def test_anonymous_redirected(self):
+        self.client_obj.logout()
+        response = self.client_obj.get(reverse("client_reviews"))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("login", response.url)

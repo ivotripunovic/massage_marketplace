@@ -3,6 +3,7 @@ from django.urls import reverse_lazy
 from django.contrib import messages, auth
 from django.shortcuts import redirect, render
 from django.http import HttpResponseRedirect
+from django import forms
 from users.forms import (
     SignupForm,
     LoginForm,
@@ -84,17 +85,54 @@ class VerifyEmailView(View):
             return render(request, "users/verify_email_error.html", context, status=400)
 
 
+class ResendVerificationView(FormView):
+    """Resend email verification link."""
+
+    template_name = "users/resend_verification.html"
+    success_url = reverse_lazy("check_email")
+
+    class ResendForm(forms.Form):
+        email = forms.EmailField(
+            widget=forms.EmailInput(
+                attrs={"class": "input-dark w-full", "placeholder": "your@email.com"}
+            )
+        )
+
+    form_class = ResendForm
+
+    def form_valid(self, form):
+        email = form.cleaned_data["email"].lower()
+        try:
+            user = User.objects.get(email__iexact=email, is_email_verified=False)
+            send_verification_email(user, self.request)
+        except User.DoesNotExist:
+            pass  # Don't reveal if email exists
+        messages.success(
+            self.request,
+            "If an unverified account exists with that email, a new verification link has been sent.",
+        )
+        return super().form_valid(form)
+
+
 class LoginView(FormView):
     """User login view."""
 
     form_class = LoginForm
     template_name = "users/login.html"
-    success_url = reverse_lazy("provider_dashboard")
+
+    def get_success_url(self):
+        """Return redirect URL based on 'next' param or user type."""
+        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        if next_url:
+            return next_url
+        if hasattr(self.request.user, "user_type") and self.request.user.user_type == "provider":
+            return reverse_lazy("provider_dashboard")
+        return reverse_lazy("home")
 
     def dispatch(self, request, *args, **kwargs):
-        """Redirect logged-in users to dashboard."""
+        """Redirect logged-in users to appropriate page."""
         if request.user.is_authenticated:
-            return redirect(self.success_url)
+            return redirect(self.get_success_url())
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):

@@ -10,7 +10,6 @@ from django.shortcuts import redirect, get_object_or_404
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django import forms
-from django.db.models import Avg
 from django.http import HttpResponseForbidden
 from providers.models import (
     Provider,
@@ -62,14 +61,8 @@ class ProviderDashboardView(ProviderRequiredMixin, TemplateView):
             from reviews.models import Review
 
             reviews = Review.objects.filter(provider=provider)
-            if reviews.exists():
-                context["total_reviews"] = reviews.count()
-                context["average_rating"] = (
-                    sum(r.rating for r in reviews) / reviews.count()
-                )
-            else:
-                context["total_reviews"] = 0
-                context["average_rating"] = 0
+            context["total_reviews"] = reviews.count()
+            context["average_rating"] = provider.average_rating()
             context["gallery_images"] = ProviderGalleryImage.objects.filter(
                 provider=provider
             )
@@ -705,17 +698,12 @@ class AdminProviderListView(AdminRequiredMixin, ListView):
 
         providers_with_stats = []
         for provider in context["providers"]:
-            reviews = Review.objects.filter(provider=provider)
-            avg_rating = (
-                reviews.aggregate(Avg("rating"))["rating__avg"]
-                if reviews.exists()
-                else 0
-            )
+            review_count = Review.objects.filter(provider=provider).count()
             providers_with_stats.append(
                 {
                     "provider": provider,
-                    "review_count": reviews.count(),
-                    "avg_rating": avg_rating,
+                    "review_count": review_count,
+                    "avg_rating": provider.average_rating(),
                 }
             )
         context["providers_with_stats"] = providers_with_stats

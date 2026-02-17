@@ -13,12 +13,7 @@
         <div style="background-color: #f3f4f6; padding: 15px; border-radius: 5px; margin: 20px 0;">
             <p><strong>Provider:</strong> {{ provider.get_name }}</p>
             <p><strong>Email:</strong> {{ provider.user.email }}</p>
-            <p><strong>Rating:</strong> {{ review.rating }} / 5 stars</p>
-            {% if review.client_name %}
-            <p><strong>Reviewer:</strong> {{ review.client_name }}</p>
-            {% else %}
-            <p><strong>Reviewer:</strong> Anonymous</p>
-            {% endif %}
+            <p><strong>Reviewer:</strong> {{ review.client.email }}</p>
             <p><strong>Comment:</strong></p>
             <p style="font-style: italic;">"{{ review.comment }}"</p>
         </div>

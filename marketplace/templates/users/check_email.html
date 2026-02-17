@@ -27,7 +27,7 @@
 
             <p class="text-text-muted text-sm mb-4">
                 <strong>Didn't receive the email?</strong> Check your spam folder or
-                <a href="/auth/resend-email/" class="text-gold hover:text-gold-light">request a new verification link</a>
+                <a href="{% url 'resend_verification' %}" class="text-gold hover:text-gold-light">request a new verification link</a>
             </p>
 
             <a href="{% url 'signup' %}" class="text-gold hover:text-gold-light text-sm">Back to sign up</a>

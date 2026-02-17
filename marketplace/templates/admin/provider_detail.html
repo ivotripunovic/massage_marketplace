@@ -171,18 +171,29 @@
         <div class="border-b pb-3">
             <div class="flex justify-between items-center mb-1">
                 <div>
-                    {% for i in "12345" %}
-                        {% if forloop.counter <= review.rating %}
-                            <span class="text-yellow-400">&#9733;</span>
-                        {% else %}
-                            <span class="text-gray-300">&#9734;</span>
-                        {% endif %}
-                    {% endfor %}
-                    <span class="text-sm text-gray-500 ml-2">{{ review.client_name|default:"Anonymous" }}</span>
+                    <span class="text-sm text-gray-500">{{ review.client.first_name|default:"Client" }} ({{ review.client.email }})</span>
                 </div>
                 <span class="text-xs text-gray-400">{{ review.created_at|date:"M d, Y" }}</span>
             </div>
-            <p class="text-sm text-gray-700">{{ review.comment }}</p>
+            {% for cr in review.category_ratings.all %}
+            <div class="flex items-center gap-1 text-sm">
+                <span class="text-gray-500">{{ cr.category.name }}:</span>
+                {% for i in "12345" %}
+                    {% if forloop.counter <= cr.rating %}
+                        <span class="text-yellow-400">&#9733;</span>
+                    {% else %}
+                        <span class="text-gray-300">&#9734;</span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% endfor %}
+            <p class="text-sm text-gray-700 mt-1">{{ review.comment }}</p>
+            {% if review.reply %}
+            <div class="ml-4 mt-2 pl-3 border-l-2 border-blue-200">
+                <p class="text-xs text-blue-600 font-semibold">Provider Reply</p>
+                <p class="text-sm text-gray-600">{{ review.reply.comment }}</p>
+            </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>

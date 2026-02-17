@@ -36,7 +36,10 @@ class SignupForm(forms.Form):
         label="Account Type",
         required=True,
         initial="provider",
-        choices=[("provider", "I am a Service Provider")],
+        choices=[
+            ("provider", "I am a Service Provider"),
+            ("client", "I am a Client"),
+        ],
         widget=forms.RadioSelect(),
     )
 

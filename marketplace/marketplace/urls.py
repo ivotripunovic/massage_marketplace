@@ -29,6 +29,7 @@ from users.views import (
     PasswordResetView,
     PasswordResetSentView,
     PasswordResetConfirmView,
+    ResendVerificationView,
 )
 from providers.views import (
     ProviderDashboardView,
@@ -53,10 +54,12 @@ from payments.views import (
 from clients.views import (
     ProviderDirectoryView,
     ProviderDetailView,
+    ClientProfileView,
+    ClientReviewsView,
     country_search_api,
     city_search_api,
 )
-from reviews.views import ReviewSubmitView
+from reviews.views import ReviewSubmitView, ReviewReplyView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -71,9 +74,19 @@ urlpatterns = [
         ReviewSubmitView.as_view(),
         name="review_submit",
     ),
+    path(
+        "providers/<slug:slug>/review/<int:pk>/reply/",
+        ReviewReplyView.as_view(),
+        name="review_reply",
+    ),
     # Authentication URLs
     path("auth/signup/", SignupView.as_view(), name="signup"),
     path("auth/check-email/", CheckEmailView.as_view(), name="check_email"),
+    path(
+        "auth/resend-email/",
+        ResendVerificationView.as_view(),
+        name="resend_verification",
+    ),
     path(
         "auth/verify-email/<str:token>/", VerifyEmailView.as_view(), name="verify_email"
     ),
@@ -90,6 +103,9 @@ urlpatterns = [
         PasswordResetConfirmView.as_view(),
         name="password_reset_confirm",
     ),
+    # Client URLs
+    path("client/profile/", ClientProfileView.as_view(), name="client_profile"),
+    path("client/reviews/", ClientReviewsView.as_view(), name="client_reviews"),
     # Provider URLs
     path(
         "provider/dashboard/",

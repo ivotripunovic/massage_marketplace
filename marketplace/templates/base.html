@@ -209,8 +209,8 @@
                             <a href="{% url 'provider_dashboard' %}" class="nav-link">Dashboard</a>
                             <a href="{% url 'provider_profile' %}" class="nav-link">Profile</a>
                         {% elif user.user_type == 'client' %}
-                            <a href="/client/dashboard/" class="nav-link">Find Services</a>
-                            <a href="/client/bookings/" class="nav-link">My Bookings</a>
+                            <a href="{% url 'client_profile' %}" class="nav-link">My Profile</a>
+                            <a href="{% url 'client_reviews' %}" class="nav-link">My Reviews</a>
                         {% endif %}
 
                         <form method="post" action="{% url 'logout' %}" style="display: inline;">
@@ -242,8 +242,8 @@
                         <a href="{% url 'provider_dashboard' %}" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">Dashboard</a>
                         <a href="{% url 'provider_profile' %}" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">Profile</a>
                     {% elif user.user_type == 'client' %}
-                        <a href="/client/dashboard/" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">Find Services</a>
-                        <a href="/client/bookings/" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">My Bookings</a>
+                        <a href="{% url 'client_profile' %}" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">My Profile</a>
+                        <a href="{% url 'client_reviews' %}" class="block px-2 py-2 text-text-secondary hover:text-gold hover:bg-dark-200 rounded">My Reviews</a>
                     {% endif %}
                     <form method="post" action="{% url 'logout' %}">
                         {% csrf_token %}

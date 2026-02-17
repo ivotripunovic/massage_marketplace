@@ -239,13 +239,13 @@ class Provider(models.Model):
         self.save()
 
     def average_rating(self):
-        """Calculate average rating from reviews."""
+        """Calculate average rating from all category ratings across reviews."""
         from django.db.models import Avg
-        from reviews.models import Review
+        from reviews.models import ReviewCategoryRating
 
-        avg = Review.objects.filter(provider=self).aggregate(Avg("rating"))[
-            "rating__avg"
-        ]
+        avg = ReviewCategoryRating.objects.filter(review__provider=self).aggregate(
+            Avg("rating")
+        )["rating__avg"]
         return round(avg, 1) if avg else 0
 
     def get_name(self):

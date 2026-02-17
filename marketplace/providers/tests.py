@@ -5,7 +5,7 @@ from django.test import TestCase, Client
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from users.models import User
-from reviews.models import Review
+from reviews.models import Review, ReviewCategory, ReviewCategoryRating
 from .models import (
     Provider,
     ProviderGalleryImage,
@@ -211,11 +211,19 @@ class ProviderDashboardViewTests(TestCase):
         )
 
         # Create test data
+        self.review_client = User.objects.create_user(
+            email="review-client@test.com",
+            password="testpass123",
+            user_type="client",
+        )
+        self.review_cat = ReviewCategory.objects.create(name="Quality")
         self.review = Review.objects.create(
             provider=self.provider,
-            rating=5,
+            client=self.review_client,
             comment="Excellent service",
-            client_email="client@test.com",
+        )
+        ReviewCategoryRating.objects.create(
+            review=self.review, category=self.review_cat, rating=5
         )
 
     def test_dashboard_requires_login(self):
@@ -264,13 +272,16 @@ class ProviderDashboardViewTests(TestCase):
         self.assertContains(response, "Total Reviews")
 
     def test_dashboard_calculates_average_rating(self):
-        """Test that dashboard calculates average rating from reviews."""
+        """Test that dashboard calculates average rating from category ratings."""
         # Add another review with 4 stars
-        Review.objects.create(
-            provider=self.provider,
-            rating=4,
-            comment="Good service",
-            client_email="client2@test.com",
+        client2 = User.objects.create_user(
+            email="client2@test.com", password="testpass123", user_type="client"
+        )
+        review2 = Review.objects.create(
+            provider=self.provider, client=client2, comment="Good service"
+        )
+        ReviewCategoryRating.objects.create(
+            review=review2, category=self.review_cat, rating=4
         )
 
         self.client.login(email=self.user.email, password="testpass123")
@@ -1060,11 +1071,19 @@ class AdminProviderListViewTests(TestCase):
         )
 
         # Add a review to provider_active
-        Review.objects.create(
+        review_client = User.objects.create_user(
+            email="review-client-admin@test.com",
+            password="testpass123",
+            user_type="client",
+        )
+        review_cat = ReviewCategory.objects.create(name="Quality")
+        review = Review.objects.create(
             provider=self.provider_active,
-            rating=5,
+            client=review_client,
             comment="Excellent service",
-            client_email="client@test.com",
+        )
+        ReviewCategoryRating.objects.create(
+            review=review, category=review_cat, rating=5
         )
 
         self.client = Client()

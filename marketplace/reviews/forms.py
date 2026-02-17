@@ -1,61 +1,67 @@
 from django import forms
-from reviews.models import Review
+from reviews.models import Review, ReviewCategory, ReviewReply
 
 
 class ReviewForm(forms.ModelForm):
-    """Form for submitting reviews."""
+    """Form for submitting reviews with per-category ratings."""
 
     class Meta:
         model = Review
-        fields = ["rating", "comment", "client_name", "client_email"]
+        fields = ["comment"]
         labels = {
-            "rating": "Rating",
             "comment": "Your Review",
-            "client_name": "Your Name (Optional)",
-            "client_email": "Your Email (Required for verification)",
         }
         widgets = {
-            "rating": forms.RadioSelect(
-                choices=Review.RATING_CHOICES, attrs={"class": "review-rating-input"}
-            ),
             "comment": forms.Textarea(
                 attrs={
-                    "class": "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
+                    "class": "input-dark w-full resize-none",
                     "placeholder": "Share your experience with this provider...",
                     "rows": 4,
                     "maxlength": 250,
                 }
             ),
-            "client_name": forms.TextInput(
-                attrs={
-                    "class": "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
-                    "placeholder": "Your name (leave blank for anonymous)",
-                }
-            ),
-            "client_email": forms.EmailInput(
-                attrs={
-                    "class": "w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent",
-                    "placeholder": "your@email.com",
-                    "required": True,
-                }
-            ),
         }
         help_texts = {
-            "client_email": "Your email is required to prevent duplicate reviews. It will not be displayed publicly.",
             "comment": "Maximum 250 characters",
         }
 
-    def clean_rating(self):
-        """Validate rating is between 1 and 5."""
-        rating = self.cleaned_data.get("rating")
-        if rating is None:
-            raise forms.ValidationError("Please select a rating.")
-        if rating < 1 or rating > 5:
-            raise forms.ValidationError("Rating must be between 1 and 5.")
-        return rating
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.categories = list(
+            ReviewCategory.objects.filter(is_active=True).order_by(
+                "display_order", "name"
+            )
+        )
+        self.category_fields = []
+        for cat in self.categories:
+            field_name = f"category_{cat.pk}"
+            self.fields[field_name] = forms.IntegerField(
+                label=cat.name,
+                required=False,
+                min_value=1,
+                max_value=5,
+                widget=forms.RadioSelect(
+                    choices=[(i, str(i)) for i in range(1, 6)],
+                ),
+            )
+            self.category_fields.append(
+                {
+                    "category": cat,
+                    "name": field_name,
+                    "bound_field": self[field_name],
+                }
+            )
+
+    def clean(self):
+        cleaned = super().clean()
+        has_rating = any(
+            cleaned.get(f"category_{cat.pk}") is not None for cat in self.categories
+        )
+        if not has_rating:
+            raise forms.ValidationError("Please rate at least one category.")
+        return cleaned
 
     def clean_comment(self):
-        """Validate comment length."""
         comment = self.cleaned_data.get("comment")
         if not comment or len(comment.strip()) == 0:
             raise forms.ValidationError("Please write a review.")
@@ -63,11 +69,23 @@ class ReviewForm(forms.ModelForm):
             raise forms.ValidationError("Review must be 250 characters or less.")
         return comment.strip()
 
-    def clean_client_email(self):
-        """Validate email is provided."""
-        email = self.cleaned_data.get("client_email")
-        if not email:
-            raise forms.ValidationError(
-                "Email is required to prevent duplicate reviews."
-            )
-        return email.lower()
+
+class ReviewReplyForm(forms.ModelForm):
+    """Form for provider replies to reviews."""
+
+    class Meta:
+        model = ReviewReply
+        fields = ["comment"]
+        labels = {
+            "comment": "Your Reply",
+        }
+        widgets = {
+            "comment": forms.Textarea(
+                attrs={
+                    "class": "input-dark w-full resize-none",
+                    "placeholder": "Write your reply...",
+                    "rows": 3,
+                    "maxlength": 500,
+                }
+            ),
+        }

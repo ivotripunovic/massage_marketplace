@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}My Reviews - Massage Marketplace{% endblock %}
+
+{% block extra_css %}
+<style>
+    .star-rating { color: #d4af37; }
+    .star-empty { color: #3d3d3d; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="mx-auto px-4 sm:px-6 lg:px-8 py-8" style="max-width: 640px">
+    <h1 class="text-2xl font-display font-bold text-gold mb-6">My Reviews</h1>
+
+    {% if reviews %}
+        {% for review in reviews %}
+        <div class="card-dark p-6 mb-4">
+            <div class="flex items-center justify-between mb-3">
+                <a href="{% url 'provider_detail' slug=review.provider.slug %}" class="text-gold hover:text-gold-light font-semibold transition-colors">
+                    {{ review.provider.get_name }}
+                </a>
+                <span class="text-text-muted text-sm">{{ review.created_at|date:"M d, Y" }}</span>
+            </div>
+
+            <!-- Per-category ratings -->
+            {% for cr in review.category_ratings.all %}
+            <div class="flex items-center gap-2 mb-1">
+                <span class="text-text-muted text-sm w-32">{{ cr.category.name }}</span>
+                <div class="flex items-center gap-0.5">
+                    {% for i in "12345" %}
+                        {% if forloop.counter <= cr.rating %}
+                        <svg class="w-3.5 h-3.5 star-rating" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                        </svg>
+                        {% else %}
+                        <svg class="w-3.5 h-3.5 star-empty" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                        </svg>
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+
+            {% if review.comment %}
+            <p class="text-text-primary mt-3">{{ review.comment }}</p>
+            {% endif %}
+
+            <!-- Provider reply -->
+            {% if review.reply %}
+            <div class="mt-4 pl-4 border-l-2 border-dark-300">
+                <p class="text-text-muted text-sm mb-1">Provider reply:</p>
+                <p class="text-text-secondary text-sm">{{ review.reply.comment }}</p>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <!-- Pagination -->
+        {% if is_paginated %}
+        <nav class="flex justify-center mt-8 gap-2">
+            {% if page_obj.has_previous %}
+            <a href="?page={{ page_obj.previous_page_number }}" class="px-4 py-2 rounded bg-dark-100 border border-dark-300 text-text-secondary hover:text-gold hover:border-gold transition-colors">&laquo; Previous</a>
+            {% endif %}
+            <span class="px-4 py-2 text-text-muted">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}" class="px-4 py-2 rounded bg-dark-100 border border-dark-300 text-text-secondary hover:text-gold hover:border-gold transition-colors">Next &raquo;</a>
+            {% endif %}
+        </nav>
+        {% endif %}
+
+    {% else %}
+        <div class="card-dark p-8 text-center">
+            <p class="text-text-muted text-lg mb-2">You haven't written any reviews yet.</p>
+            <p class="text-text-secondary text-sm">Browse providers and share your experience!</p>
+            <a href="{% url 'home' %}" class="btn-gold inline-block mt-4">Browse Providers</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
