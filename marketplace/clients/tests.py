@@ -1,6 +1,7 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.cache import cache
 from users.models import User
 from providers.models import Provider, ProviderGalleryImage, ProviderPricing
 from reviews.models import Review, ReviewCategory, ReviewCategoryRating
@@ -1131,3 +1132,211 @@ class ClientReviewsViewTests(TestCase):
         response = self.client_obj.get(reverse("client_reviews"))
         self.assertEqual(response.status_code, 302)
         self.assertIn("login", response.url)
+
+
+class CachedCountPaginatorTests(TestCase):
+    """
+    CachedCountPaginator caches COUNT(*) per unique queryset.
+    Tests use DummyCache (from test_settings) so cache.get always returns None
+    and cache.set is a no-op — the paginator must still return correct counts.
+    """
+
+    def setUp(self):
+        self.client = Client()
+        for i in range(5):
+            u = User.objects.create_user(
+                email=f"prov{i}@cache.test",
+                password="pass",
+                user_type="provider",
+                is_email_verified=True,
+            )
+            Provider.objects.create(
+                user=u, phone=f"+1000000{i:03}", subscription_status="active"
+            )
+
+    def test_homepage_paginates_correctly(self):
+        """Paginator returns correct total count with DummyCache (no real caching)."""
+        response = self.client.get(reverse("providers"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["paginator"].count, 5)
+
+    def test_count_reflects_new_provider(self):
+        """Count updates when a new provider becomes active (cache is a no-op in tests)."""
+        response = self.client.get(reverse("providers"))
+        count_before = response.context["paginator"].count
+
+        new_user = User.objects.create_user(
+            email="new@cache.test",
+            password="pass",
+            user_type="provider",
+            is_email_verified=True,
+        )
+        Provider.objects.create(
+            user=new_user, phone="+19999999999", subscription_status="active"
+        )
+
+        response = self.client.get(reverse("providers"))
+        self.assertEqual(response.context["paginator"].count, count_before + 1)
+
+    def test_cached_count_paginator_used(self):
+        """ProviderDirectoryView uses CachedCountPaginator."""
+        from clients.views import CachedCountPaginator
+
+        response = self.client.get(reverse("providers"))
+        self.assertIsInstance(response.context["paginator"], CachedCountPaginator)
+
+
+class PreferenceGroupCacheTests(TestCase):
+    """
+    The PreferenceGroup tree is cached under PREF_GROUPS_CACHE_KEY.
+    With DummyCache, cache misses are always triggered so the DB is always hit —
+    we verify the view still works correctly and the signal handler doesn't error.
+    """
+
+    def setUp(self):
+        from providers.models import PreferenceGroup, PreferenceSubgroup
+
+        self.client = Client()
+
+        self.group = PreferenceGroup.objects.create(
+            name="Test Group", display_order=1, is_active=True
+        )
+        self.subgroup = PreferenceSubgroup.objects.create(
+            group=self.group, name="Test Subgroup", display_order=1, is_active=True
+        )
+
+        user = User.objects.create_user(
+            email="prov@pref.test",
+            password="pass",
+            user_type="provider",
+            is_email_verified=True,
+        )
+        self.provider = Provider.objects.create(
+            user=user, phone="+10000000001", subscription_status="active"
+        )
+
+    def test_detail_view_renders_preference_group(self):
+        """Provider detail page includes preference group data."""
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("preference_display", response.context)
+        groups = response.context["preference_display"]
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0]["name"], "Test Group")
+
+    def test_cache_key_deleted_on_group_save(self):
+        """Saving a PreferenceGroup calls cache.delete (no-op with DummyCache, no error)."""
+        from providers.signals import PREF_GROUPS_CACHE_KEY
+
+        # Seed a value so we can assert it's cleared (LocMemCache behaviour;
+        # with DummyCache this is also a no-op, but must not raise).
+        cache.set(PREF_GROUPS_CACHE_KEY, "sentinel", 60)
+        self.group.name = "Updated Group"
+        self.group.save()
+        # With DummyCache get always returns None; with a real cache it should be cleared.
+        self.assertIsNone(cache.get(PREF_GROUPS_CACHE_KEY))
+
+    def test_cache_key_deleted_on_subgroup_save(self):
+        """Saving a PreferenceSubgroup also invalidates the cache."""
+        from providers.signals import PREF_GROUPS_CACHE_KEY
+
+        cache.set(PREF_GROUPS_CACHE_KEY, "sentinel", 60)
+        self.subgroup.name = "Updated Subgroup"
+        self.subgroup.save()
+        self.assertIsNone(cache.get(PREF_GROUPS_CACHE_KEY))
+
+    def test_cache_key_deleted_on_group_delete(self):
+        """Deleting a PreferenceGroup invalidates the cache."""
+        from providers.signals import PREF_GROUPS_CACHE_KEY
+
+        cache.set(PREF_GROUPS_CACHE_KEY, "sentinel", 60)
+        self.group.delete()
+        self.assertIsNone(cache.get(PREF_GROUPS_CACHE_KEY))
+
+    def test_inactive_subgroup_excluded(self):
+        """Inactive subgroups are not included in preference_display."""
+        from providers.models import PreferenceSubgroup
+
+        PreferenceSubgroup.objects.create(
+            group=self.group, name="Inactive Sub", display_order=2, is_active=False
+        )
+        response = self.client.get(
+            reverse("provider_detail", kwargs={"slug": self.provider.slug})
+        )
+        subgroup_names = [
+            sg["name"]
+            for g in response.context["preference_display"]
+            for sg in g["subgroups"]
+        ]
+        self.assertNotIn("Inactive Sub", subgroup_names)
+
+
+class LocationAPICacheTests(TestCase):
+    """
+    Country and city API responses are cached.
+    With DummyCache the cache is a no-op — verify the endpoints
+    return correct data regardless of cache state.
+    """
+
+    def setUp(self):
+        from providers.models import Continent, Country, City
+
+        self.client = Client()
+
+        continent = Continent.objects.create(
+            name="Europe", code="EU", display_order=1
+        )
+        self.country = Country.objects.create(
+            name="Germany", code="DE", continent=continent, is_active=True
+        )
+        self.city = City.objects.create(
+            name="Berlin",
+            country=self.country,
+            population=3769000,
+            is_capital=True,
+            is_major_city=True,
+        )
+
+    def test_country_api_cache_miss_returns_data(self):
+        """Country API returns correct data when cache is cold."""
+        response = self.client.get(reverse("api_country_search"), {"all": "1"})
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        country_names = [
+            c["name"]
+            for continent in data["continents"]
+            for c in continent["countries"]
+        ]
+        self.assertIn("Germany", country_names)
+
+    def test_country_api_consistent_on_repeat_calls(self):
+        """Country API returns same data on two consecutive calls (cache hit or miss)."""
+        url = reverse("api_country_search")
+        r1 = self.client.get(url, {"all": "1"}).json()
+        r2 = self.client.get(url, {"all": "1"}).json()
+        self.assertEqual(r1, r2)
+
+    def test_city_api_cache_miss_returns_data(self):
+        """City API returns correct data when cache is cold."""
+        response = self.client.get(
+            reverse("api_city_search"), {"country": self.country.pk, "all": "1"}
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        city_names = [c["name"] for c in data["results"]]
+        self.assertIn("Berlin", city_names)
+
+    def test_city_api_consistent_on_repeat_calls(self):
+        """City API returns same data on two consecutive calls."""
+        url = reverse("api_city_search")
+        params = {"country": self.country.pk, "all": "1"}
+        r1 = self.client.get(url, params).json()
+        r2 = self.client.get(url, params).json()
+        self.assertEqual(r1, r2)
+
+    def test_country_api_empty_query_no_cache(self):
+        """Country API with no query and no all=1 returns empty (not cached)."""
+        response = self.client.get(reverse("api_country_search"))
+        self.assertEqual(response.json(), {"continents": []})

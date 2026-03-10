@@ -1,5 +1,9 @@
+from functools import cached_property
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.cache import cache
+from django.core.paginator import Paginator
 from django.shortcuts import redirect
 from django.views.generic import ListView, DetailView, FormView
 from django.db.models import Avg, Count, OuterRef, Q, Prefetch, Subquery
@@ -7,6 +11,29 @@ from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.urls import reverse_lazy
 from django.views.decorators.http import require_GET
+
+# ---------------------------------------------------------------------------
+# Cache keys and TTLs
+# ---------------------------------------------------------------------------
+PREF_GROUPS_CACHE_KEY = "pref_groups_tree"
+PREF_GROUPS_CACHE_TTL = 3600  # 1 hour — invalidated by providers.signals
+
+COUNTRIES_API_CACHE_TTL = 3600   # 1 hour
+CITIES_API_CACHE_TTL = 3600      # 1 hour
+PROVIDER_COUNT_CACHE_TTL = 60    # 60 s — short TTL, no explicit invalidation needed
+
+
+class CachedCountPaginator(Paginator):
+    """Paginator that caches the COUNT(*) query for 60 seconds."""
+
+    @cached_property
+    def count(self):
+        key = f"provider_count:{hash(str(self.object_list.query))}"
+        result = cache.get(key)
+        if result is None:
+            result = self.object_list.count()
+            cache.set(key, result, PROVIDER_COUNT_CACHE_TTL)
+        return result
 from providers.models import (
     Provider,
     ProviderGalleryImage,
@@ -28,6 +55,14 @@ def country_search_api(request):
     query = request.GET.get("q", "").strip()
     list_all = request.GET.get("all", "").strip() == "1"
 
+    if not list_all and len(query) < 1:
+        return JsonResponse({"continents": []})
+
+    cache_key = f"api:countries:{query}:{list_all}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return JsonResponse(cached)
+
     # Get provider counts per country
     provider_counts = dict(
         Provider.objects.filter(
@@ -40,44 +75,37 @@ def country_search_api(request):
         .values_list("country", "count")
     )
 
-    if list_all or len(query) >= 1:
-        # Filter by query if provided
-        countries_qs = Country.objects.filter(is_active=True).select_related(
-            "continent"
+    # Filter by query if provided
+    countries_qs = Country.objects.filter(is_active=True).select_related("continent")
+    if query:
+        countries_qs = countries_qs.filter(
+            Q(name__icontains=query) | Q(code__icontains=query)
         )
-        if query:
-            countries_qs = countries_qs.filter(
-                Q(name__icontains=query) | Q(code__icontains=query)
-            )
-        # Order: Europe first (display_order), then by country name
-        countries_qs = countries_qs.order_by("continent__display_order", "name")
+    countries_qs = countries_qs.order_by("continent__display_order", "name")
 
-        # Group by continent
-        continents = {}
-        for c in countries_qs:
-            continent_name = c.continent.name
-            if continent_name not in continents:
-                continents[continent_name] = {
-                    "name": continent_name,
-                    "code": c.continent.code,
-                    "order": c.continent.display_order,
-                    "countries": [],
-                }
-            continents[continent_name]["countries"].append(
-                {
-                    "id": c.id,
-                    "name": c.name,
-                    "code": c.code,
-                    "provider_count": provider_counts.get(c.id, 0),
-                }
-            )
+    # Group by continent
+    continents = {}
+    for c in countries_qs:
+        continent_name = c.continent.name
+        if continent_name not in continents:
+            continents[continent_name] = {
+                "name": continent_name,
+                "code": c.continent.code,
+                "order": c.continent.display_order,
+                "countries": [],
+            }
+        continents[continent_name]["countries"].append(
+            {
+                "id": c.id,
+                "name": c.name,
+                "code": c.code,
+                "provider_count": provider_counts.get(c.id, 0),
+            }
+        )
 
-        # Sort continents by display order and convert to list
-        results = sorted(continents.values(), key=lambda x: x["order"])
-
-        return JsonResponse({"continents": results})
-
-    return JsonResponse({"continents": []})
+    data = {"continents": sorted(continents.values(), key=lambda x: x["order"])}
+    cache.set(cache_key, data, COUNTRIES_API_CACHE_TTL)
+    return JsonResponse(data)
 
 
 @require_GET
@@ -94,6 +122,11 @@ def city_search_api(request):
         country_id = int(country_id)
     except ValueError:
         return JsonResponse({"results": []})
+
+    cache_key = f"api:cities:{country_id}:{query}:{list_all}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return JsonResponse(cached)
 
     # Get provider counts per city
     provider_counts = dict(
@@ -132,7 +165,9 @@ def city_search_api(request):
         for c in cities_qs
     ]
 
-    return JsonResponse({"results": results})
+    data = {"results": results}
+    cache.set(cache_key, data, CITIES_API_CACHE_TTL)
+    return JsonResponse(data)
 
 
 class ProviderDirectoryView(ListView):
@@ -142,6 +177,7 @@ class ProviderDirectoryView(ListView):
     template_name = "clients/provider_list.html"
     context_object_name = "providers"
     paginate_by = 20
+    paginator_class = CachedCountPaginator
 
     def get_queryset(self):
         """Get all active verified providers with related data."""
@@ -407,20 +443,41 @@ class ProviderDetailView(DetailView):
 
     def _build_preference_display(self, provider):
         """Build structured preference data for template rendering."""
-        groups = (
-            PreferenceGroup.objects.filter(is_active=True)
-            .prefetch_related(
-                "subgroups",
-                "subgroups__options",
+        # The group/subgroup/option tree is global and changes only when an admin
+        # edits preferences.  Cache it as plain dicts; invalidated by
+        # providers.signals whenever PreferenceGroup/Subgroup/Option are saved.
+        groups_data = cache.get(PREF_GROUPS_CACHE_KEY)
+        if groups_data is None:
+            groups_qs = (
+                PreferenceGroup.objects.filter(is_active=True)
+                .prefetch_related("subgroups", "subgroups__options")
+                .order_by("display_order", "name")
             )
-            .order_by("display_order", "name")
-        )
+            groups_data = [
+                {
+                    "name": group.name,
+                    "subgroups": [
+                        {
+                            "pk": sg.pk,
+                            "name": sg.name,
+                            "display_order": sg.display_order,
+                            "options": [opt.text for opt in sg.options.all()],
+                        }
+                        for sg in sorted(
+                            (s for s in group.subgroups.all() if s.is_active),
+                            key=lambda s: (s.display_order, s.name),
+                        )
+                    ],
+                }
+                for group in groups_qs
+            ]
+            cache.set(PREF_GROUPS_CACHE_KEY, groups_data, PREF_GROUPS_CACHE_TTL)
 
-        # Bulk fetch provider's preferences and custom options (2 queries)
-        pref_map = {}
-        for pref in ProviderPreference.objects.filter(provider=provider):
-            pref_map[pref.subgroup_id] = pref.is_checked
-
+        # Bulk fetch provider-specific data (2 queries, not cacheable per-provider)
+        pref_map = {
+            pref.subgroup_id: pref.is_checked
+            for pref in ProviderPreference.objects.filter(provider=provider)
+        }
         custom_map = {}
         for custom in ProviderPreferenceCustomOption.objects.filter(
             provider=provider
@@ -428,44 +485,41 @@ class ProviderDetailView(DetailView):
             custom_map.setdefault(custom.subgroup_id, []).append(custom.text)
 
         result = []
-        for group in groups:
+        for group in groups_data:
             subgroups = []
-            # Filter in Python to use the prefetched data (not .filter() which hits DB)
-            for sg in sorted(
-                (s for s in group.subgroups.all() if s.is_active),
-                key=lambda s: (s.display_order, s.name),
-            ):
-                is_checked = pref_map.get(sg.pk, False)
-                predefined_options = [opt.text for opt in sg.options.all()]
-                custom_options = custom_map.get(sg.pk, [])
+            for sg in group["subgroups"]:
                 subgroups.append(
                     {
-                        "name": sg.name,
-                        "is_checked": is_checked,
-                        "predefined_options": predefined_options,
-                        "custom_options": custom_options,
+                        "name": sg["name"],
+                        "is_checked": pref_map.get(sg["pk"], False),
+                        "predefined_options": sg["options"],
+                        "custom_options": custom_map.get(sg["pk"], []),
                     }
                 )
             if subgroups:
-                result.append({"name": group.name, "subgroups": subgroups})
+                result.append({"name": group["name"], "subgroups": subgroups})
 
-        # Append provider's custom preferences as an "Other" group
+        # Append provider's own custom preferences as an "Other" group
         custom_prefs = list(
             ProviderCustomPreference.objects.filter(provider=provider).order_by(
                 "display_order", "name"
             )
         )
         if custom_prefs:
-            other_subgroups = [
+            result.append(
                 {
-                    "name": cp.name,
-                    "is_checked": True,
-                    "predefined_options": [],
-                    "custom_options": [],
+                    "name": "Other",
+                    "subgroups": [
+                        {
+                            "name": cp.name,
+                            "is_checked": True,
+                            "predefined_options": [],
+                            "custom_options": [],
+                        }
+                        for cp in custom_prefs
+                    ],
                 }
-                for cp in custom_prefs
-            ]
-            result.append({"name": "Other", "subgroups": other_subgroups})
+            )
 
         return result
 

@@ -27,6 +27,13 @@ DATABASES = {
 # Disable rate limiting by default in tests (security tests override this)
 RATE_LIMIT_RULES = {}
 
+# Use dummy cache in tests — no Redis dependency
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.dummy.DummyCache",
+    }
+}
+
 # Disable migrations for faster test setup
 # (comment out if you need migration testing)
 # MIGRATION_MODULES = {app: None for app in INSTALLED_APPS if 'django' not in app}
