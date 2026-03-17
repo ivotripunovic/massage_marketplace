@@ -733,3 +733,117 @@ class SubscriptionConfirmationEmailTests(TestCase):
 
         template = get_template("emails/subscription_confirmation.txt")
         self.assertIsNotNone(template)
+
+
+class NowPaymentsWebhookViewTests(TestCase):
+    """Test the NOWPayments IPN webhook endpoint."""
+
+    def setUp(self):
+        self.client = Client()
+        self.user = User.objects.create_user(
+            email="provider@test.com", password="pass", user_type="provider"
+        )
+        self.provider = Provider.objects.create(
+            user=self.user, phone="+1234567890", subscription_status="inactive"
+        )
+        self.payment = SubscriptionPayment.objects.create(
+            provider=self.provider,
+            amount=29.99,
+            payment_method="crypto_bitcoin",
+            status="pending",
+            nowpayments_payment_id="test-nowpay-111",
+        )
+        self.url = reverse("nowpayments_webhook")
+
+    def _build_payload(self, payment_status="finished"):
+        import json
+        return json.dumps({
+            "payment_id": "test-nowpay-111",
+            "payment_status": payment_status,
+            "pay_address": "1BTC",
+            "price_amount": 29.99,
+            "price_currency": "usd",
+            "pay_amount": 0.00085,
+            "actually_paid": 0.00085,
+            "pay_currency": "btc",
+            "order_id": "1-provider@test.com",
+        }).encode()
+
+    def _make_request(self, payload, sig="validsig"):
+        return self.client.post(
+            self.url,
+            data=payload,
+            content_type="application/json",
+            HTTP_X_NOWPAYMENTS_SIG=sig,
+        )
+
+    def test_webhook_rejects_invalid_signature(self):
+        """Webhook returns 400 for invalid HMAC signature."""
+        payload = self._build_payload()
+        with patch("payments.nowpayments.verify_ipn_signature", return_value=False):
+            response = self._make_request(payload)
+        self.assertEqual(response.status_code, 400)
+
+    def test_webhook_finished_activates_subscription(self):
+        """Webhook with status=finished completes payment and activates subscription."""
+        payload = self._build_payload("finished")
+        with patch("payments.nowpayments.verify_ipn_signature", return_value=True):
+            response = self._make_request(payload)
+        self.assertEqual(response.status_code, 200)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, "completed")
+        self.assertIsNotNone(self.payment.completed_at)
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, "active")
+
+    def test_webhook_failed_marks_payment_failed(self):
+        """Webhook with status=failed marks payment as failed."""
+        payload = self._build_payload("failed")
+        with patch("payments.nowpayments.verify_ipn_signature", return_value=True):
+            response = self._make_request(payload)
+        self.assertEqual(response.status_code, 200)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, "failed")
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, "inactive")
+
+    def test_webhook_expired_marks_payment_failed(self):
+        """Webhook with status=expired marks payment as failed."""
+        payload = self._build_payload("expired")
+        with patch("payments.nowpayments.verify_ipn_signature", return_value=True):
+            response = self._make_request(payload)
+        self.assertEqual(response.status_code, 200)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, "failed")
+
+    def test_webhook_idempotent_for_completed_payment(self):
+        """Calling the webhook again for an already-completed payment is a no-op."""
+        self.payment.mark_completed()
+        self.provider.activate_subscription("crypto_bitcoin")
+        payload = self._build_payload("finished")
+        with patch("payments.nowpayments.verify_ipn_signature", return_value=True):
+            response = self._make_request(payload)
+        self.assertEqual(response.status_code, 200)
+        # Status unchanged
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, "completed")
+
+    def test_webhook_ignores_unknown_payment_id(self):
+        """Webhook with unknown payment_id returns 200 (not an error)."""
+        import json
+        payload = json.dumps({
+            "payment_id": "nonexistent-id",
+            "payment_status": "finished",
+        }).encode()
+        with patch("payments.nowpayments.verify_ipn_signature", return_value=True):
+            response = self._make_request(payload)
+        self.assertEqual(response.status_code, 200)
+
+    def test_webhook_intermediate_status_no_change(self):
+        """Intermediate statuses (confirming, sending) do not change payment status."""
+        for intermediate in ("waiting", "confirming", "confirmed", "sending"):
+            payload = self._build_payload(intermediate)
+            with patch("payments.nowpayments.verify_ipn_signature", return_value=True):
+                self._make_request(payload)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, "pending")

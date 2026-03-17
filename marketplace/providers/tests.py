@@ -1352,20 +1352,25 @@ class ProviderSubscriptionActivationTests(TestCase):
         self.assertEqual(self.provider.subscription_status, "inactive")
 
     def test_subscription_form_creates_payment_record(self):
-        """Test that crypto payment submission creates a SubscriptionPayment record."""
+        """Test that visiting the crypto payment page creates a SubscriptionPayment record via NOWPayments."""
         from payments.models import SubscriptionPayment
+        from unittest.mock import patch
 
         self.client.login(email=self.user.email, password="testpass123")
 
         # Step 1: Select payment method
         self.client.post(reverse("subscription"), {"payment_method": "crypto_bitcoin"})
 
-        # Step 2: Submit transaction ID on crypto payment page
-        self.client.post(
-            reverse("subscription_crypto_payment"),
-            {"transaction_id": "0xabc123def456"},
-            follow=True,
-        )
+        # Step 2: GET crypto payment page — NOWPayments API is called here
+        mock_result = {
+            "payment_id": "test-nowpay-123",
+            "pay_address": "1BitcoinAddressABC",
+            "pay_amount": 0.00085,
+            "pay_currency": "btc",
+            "payment_status": "waiting",
+        }
+        with patch("payments.nowpayments.create_payment", return_value=mock_result):
+            self.client.get(reverse("subscription_crypto_payment"))
 
         # Should have created a payment record
         payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
@@ -1373,37 +1378,47 @@ class ProviderSubscriptionActivationTests(TestCase):
         self.assertEqual(payment.payment_method, "crypto_bitcoin")
         self.assertEqual(payment.status, "pending")
         self.assertEqual(float(payment.amount), 29.99)
-        self.assertEqual(payment.reference_id, "0xabc123def456")
+        self.assertEqual(payment.nowpayments_payment_id, "test-nowpay-123")
+        self.assertEqual(payment.pay_address, "1BitcoinAddressABC")
 
     def test_subscription_activation_flow(self):
-        """Test complete subscription activation flow via crypto payment."""
+        """Test that subscription is activated via NOWPayments webhook, not form submit."""
         from payments.models import SubscriptionPayment
+        from unittest.mock import patch
 
         self.client.login(email=self.user.email, password="testpass123")
 
         # Step 1: Select payment method
         self.client.post(reverse("subscription"), {"payment_method": "crypto_ethereum"})
 
-        # Step 2: Submit transaction ID
+        # Step 2: GET crypto page — creates pending payment via NOWPayments
+        mock_result = {
+            "payment_id": "eth-nowpay-456",
+            "pay_address": "0xEthAddressXYZ",
+            "pay_amount": 0.015,
+            "pay_currency": "eth",
+            "payment_status": "waiting",
+        }
+        with patch("payments.nowpayments.create_payment", return_value=mock_result):
+            self.client.get(reverse("subscription_crypto_payment"))
+
+        # Step 3: POST ("I've sent the payment") — redirects to confirm
         response = self.client.post(
             reverse("subscription_crypto_payment"),
-            {"transaction_id": "0xethtx123"},
             follow=True,
         )
-
-        # Should redirect to confirmation page
         self.assertEqual(response.status_code, 200)
         self.assertIn(reverse("subscription_confirm"), response.request["PATH_INFO"])
 
-        # Provider should be activated
+        # Provider should NOT be activated yet (activation happens via webhook)
         self.provider.refresh_from_db()
-        self.assertEqual(self.provider.subscription_status, "active")
-        self.assertEqual(self.provider.subscription_payment_method, "crypto_ethereum")
+        self.assertEqual(self.provider.subscription_status, "inactive")
 
-        # Payment record should be created
+        # Payment record should exist as pending
         payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
         self.assertIsNotNone(payment)
         self.assertEqual(payment.status, "pending")
+        self.assertEqual(payment.nowpayments_payment_id, "eth-nowpay-456")
 
     def test_subscription_confirm_view_loads(self):
         """Test that subscription confirmation view loads."""
@@ -1466,87 +1481,113 @@ class CryptoPaymentViewTests(TestCase):
         response = self.client.get(reverse("subscription_crypto_payment"))
         self.assertRedirects(response, reverse("subscription"))
 
+    def _set_session(self, **kwargs):
+        session = self.client.session
+        for k, v in kwargs.items():
+            session[k] = v
+        session.save()
+
+    def _mock_nowpayments(self):
+        from unittest.mock import patch
+        return patch(
+            "payments.nowpayments.create_payment",
+            return_value={
+                "payment_id": "mock-np-id-999",
+                "pay_address": "1MockBitcoinAddr",
+                "pay_amount": 0.0009,
+                "pay_currency": "btc",
+                "payment_status": "waiting",
+            },
+        )
+
     def test_crypto_page_loads_with_session(self):
         """Test that crypto page loads when session is set."""
         self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "crypto_bitcoin"
-        session.save()
-        response = self.client.get(reverse("subscription_crypto_payment"))
+        self._set_session(pending_payment_method="crypto_bitcoin")
+        with self._mock_nowpayments():
+            response = self.client.get(reverse("subscription_crypto_payment"))
         self.assertEqual(response.status_code, 200)
         self.assertTemplateUsed(response, "providers/subscription_crypto.html")
 
     def test_crypto_page_shows_wallet_address(self):
-        """Test that crypto page displays wallet address."""
+        """Test that crypto page displays the NOWPayments pay address."""
         self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "crypto_bitcoin"
-        session.save()
-        response = self.client.get(reverse("subscription_crypto_payment"))
-        self.assertContains(response, "Wallet Address")
+        self._set_session(pending_payment_method="crypto_bitcoin")
+        with self._mock_nowpayments():
+            response = self.client.get(reverse("subscription_crypto_payment"))
+        self.assertContains(response, "1MockBitcoinAddr")
         self.assertContains(response, "29.99")
 
     def test_crypto_page_shows_payment_instructions(self):
         """Test that crypto page shows payment instructions."""
         self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "crypto_bitcoin"
-        session.save()
-        response = self.client.get(reverse("subscription_crypto_payment"))
-        self.assertContains(response, "Payment Instructions")
-        self.assertContains(response, "Transaction ID")
+        self._set_session(pending_payment_method="crypto_bitcoin")
+        with self._mock_nowpayments():
+            response = self.client.get(reverse("subscription_crypto_payment"))
+        self.assertContains(response, "How to pay")
+        self.assertContains(response, "0.0009")
 
-    def test_crypto_submit_transaction_id(self):
-        """Test submitting a crypto transaction ID."""
+    def test_crypto_get_creates_payment_record(self):
+        """Test that GET creates a SubscriptionPayment record via NOWPayments."""
         from payments.models import SubscriptionPayment
 
         self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "crypto_bitcoin"
-        session.save()
+        self._set_session(pending_payment_method="crypto_bitcoin")
+        with self._mock_nowpayments():
+            self.client.get(reverse("subscription_crypto_payment"))
 
-        response = self.client.post(
-            reverse("subscription_crypto_payment"),
-            {"transaction_id": "0xabc123"},
-            follow=True,
-        )
-
-        self.assertEqual(response.status_code, 200)
         payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
         self.assertIsNotNone(payment)
-        self.assertEqual(payment.reference_id, "0xabc123")
+        self.assertEqual(payment.nowpayments_payment_id, "mock-np-id-999")
+        self.assertEqual(payment.pay_address, "1MockBitcoinAddr")
         self.assertEqual(payment.payment_method, "crypto_bitcoin")
         self.assertEqual(payment.status, "pending")
 
-    def test_crypto_submit_activates_subscription(self):
-        """Test that crypto submission activates subscription."""
+    def test_crypto_get_reuses_existing_pending_payment(self):
+        """Test that refreshing the page reuses the existing pending payment."""
+        from payments.models import SubscriptionPayment
+        from unittest.mock import patch, MagicMock
+
         self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "crypto_ethereum"
-        session.save()
+        self._set_session(pending_payment_method="crypto_bitcoin")
 
-        self.client.post(
-            reverse("subscription_crypto_payment"), {"transaction_id": "0xeth456"}
+        mock_fn = MagicMock(return_value={
+            "payment_id": "mock-np-id-999",
+            "pay_address": "1MockBitcoinAddr",
+            "pay_amount": 0.0009,
+            "pay_currency": "btc",
+            "payment_status": "waiting",
+        })
+        with patch("payments.nowpayments.create_payment", mock_fn):
+            self.client.get(reverse("subscription_crypto_payment"))
+            self.client.get(reverse("subscription_crypto_payment"))
+
+        # API called only once — second GET reused the session payment
+        self.assertEqual(mock_fn.call_count, 1)
+        # Only one DB record created
+        self.assertEqual(
+            SubscriptionPayment.objects.filter(provider=self.provider).count(), 1
         )
-
-        self.provider.refresh_from_db()
-        self.assertEqual(self.provider.subscription_status, "active")
-        self.assertEqual(self.provider.subscription_payment_method, "crypto_ethereum")
-        self.assertIsNotNone(self.provider.subscription_renewal_date)
 
     def test_crypto_submit_clears_session(self):
-        """Test that crypto submission clears session."""
+        """Test that POST clears the pending_payment_method session key."""
         self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "crypto_bitcoin"
-        session.save()
-
-        self.client.post(
-            reverse("subscription_crypto_payment"), {"transaction_id": "0x123"}
-        )
-
+        self._set_session(pending_payment_method="crypto_bitcoin")
+        with self._mock_nowpayments():
+            self.client.get(reverse("subscription_crypto_payment"))
+        self.client.post(reverse("subscription_crypto_payment"))
         session = self.client.session
         self.assertNotIn("pending_payment_method", session)
+
+    def test_crypto_submit_does_not_activate_subscription(self):
+        """Subscription is NOT activated on POST — it waits for the IPN webhook."""
+        self.client.login(email=self.user.email, password="testpass123")
+        self._set_session(pending_payment_method="crypto_ethereum")
+        with self._mock_nowpayments():
+            self.client.get(reverse("subscription_crypto_payment"))
+        self.client.post(reverse("subscription_crypto_payment"))
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, "inactive")
 
     def test_crypto_rejects_bank_transfer_method(self):
         """Test that crypto page rejects bank_transfer method."""
@@ -1556,6 +1597,79 @@ class CryptoPaymentViewTests(TestCase):
         session.save()
         response = self.client.get(reverse("subscription_crypto_payment"))
         self.assertRedirects(response, reverse("subscription"))
+
+
+class CryptoPaymentStatusViewTests(TestCase):
+    """Test the JSON status polling endpoint."""
+
+    def setUp(self):
+        from payments.models import SubscriptionPayment
+
+        self.user = User.objects.create_user(
+            email="provider@test.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+        )
+        self.provider = Provider.objects.create(
+            user=self.user, phone="+1234567890", subscription_status="inactive"
+        )
+        self.payment = SubscriptionPayment.objects.create(
+            provider=self.provider,
+            amount=29.99,
+            payment_method="crypto_bitcoin",
+            status="pending",
+            nowpayments_payment_id="poll-test-id-001",
+        )
+        self.client = Client()
+        self.url = reverse(
+            "crypto_payment_status",
+            kwargs={"nowpayments_payment_id": "poll-test-id-001"},
+        )
+
+    def test_requires_login(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 302)
+
+    def test_returns_pending_status(self):
+        self.client.login(email=self.user.email, password="testpass123")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"status": "pending"})
+
+    def test_returns_completed_status(self):
+        self.payment.mark_completed()
+        self.client.login(email=self.user.email, password="testpass123")
+        response = self.client.get(self.url)
+        self.assertEqual(response.json(), {"status": "completed"})
+
+    def test_returns_failed_status(self):
+        self.payment.mark_failed()
+        self.client.login(email=self.user.email, password="testpass123")
+        response = self.client.get(self.url)
+        self.assertEqual(response.json(), {"status": "failed"})
+
+    def test_returns_404_for_wrong_provider(self):
+        """Another provider cannot poll a payment they don't own."""
+        other_user = User.objects.create_user(
+            email="other@test.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+        )
+        Provider.objects.create(user=other_user, phone="+9999999999")
+        self.client.login(email="other@test.com", password="testpass123")
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 404)
+
+    def test_returns_404_for_unknown_payment_id(self):
+        self.client.login(email=self.user.email, password="testpass123")
+        url = reverse(
+            "crypto_payment_status",
+            kwargs={"nowpayments_payment_id": "nonexistent-id"},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
 
 
 class BankTransferPaymentViewTests(TestCase):

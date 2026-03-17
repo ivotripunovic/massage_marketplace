@@ -38,6 +38,7 @@ from providers.views import (
     ProviderSubscriptionView,
     SubscriptionConfirmView,
     CryptoPaymentView,
+    CryptoPaymentStatusView,
     BankTransferPaymentView,
     GalleryImageCreateView,
     GalleryImageDeleteView,
@@ -50,6 +51,7 @@ from payments.views import (
     AdminProviderSuspendView,
     AdminPaymentApproveView,
     AdminAnalyticsView,
+    NowPaymentsWebhookView,
 )
 from clients.views import (
     ProviderDirectoryView,
@@ -138,6 +140,11 @@ urlpatterns = [
         name="subscription_confirm",
     ),
     path(
+        "provider/subscription/status/<str:nowpayments_payment_id>/",
+        CryptoPaymentStatusView.as_view(),
+        name="crypto_payment_status",
+    ),
+    path(
         "provider/gallery/upload/",
         GalleryImageCreateView.as_view(),
         name="gallery_upload",
@@ -201,6 +208,12 @@ urlpatterns = [
     # API endpoints for location autocomplete
     path("api/countries/search/", country_search_api, name="api_country_search"),
     path("api/cities/search/", city_search_api, name="api_city_search"),
+    # NOWPayments IPN webhook
+    path(
+        "payments/webhook/nowpayments/",
+        NowPaymentsWebhookView.as_view(),
+        name="nowpayments_webhook",
+    ),
 ]
 
 # Serve media files in development

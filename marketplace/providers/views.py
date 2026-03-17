@@ -4,6 +4,7 @@ from django.views.generic import (
     CreateView,
     DeleteView,
     ListView,
+    View,
 )
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect, get_object_or_404
@@ -24,7 +25,6 @@ from providers.models import (
 )
 from providers.forms import (
     SubscriptionSettingsForm,
-    CryptoPaymentForm,
     BankTransferForm,
     GalleryImageForm,
 )
@@ -741,100 +741,138 @@ class ProviderSubscriptionView(ProviderRequiredMixin, FormView):
             return redirect("subscription_crypto_payment")
 
 
-class CryptoPaymentView(ProviderRequiredMixin, FormView):
-    """View for crypto payment with wallet address and transaction ID submission."""
+def _qr_data_uri(data: str) -> str:
+    """Return a base64 PNG data URI for the given string."""
+    import base64
+    import io
+    import qrcode
+    from PIL import Image
 
-    form_class = CryptoPaymentForm
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=6,
+        border=2,
+    )
+    qr.add_data(data)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="#f5f5f5", back_color="#111827")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    encoded = base64.b64encode(buf.getvalue()).decode()
+    return f"data:image/png;base64,{encoded}"
+
+
+class CryptoPaymentView(ProviderRequiredMixin, View):
+    """Crypto payment via NOWPayments: create a payment and display the address."""
+
     template_name = "providers/subscription_crypto.html"
 
     def dispatch(self, request, *args, **kwargs):
-        """Ensure payment method is in session."""
         self.payment_method = request.session.get("pending_payment_method")
         if not self.payment_method or not self.payment_method.startswith("crypto_"):
             messages.error(request, "Please select a payment method first.")
             return redirect("subscription")
         return super().dispatch(request, *args, **kwargs)
 
-    def get_context_data(self, **kwargs):
-        """Add wallet address and payment info to context."""
+    def get(self, request):
         from django.conf import settings as django_settings
-
-        context = super().get_context_data(**kwargs)
-
-        provider = get_object_or_404(Provider, user=self.request.user)
-        context["provider"] = provider
-        context["payment_method"] = self.payment_method
-        context["payment_method_display"] = dict(
-            SubscriptionSettingsForm.PAYMENT_METHOD_CHOICES
-        ).get(self.payment_method, self.payment_method)
-        context["amount"] = getattr(django_settings, "SUBSCRIPTION_AMOUNT", 29.99)
-        context["wallet_address"] = getattr(
-            django_settings, "PLATFORM_CRYPTO_ADDRESSES", {}
-        ).get(self.payment_method, "")
-
-        return context
-
-    def form_valid(self, form):
-        """Create payment record and activate subscription."""
         from payments.models import SubscriptionPayment
-        from django.conf import settings as django_settings
+        import payments.nowpayments as nowpayments
 
-        provider = get_object_or_404(Provider, user=self.request.user)
-        transaction_id = form.cleaned_data["transaction_id"]
+        provider = get_object_or_404(Provider, user=request.user)
         amount = getattr(django_settings, "SUBSCRIPTION_AMOUNT", 29.99)
 
-        # Create payment record with transaction reference
-        SubscriptionPayment.objects.create(
-            provider=provider,
-            amount=amount,
-            payment_method=self.payment_method,
-            status="pending",
-            reference_id=transaction_id,
-        )
+        # Reuse existing pending NOWPayments payment if one was already created
+        existing_id = request.session.get("nowpayments_payment_id")
+        payment_record = None
+        if existing_id:
+            payment_record = SubscriptionPayment.objects.filter(
+                nowpayments_payment_id=existing_id,
+                provider=provider,
+                status="pending",
+            ).first()
 
-        # Activate subscription
-        provider.activate_subscription(self.payment_method)
+        if not payment_record:
+            # Build the IPN callback URL
+            ipn_url = request.build_absolute_uri("/payments/webhook/nowpayments/")
+            try:
+                result = nowpayments.create_payment(
+                    amount_usd=amount,
+                    payment_method=self.payment_method,
+                    order_id=f"{provider.pk}-{provider.user.email}",
+                    ipn_callback_url=ipn_url,
+                )
+            except Exception as exc:
+                messages.error(
+                    request,
+                    "Could not create payment. Please try again or contact support.",
+                )
+                return redirect("subscription")
 
-        # Send confirmation email
-        self._send_confirmation_email(provider)
+            payment_record = SubscriptionPayment.objects.create(
+                provider=provider,
+                amount=amount,
+                payment_method=self.payment_method,
+                status="pending",
+                nowpayments_payment_id=str(result["payment_id"]),
+                pay_address=result.get("pay_address", ""),
+                pay_amount=result.get("pay_amount"),
+                pay_currency=result.get("pay_currency", ""),
+            )
+            request.session["nowpayments_payment_id"] = str(result["payment_id"])
 
-        # Clear session
-        self.request.session.pop("pending_payment_method", None)
+        # Build wallet URI for QR code and deeplink
+        pay_currency_lower = (payment_record.pay_currency or "").lower()
+        if pay_currency_lower == "btc":
+            wallet_uri = f"bitcoin:{payment_record.pay_address}?amount={payment_record.pay_amount}"
+        else:
+            wallet_uri = f"ethereum:{payment_record.pay_address}"
 
-        messages.success(
-            self.request,
-            "Payment submitted! Your subscription is active while we verify your transaction.",
-        )
+        qr_data_uri = ""
+        if payment_record.pay_address:
+            try:
+                qr_data_uri = _qr_data_uri(wallet_uri)
+            except Exception:
+                pass
+
+        context = {
+            "provider": provider,
+            "payment_method": self.payment_method,
+            "payment_method_display": dict(
+                SubscriptionSettingsForm.PAYMENT_METHOD_CHOICES
+            ).get(self.payment_method, self.payment_method),
+            "amount": amount,
+            "pay_address": payment_record.pay_address,
+            "pay_amount": payment_record.pay_amount,
+            "pay_currency": (payment_record.pay_currency or "").upper(),
+            "wallet_uri": wallet_uri,
+            "qr_data_uri": qr_data_uri,
+            "payment": payment_record,
+        }
+        from django.shortcuts import render
+        return render(request, self.template_name, context)
+
+    def post(self, request):
+        """Provider confirmed they sent the payment — redirect to confirm page."""
+        request.session.pop("pending_payment_method", None)
         return redirect("subscription_confirm")
 
-    def _send_confirmation_email(self, provider):
-        """Send subscription confirmation email."""
-        from django.core.mail import send_mail
-        from django.template.loader import render_to_string
 
-        try:
-            html_message = render_to_string(
-                "emails/subscription_confirmation.html",
-                {
-                    "provider": provider,
-                    "amount": 29.99,
-                    "payment_method_display": dict(
-                        SubscriptionSettingsForm.PAYMENT_METHOD_CHOICES
-                    ).get(self.payment_method, self.payment_method),
-                    "renewal_date": provider.subscription_renewal_date,
-                },
-            )
+class CryptoPaymentStatusView(ProviderRequiredMixin, View):
+    """JSON endpoint polled by the payment page to detect confirmation."""
 
-            send_mail(
-                "Subscription Activated - Massage Marketplace",
-                "Your subscription has been activated.",
-                "noreply@massagemarketplace.com",
-                [provider.user.email],
-                html_message=html_message,
-                fail_silently=True,
-            )
-        except Exception:
-            pass
+    def get(self, request, nowpayments_payment_id):
+        from django.http import JsonResponse
+        from payments.models import SubscriptionPayment
+
+        provider = get_object_or_404(Provider, user=request.user)
+        payment = get_object_or_404(
+            SubscriptionPayment,
+            nowpayments_payment_id=nowpayments_payment_id,
+            provider=provider,
+        )
+        return JsonResponse({"status": payment.status})
 
 
 class BankTransferPaymentView(ProviderRequiredMixin, FormView):
@@ -955,7 +993,6 @@ class SubscriptionConfirmView(ProviderRequiredMixin, TemplateView):
             provider = Provider.objects.get(user=self.request.user)
             context["provider"] = provider
 
-            # Get the most recent subscription payment
             from payments.models import SubscriptionPayment
 
             recent_payment = (
@@ -964,8 +1001,15 @@ class SubscriptionConfirmView(ProviderRequiredMixin, TemplateView):
                 .first()
             )
             context["recent_payment"] = recent_payment
+            # Show pending state for NOWPayments crypto payments awaiting confirmation
+            context["payment_pending"] = bool(
+                recent_payment
+                and recent_payment.nowpayments_payment_id
+                and recent_payment.status == "pending"
+            )
         except Provider.DoesNotExist:
             context["provider"] = None
+            context["payment_pending"] = False
         return context
 
 

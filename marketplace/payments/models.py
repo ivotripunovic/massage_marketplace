@@ -40,6 +40,34 @@ class SubscriptionPayment(models.Model):
         help_text="Transaction hash for crypto, transaction ID for bank",
     )
 
+    # NOWPayments integration fields
+    nowpayments_payment_id = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        db_index=True,
+        help_text="NOWPayments internal payment ID",
+    )
+    pay_address = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True,
+        help_text="Crypto address the provider must send funds to",
+    )
+    pay_amount = models.DecimalField(
+        max_digits=20,
+        decimal_places=8,
+        blank=True,
+        null=True,
+        help_text="Exact crypto amount the provider must send",
+    )
+    pay_currency = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="Cryptocurrency code (e.g. btc, eth)",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(blank=True, null=True)

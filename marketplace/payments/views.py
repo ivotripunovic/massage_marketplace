@@ -1,12 +1,19 @@
+import json
+import logging
+
 from django.views.generic import ListView, DetailView, TemplateView, View
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect, get_object_or_404
-from django.http import HttpResponseForbidden
+from django.http import HttpResponse, HttpResponseForbidden
 from django.contrib import messages
 from django.db.models import Q, Sum, Avg
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from payments.models import SubscriptionPayment
 from providers.models import Provider
+
+logger = logging.getLogger(__name__)
 
 
 class AdminRequiredMixin(LoginRequiredMixin):
@@ -229,6 +236,92 @@ class AdminPaymentApproveView(AdminRequiredMixin, View):
         return redirect("admin_payment_detail", pk=pk)
 
     def _send_payment_confirmation(self, payment):
+        from django.core.mail import send_mail
+
+        try:
+            send_mail(
+                "Payment Confirmed - Massage Marketplace",
+                f"Your payment of ${payment.amount} has been verified and confirmed. "
+                f"Your subscription is active until {payment.provider.subscription_renewal_date}.",
+                "noreply@massagemarketplace.com",
+                [payment.provider.user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+
+@method_decorator(csrf_exempt, name="dispatch")
+class NowPaymentsWebhookView(View):
+    """Receive and process IPN callbacks from NOWPayments."""
+
+    TERMINAL_SUCCESS = "finished"
+    TERMINAL_FAILURE = {"failed", "expired", "refunded"}
+
+    def post(self, request):
+        from payments.nowpayments import verify_ipn_signature
+
+        payload_bytes = request.body
+        received_sig = request.headers.get("x-nowpayments-sig", "")
+
+        if not verify_ipn_signature(payload_bytes, received_sig):
+            logger.warning("NOWPayments IPN: invalid signature")
+            return HttpResponse(status=400)
+
+        try:
+            data = json.loads(payload_bytes)
+        except json.JSONDecodeError:
+            logger.warning("NOWPayments IPN: invalid JSON body")
+            return HttpResponse(status=400)
+
+        nowpayments_id = str(data.get("payment_id", ""))
+        status = data.get("payment_status", "")
+
+        if not nowpayments_id:
+            return HttpResponse(status=400)
+
+        try:
+            payment = SubscriptionPayment.objects.select_related(
+                "provider__user"
+            ).get(nowpayments_payment_id=nowpayments_id)
+        except SubscriptionPayment.DoesNotExist:
+            logger.warning(
+                "NOWPayments IPN: payment %s not found in DB", nowpayments_id
+            )
+            return HttpResponse(status=200)
+
+        if payment.status == "completed":
+            # Idempotent: already processed
+            return HttpResponse(status=200)
+
+        if status == self.TERMINAL_SUCCESS:
+            payment.mark_completed()
+            # Store the on-chain transaction hash if provided
+            tx_hash = data.get("outcome_transaction_hash") or data.get(
+                "payin_hash", ""
+            )
+            if tx_hash:
+                payment.reference_id = tx_hash
+                payment.save(update_fields=["reference_id"])
+            payment.provider.activate_subscription(payment.payment_method)
+            self._send_confirmation_email(payment)
+            logger.info(
+                "NOWPayments IPN: payment %s completed for %s",
+                nowpayments_id,
+                payment.provider.user.email,
+            )
+        elif status in self.TERMINAL_FAILURE:
+            payment.mark_failed()
+            logger.info(
+                "NOWPayments IPN: payment %s %s for %s",
+                nowpayments_id,
+                status,
+                payment.provider.user.email,
+            )
+
+        return HttpResponse(status=200)
+
+    def _send_confirmation_email(self, payment):
         from django.core.mail import send_mail
 
         try:

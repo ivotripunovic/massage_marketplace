@@ -170,6 +170,11 @@ AUTHENTICATION_BACKENDS = [
 # Subscription Settings
 SUBSCRIPTION_AMOUNT = 29.99
 
+# NOWPayments Settings
+NOWPAYMENTS_API_KEY = os.getenv("NOW_PAYMENTS_API_KEY", "")
+NOWPAYMENTS_IPN_SECRET = os.getenv("NOW_PAYMENTS_IPN", "")
+NOWPAYMENTS_SANDBOX = os.getenv("NOWPAYMENTS_SANDBOX", "false").lower() in ("true", "1", "yes")
+
 # Platform Crypto Wallet Addresses
 PLATFORM_CRYPTO_ADDRESSES = {
     "crypto_bitcoin": os.getenv(

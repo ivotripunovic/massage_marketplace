@@ -10,12 +10,20 @@
 </div>
 
 <div class="max-w-2xl mx-auto">
-    <!-- Success Message -->
+    <!-- Success / Pending Message -->
+    {% if payment_pending %}
+    <div class="bg-amber-900/50 border border-amber-700 rounded-lg p-8 mb-6 text-center">
+        <div class="text-4xl mb-4 text-amber-400">⏳</div>
+        <h2 class="text-2xl font-bold text-amber-300 mb-2">Awaiting Payment Confirmation</h2>
+        <p class="text-amber-200">Your payment is being verified on the blockchain. Your subscription will be activated automatically once confirmed — this usually takes a few minutes.</p>
+    </div>
+    {% else %}
     <div class="bg-emerald-900/50 border border-emerald-700 rounded-lg p-8 mb-6 text-center">
         <div class="text-4xl mb-4 text-emerald-400">✓</div>
         <h2 class="text-2xl font-bold text-emerald-300 mb-2">Subscription Activated</h2>
         <p class="text-emerald-200">Your subscription is now active and your services are visible to clients!</p>
     </div>
+    {% endif %}
 
     <!-- Subscription Details -->
     {% if provider %}
