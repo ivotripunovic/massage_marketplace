@@ -9,38 +9,25 @@
     <p class="text-text-secondary">Manage your subscription and payment method</p>
 </div>
 
-<div class="max-w-2xl mx-auto">
+<div class="max-w-3xl mx-auto">
     <!-- Current Status Card -->
     {% if provider %}
     <div class="card-dark p-6 mb-6">
         <h2 class="text-lg font-bold mb-4">Current Subscription Status</h2>
-
         <div class="space-y-3">
             <div>
                 <p class="text-text-secondary text-sm">Status</p>
                 <p class="text-lg font-semibold
-                    {% if provider.subscription_status == 'active' %}
-                        text-emerald-400
-                    {% elif provider.subscription_status == 'inactive' %}
-                        text-amber-400
-                    {% else %}
-                        text-red-400
-                    {% endif %}">
+                    {% if provider.subscription_status == 'active' %}text-emerald-400
+                    {% elif provider.subscription_status == 'inactive' %}text-amber-400
+                    {% else %}text-red-400{% endif %}">
                     {{ provider.get_subscription_status_display }}
                 </p>
             </div>
-
             {% if provider.subscription_renewal_date %}
             <div>
                 <p class="text-text-secondary text-sm">Renewal Date</p>
                 <p class="text-lg font-semibold">{{ provider.subscription_renewal_date|date:"F d, Y" }}</p>
-            </div>
-            {% endif %}
-
-            {% if provider.subscription_payment_method %}
-            <div>
-                <p class="text-text-secondary text-sm">Current Payment Method</p>
-                <p class="text-lg font-semibold">{{ provider.get_subscription_payment_method_display }}</p>
             </div>
             {% endif %}
         </div>
@@ -53,84 +40,188 @@
         </a>
     </div>
     {% endif %}
-    
-    <!-- Subscription Form -->
+
+    <!-- Payment Form -->
     <div class="card-dark p-6">
-        <h2 class="text-lg font-bold mb-4">Select Payment Method</h2>
+        <div class="flex items-center justify-between mb-6">
+            <div>
+                <h2 class="text-lg font-bold">Pay with Cryptocurrency</h2>
+                <p class="text-text-secondary text-sm mt-1">Select your preferred coin — you'll be shown the exact address and amount.</p>
+            </div>
+            <div class="text-right">
+                <p class="text-text-muted text-xs">Monthly cost</p>
+                <p class="text-2xl font-bold text-gold">$29.99</p>
+            </div>
+        </div>
 
         {% if messages %}
         <div class="mb-4">
             {% for message in messages %}
-            <div class="bg-blue-900/50 border border-blue-700 rounded-lg p-4 text-blue-300">
-                {{ message }}
-            </div>
+            <div class="bg-red-900/50 border border-red-700 rounded-lg p-3 text-red-300 text-sm mb-2">{{ message }}</div>
             {% endfor %}
         </div>
         {% endif %}
 
-        <form method="post">
+        <form method="post" id="payment-form">
             {% csrf_token %}
+            <!-- Hidden input updated by JS when a coin card is clicked -->
+            <input type="hidden" name="payment_method" id="payment_method_input" value="">
 
-            <!-- Payment Method Selection -->
-            <div class="space-y-4 mb-6">
-                <div class="text-sm text-text-secondary mb-2">
-                    <p>Choose how you'd like to pay for your subscription.</p>
-                    <p>Monthly subscription cost: <span class="font-semibold text-gold">$29.99</span></p>
-                </div>
-
-                {% for radio in form.payment_method %}
-                <label class="flex items-center p-4 border rounded-lg hover:bg-dark-100 cursor-pointer
-                    {% if radio.data.value == form.payment_method.value %}
-                        bg-dark-100 border-gold
-                    {% else %}
-                        border-dark-300
-                    {% endif %}">
-                    <input type="radio" name="payment_method" value="{{ radio.data.value }}"
-                           {% if radio.data.value == form.payment_method.value %}checked{% endif %}
-                           class="w-4 h-4 text-gold">
-                    <div class="ml-3">
-                        <p class="font-medium">{{ radio.choice_label }}</p>
-                        {% if radio.data.value == 'crypto_bitcoin' %}
-                            <p class="text-sm text-text-secondary">Pay with Bitcoin (BTC)</p>
-                        {% elif radio.data.value == 'crypto_ethereum' %}
-                            <p class="text-sm text-text-secondary">Pay with Ethereum (ETH)</p>
-                        {% elif radio.data.value == 'crypto_usdc' %}
-                            <p class="text-sm text-text-secondary">Pay with USDC stablecoin</p>
-                        {% endif %}
-                    </div>
-                </label>
-                {% endfor %}
+            <!-- Search -->
+            <div class="relative mb-5">
+                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input type="text" id="coin-search" placeholder="Search coins…"
+                       class="w-full bg-dark-100 border border-dark-300 rounded-lg pl-10 pr-4 py-2.5 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-gold transition">
             </div>
 
-            {% if form.payment_method.errors %}
-            <div class="text-red-400 text-sm mb-4">
-                {{ form.payment_method.errors }}
+            <!-- Popular coins -->
+            {% if popular_currencies %}
+            <div id="popular-section">
+                <p class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Popular</p>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6" id="popular-grid">
+                    {% for coin in popular_currencies %}
+                    <div class="coin-card cursor-pointer rounded-xl border border-dark-300 p-4 transition select-none
+                                hover:border-gold/60 hover:bg-dark-100"
+                         data-code="{{ coin.code }}"
+                         data-name="{{ coin.name|lower }}"
+                         onclick="selectCoin('{{ coin.code }}', this)">
+                        <div class="flex items-start justify-between mb-2">
+                            <span class="font-mono font-bold text-sm text-gold uppercase">{{ coin.code }}</span>
+                            <span class="network-badge text-xs px-1.5 py-0.5 rounded font-medium uppercase" data-net="{{ coin.network }}">{{ coin.network }}</span>
+                        </div>
+                        <p class="text-text-primary text-sm font-medium leading-tight">{{ coin.name }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
             {% endif %}
 
-            <!-- Submit Button -->
-            <div class="flex gap-4">
-                <button type="submit" class="btn-gold px-6 py-3 rounded-lg">
-                    Continue to Payment
-                </button>
-                <a href="{% url 'provider_dashboard' %}" class="bg-dark-200 hover:bg-dark-300 text-text-primary px-6 py-3 rounded-lg font-medium transition">
-                    Cancel
-                </a>
+            <!-- Other coins -->
+            {% if other_currencies %}
+            <div id="other-section">
+                <p class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">All Currencies</p>
+                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2" id="other-grid">
+                    {% for coin in other_currencies %}
+                    <div class="coin-card cursor-pointer rounded-lg border border-dark-300 p-3 transition select-none
+                                hover:border-gold/60 hover:bg-dark-100"
+                         data-code="{{ coin.code }}"
+                         data-name="{{ coin.name|lower }}"
+                         onclick="selectCoin('{{ coin.code }}', this)">
+                        <div class="flex items-center gap-1.5 mb-1">
+                            <span class="font-mono font-bold text-xs text-gold uppercase">{{ coin.code }}</span>
+                        </div>
+                        <p class="text-text-secondary text-xs leading-tight">{{ coin.name }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- No results message -->
+            <div id="no-results" class="hidden text-center py-8 text-text-muted text-sm">
+                No coins match your search.
             </div>
 
-            <!-- Info Box -->
-            <div class="mt-6 p-4 bg-dark-100 border border-dark-300 rounded-lg text-sm text-text-secondary">
-                <p class="font-semibold text-text-primary mb-2">What happens next?</p>
-                <ul class="list-disc list-inside space-y-1">
-                    <li>Your services will become visible to clients</li>
-                    <li>You'll have access to full provider dashboard</li>
-                    <li>Client reviews will help build your reputation</li>
-                    <li>Subscription auto-renews monthly</li>
-                </ul>
+            <!-- Selected coin display + submit -->
+            <div class="mt-6 pt-5 border-t border-dark-300">
+                <div id="selection-summary" class="hidden mb-4 p-4 bg-dark-100 border border-gold/40 rounded-xl flex items-center gap-4">
+                    <div class="w-10 h-10 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center flex-shrink-0">
+                        <span id="selected-code-icon" class="font-mono font-bold text-gold text-xs uppercase"></span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-text-muted text-xs">Selected currency</p>
+                        <p id="selected-name-display" class="font-semibold text-text-primary"></p>
+                    </div>
+                    <button type="button" onclick="clearSelection()" class="text-text-muted hover:text-text-secondary text-xs transition">Change</button>
+                </div>
+
+                <div class="flex gap-3">
+                    <button type="submit" id="submit-btn" disabled
+                            class="flex-1 btn-gold px-6 py-3 rounded-xl font-semibold text-base disabled:opacity-40 disabled:cursor-not-allowed transition">
+                        Continue to Payment →
+                    </button>
+                    <a href="{% url 'provider_dashboard' %}" class="bg-dark-200 hover:bg-dark-300 text-text-primary px-5 py-3 rounded-xl font-medium transition text-sm flex items-center">
+                        Cancel
+                    </a>
+                </div>
+
+                <div class="mt-4 p-3 bg-dark-100 border border-dark-300 rounded-lg text-xs text-text-muted">
+                    <strong class="text-text-secondary">Powered by NOWPayments.</strong>
+                    You'll receive an exact address and amount — pay from any wallet, subscription activates automatically on confirmation.
+                </div>
             </div>
         </form>
     </div>
 </div>
 </div>
 
+<style>
+.coin-card.selected {
+    border-color: #d4a042;
+    background-color: rgba(212, 160, 66, 0.08);
+}
+.network-badge[data-net="btc"]      { background: rgba(247,147,26,0.15);  color: #f7931a; }
+.network-badge[data-net="eth"]      { background: rgba(98,126,234,0.15);  color: #8a98db; }
+.network-badge[data-net="trx"]      { background: rgba(235,84,55,0.15);   color: #eb5437; }
+.network-badge[data-net="bsc"]      { background: rgba(243,186,47,0.15);  color: #f3ba2f; }
+.network-badge[data-net="sol"]      { background: rgba(20,241,149,0.15);  color: #14f195; }
+.network-badge[data-net="ltc"]      { background: rgba(162,162,162,0.15); color: #a2a2a2; }
+.network-badge[data-net="xmr"]      { background: rgba(255,102,0,0.15);   color: #ff6600; }
+.network-badge[data-net="doge"]     { background: rgba(194,161,72,0.15);  color: #c2a148; }
+.network-badge                      { background: rgba(100,100,100,0.15); color: #888; }
+</style>
+
+<script>
+let selectedCode = "";
+
+function selectCoin(code, el) {
+    // Clear previous selection
+    document.querySelectorAll(".coin-card").forEach(c => c.classList.remove("selected"));
+    el.classList.add("selected");
+
+    selectedCode = code;
+    document.getElementById("payment_method_input").value = code;
+    document.getElementById("submit-btn").disabled = false;
+
+    const name = el.querySelector("p").textContent.trim();
+    document.getElementById("selected-code-icon").textContent = code.length > 4 ? code.slice(0,4) : code;
+    document.getElementById("selected-name-display").textContent = name;
+    document.getElementById("selection-summary").classList.remove("hidden");
+}
+
+function clearSelection() {
+    selectedCode = "";
+    document.getElementById("payment_method_input").value = "";
+    document.getElementById("submit-btn").disabled = true;
+    document.getElementById("selection-summary").classList.add("hidden");
+    document.querySelectorAll(".coin-card").forEach(c => c.classList.remove("selected"));
+}
+
+// Search / filter
+document.getElementById("coin-search").addEventListener("input", function () {
+    const q = this.value.toLowerCase().trim();
+    let anyVisible = false;
+
+    document.querySelectorAll(".coin-card").forEach(card => {
+        const match = !q ||
+            card.dataset.code.includes(q) ||
+            card.dataset.name.includes(q);
+        card.style.display = match ? "" : "none";
+        if (match) anyVisible = true;
+    });
+
+    // Show/hide section headers based on visible children
+    ["popular-section", "other-section"].forEach(id => {
+        const section = document.getElementById(id);
+        if (!section) return;
+        const hasVisible = Array.from(section.querySelectorAll(".coin-card"))
+            .some(c => c.style.display !== "none");
+        section.style.display = hasVisible ? "" : "none";
+    });
+
+    document.getElementById("no-results").classList.toggle("hidden", anyVisible);
+});
+</script>
 {% endblock %}

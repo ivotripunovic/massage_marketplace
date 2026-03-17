@@ -717,23 +717,37 @@ class ProviderSubscriptionView(ProviderRequiredMixin, FormView):
     template_name = "providers/subscription.html"
     success_url = reverse_lazy("subscription_confirm")
 
+    def _get_currencies(self):
+        try:
+            import payments.nowpayments as nowpayments
+            return nowpayments.get_currencies()
+        except Exception:
+            from payments.nowpayments import FALLBACK_CURRENCIES
+            return FALLBACK_CURRENCIES
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["currencies"] = self._get_currencies()
+        return kwargs
+
     def get_context_data(self, **kwargs):
-        """Add provider to context."""
         context = super().get_context_data(**kwargs)
         try:
             provider = Provider.objects.get(user=self.request.user)
             context["provider"] = provider
         except Provider.DoesNotExist:
             context["provider"] = None
+        from payments.nowpayments import POPULAR_CURRENCY_CODES
+        currencies = self._get_currencies()
+        popular_set = set(POPULAR_CURRENCY_CODES)
+        context["popular_currencies"] = [c for c in currencies if c["code"] in popular_set]
+        context["other_currencies"] = [c for c in currencies if c["code"] not in popular_set]
         return context
 
     def form_valid(self, form):
-        """Redirect to crypto payment page."""
+        """Store chosen currency and redirect to crypto payment page."""
         payment_method = form.cleaned_data["payment_method"]
-
-        # Store chosen method in session for the payment page
         self.request.session["pending_payment_method"] = payment_method
-
         return redirect("subscription_crypto_payment")
 
 
@@ -766,7 +780,7 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
 
     def dispatch(self, request, *args, **kwargs):
         self.payment_method = request.session.get("pending_payment_method")
-        if not self.payment_method or not self.payment_method.startswith("crypto_"):
+        if not self.payment_method:
             messages.error(request, "Please select a payment method first.")
             return redirect("subscription")
         return super().dispatch(request, *args, **kwargs)
@@ -795,7 +809,7 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
             try:
                 result = nowpayments.create_payment(
                     amount_usd=amount,
-                    payment_method=self.payment_method,
+                    pay_currency=self.payment_method,
                     order_id=f"{provider.pk}-{provider.user.email}",
                     ipn_callback_url=ipn_url,
                 )
@@ -832,12 +846,18 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
             except Exception:
                 pass
 
+        try:
+            currencies = nowpayments.get_currencies()
+            currency_name = {c["code"]: c["name"] for c in currencies}.get(
+                self.payment_method, self.payment_method.upper()
+            )
+        except Exception:
+            currency_name = self.payment_method.upper()
+
         context = {
             "provider": provider,
             "payment_method": self.payment_method,
-            "payment_method_display": dict(
-                SubscriptionSettingsForm.PAYMENT_METHOD_CHOICES
-            ).get(self.payment_method, self.payment_method),
+            "payment_method_display": currency_name,
             "amount": amount,
             "pay_address": payment_record.pay_address,
             "pay_amount": payment_record.pay_amount,

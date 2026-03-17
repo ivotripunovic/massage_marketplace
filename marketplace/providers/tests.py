@@ -1251,16 +1251,15 @@ class ProviderSubscriptionViewTests(TestCase):
         self.assertContains(response, "payment_method")
 
     def test_subscription_form_choices(self):
-        """Test that form has correct payment method choices."""
+        """Test that form has payment method choices (uses fallback currencies)."""
         from providers.forms import SubscriptionSettingsForm
 
         form = SubscriptionSettingsForm()
         choices = form.fields["payment_method"].choices
-        self.assertEqual(len(choices), 3)
+        self.assertGreater(len(choices), 0)
         choice_values = [choice[0] for choice in choices]
-        self.assertIn("crypto_bitcoin", choice_values)
-        self.assertIn("crypto_ethereum", choice_values)
-        self.assertIn("crypto_usdc", choice_values)
+        self.assertIn("btc", choice_values)
+        self.assertIn("eth", choice_values)
 
     def test_subscription_status_displayed(self):
         """Test that current subscription status is displayed."""
@@ -1273,12 +1272,10 @@ class ProviderSubscriptionViewTests(TestCase):
         """Test that form submission redirects to payment page."""
         self.client.login(email=self.user.email, password="testpass123")
         response = self.client.post(
-            reverse("subscription"), {"payment_method": "crypto_bitcoin"}, follow=True
+            reverse("subscription"), {"payment_method": "btc"}
         )
-        self.assertEqual(response.status_code, 200)
-        # Should redirect to crypto payment page
-        self.assertIn(
-            reverse("subscription_crypto_payment"), response.request["PATH_INFO"]
+        self.assertRedirects(
+            response, reverse("subscription_crypto_payment"), fetch_redirect_response=False
         )
 
     def test_subscription_form_invalid_choice(self):
@@ -1325,7 +1322,7 @@ class ProviderSubscriptionActivationTests(TestCase):
         self.provider.refresh_from_db()
 
         self.assertEqual(self.provider.subscription_status, "active")
-        self.assertEqual(self.provider.subscription_payment_method, "crypto_bitcoin")
+        self.assertEqual(self.provider.subscription_payment_method, "crypto_bitcoin")  # model method can store any value
         self.assertIsNotNone(self.provider.subscription_renewal_date)
 
     def test_activate_subscription_sets_renewal_date(self):
@@ -1358,7 +1355,7 @@ class ProviderSubscriptionActivationTests(TestCase):
         self.client.login(email=self.user.email, password="testpass123")
 
         # Step 1: Select payment method
-        self.client.post(reverse("subscription"), {"payment_method": "crypto_bitcoin"})
+        self.client.post(reverse("subscription"), {"payment_method": "btc"})
 
         # Step 2: GET crypto payment page — NOWPayments API is called here
         mock_result = {
@@ -1374,7 +1371,7 @@ class ProviderSubscriptionActivationTests(TestCase):
         # Should have created a payment record
         payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
         self.assertIsNotNone(payment)
-        self.assertEqual(payment.payment_method, "crypto_bitcoin")
+        self.assertEqual(payment.payment_method, "btc")
         self.assertEqual(payment.status, "pending")
         self.assertEqual(float(payment.amount), 29.99)
         self.assertEqual(payment.nowpayments_payment_id, "test-nowpay-123")
@@ -1388,7 +1385,7 @@ class ProviderSubscriptionActivationTests(TestCase):
         self.client.login(email=self.user.email, password="testpass123")
 
         # Step 1: Select payment method
-        self.client.post(reverse("subscription"), {"payment_method": "crypto_ethereum"})
+        self.client.post(reverse("subscription"), {"payment_method": "eth"})
 
         # Step 2: GET crypto page — creates pending payment via NOWPayments
         mock_result = {
@@ -1502,7 +1499,7 @@ class CryptoPaymentViewTests(TestCase):
     def test_crypto_page_loads_with_session(self):
         """Test that crypto page loads when session is set."""
         self.client.login(email=self.user.email, password="testpass123")
-        self._set_session(pending_payment_method="crypto_bitcoin")
+        self._set_session(pending_payment_method="btc")
         with self._mock_nowpayments():
             response = self.client.get(reverse("subscription_crypto_payment"))
         self.assertEqual(response.status_code, 200)
@@ -1511,7 +1508,7 @@ class CryptoPaymentViewTests(TestCase):
     def test_crypto_page_shows_wallet_address(self):
         """Test that crypto page displays the NOWPayments pay address."""
         self.client.login(email=self.user.email, password="testpass123")
-        self._set_session(pending_payment_method="crypto_bitcoin")
+        self._set_session(pending_payment_method="btc")
         with self._mock_nowpayments():
             response = self.client.get(reverse("subscription_crypto_payment"))
         self.assertContains(response, "1MockBitcoinAddr")
@@ -1520,7 +1517,7 @@ class CryptoPaymentViewTests(TestCase):
     def test_crypto_page_shows_payment_instructions(self):
         """Test that crypto page shows payment instructions."""
         self.client.login(email=self.user.email, password="testpass123")
-        self._set_session(pending_payment_method="crypto_bitcoin")
+        self._set_session(pending_payment_method="btc")
         with self._mock_nowpayments():
             response = self.client.get(reverse("subscription_crypto_payment"))
         self.assertContains(response, "How to pay")
@@ -1531,7 +1528,7 @@ class CryptoPaymentViewTests(TestCase):
         from payments.models import SubscriptionPayment
 
         self.client.login(email=self.user.email, password="testpass123")
-        self._set_session(pending_payment_method="crypto_bitcoin")
+        self._set_session(pending_payment_method="btc")
         with self._mock_nowpayments():
             self.client.get(reverse("subscription_crypto_payment"))
 
@@ -1539,7 +1536,7 @@ class CryptoPaymentViewTests(TestCase):
         self.assertIsNotNone(payment)
         self.assertEqual(payment.nowpayments_payment_id, "mock-np-id-999")
         self.assertEqual(payment.pay_address, "1MockBitcoinAddr")
-        self.assertEqual(payment.payment_method, "crypto_bitcoin")
+        self.assertEqual(payment.payment_method, "btc")
         self.assertEqual(payment.status, "pending")
 
     def test_crypto_get_reuses_existing_pending_payment(self):
@@ -1548,7 +1545,7 @@ class CryptoPaymentViewTests(TestCase):
         from unittest.mock import patch, MagicMock
 
         self.client.login(email=self.user.email, password="testpass123")
-        self._set_session(pending_payment_method="crypto_bitcoin")
+        self._set_session(pending_payment_method="btc")
 
         mock_fn = MagicMock(return_value={
             "payment_id": "mock-np-id-999",
@@ -1571,7 +1568,7 @@ class CryptoPaymentViewTests(TestCase):
     def test_crypto_submit_clears_session(self):
         """Test that POST clears the pending_payment_method session key."""
         self.client.login(email=self.user.email, password="testpass123")
-        self._set_session(pending_payment_method="crypto_bitcoin")
+        self._set_session(pending_payment_method="btc")
         with self._mock_nowpayments():
             self.client.get(reverse("subscription_crypto_payment"))
         self.client.post(reverse("subscription_crypto_payment"))
@@ -1581,7 +1578,7 @@ class CryptoPaymentViewTests(TestCase):
     def test_crypto_submit_does_not_activate_subscription(self):
         """Subscription is NOT activated on POST — it waits for the IPN webhook."""
         self.client.login(email=self.user.email, password="testpass123")
-        self._set_session(pending_payment_method="crypto_ethereum")
+        self._set_session(pending_payment_method="eth")
         with self._mock_nowpayments():
             self.client.get(reverse("subscription_crypto_payment"))
         self.client.post(reverse("subscription_crypto_payment"))

@@ -276,7 +276,7 @@ class SandboxAPITests(TestCase):
         time.sleep(1)  # avoid rate limit after setUpClass calls
         result = nowpayments.create_payment(
             amount_usd=29.99,
-            payment_method="crypto_bitcoin",
+            pay_currency="btc",
             order_id="client-wrapper-test",
             ipn_callback_url="https://placeholder.example.com/webhook/",
         )
@@ -313,14 +313,14 @@ class SandboxEndToEndTests(TestCase):
         # Create two payments for the different scenarios
         cls.btc_api_result = nowpayments.create_payment(
             amount_usd=29.99,
-            payment_method="crypto_bitcoin",
+            pay_currency="btc",
             order_id="e2e-btc",
             ipn_callback_url="https://placeholder.example.com/webhook/",
         )
         time.sleep(1)
         cls.eth_api_result = nowpayments.create_payment(
             amount_usd=29.99,
-            payment_method="crypto_ethereum",
+            pay_currency="eth",
             order_id="e2e-eth",
             ipn_callback_url="https://placeholder.example.com/webhook/",
         )

@@ -10,12 +10,25 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Maps our internal payment method codes to NOWPayments currency codes
-CURRENCY_MAP = {
-    "crypto_bitcoin": "btc",
-    "crypto_ethereum": "eth",
-    "crypto_usdc": "usdcerc20",
-}
+# Popular cryptocurrency codes to feature prominently in the UI
+POPULAR_CURRENCY_CODES = [
+    "btc", "eth", "usdterc20", "usdttrc20", "usdcerc20",
+    "ltc", "sol", "xmr", "doge", "trx",
+]
+
+# Fallback list used when the API is unavailable or the API key is not configured
+FALLBACK_CURRENCIES = [
+    {"code": "btc",       "name": "Bitcoin",              "network": "btc"},
+    {"code": "eth",       "name": "Ethereum",             "network": "eth"},
+    {"code": "usdcerc20", "name": "USD Coin",             "network": "eth"},
+    {"code": "usdterc20", "name": "Tether USD (ERC-20)",  "network": "eth"},
+    {"code": "usdttrc20", "name": "Tether USD (TRC-20)",  "network": "trx"},
+    {"code": "ltc",       "name": "Litecoin",             "network": "ltc"},
+    {"code": "sol",       "name": "Solana",               "network": "sol"},
+    {"code": "xmr",       "name": "Monero",               "network": "xmr"},
+    {"code": "doge",      "name": "Dogecoin",             "network": "doge"},
+    {"code": "trx",       "name": "TRON",                 "network": "trx"},
+]
 
 
 def _base_url():
@@ -31,14 +44,56 @@ def _headers():
     }
 
 
-def get_pay_currency(payment_method):
-    """Return the NOWPayments currency code for an internal payment method."""
-    return CURRENCY_MAP.get(payment_method, "btc")
+def get_currencies():
+    """
+    Return a list of available deposit currencies from NOWPayments.
+
+    Result is cached for 1 hour. Falls back to FALLBACK_CURRENCIES if the API
+    key is not configured or the request fails.
+
+    Each entry is a dict: {"code": str, "name": str, "network": str}.
+    """
+    if not getattr(settings, "NOWPAYMENTS_API_KEY", ""):
+        return FALLBACK_CURRENCIES
+
+    from django.core.cache import cache
+
+    CACHE_KEY = "nowpayments_currencies_v1"
+    cached = cache.get(CACHE_KEY)
+    if cached is not None:
+        return cached
+
+    try:
+        resp = requests.get(
+            f"{_base_url()}/full-currencies",
+            headers=_headers(),
+            timeout=10,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        currencies = []
+        for c in data.get("currencies", []):
+            if not c.get("enable") or not c.get("isDepositEnabled", True):
+                continue
+            currencies.append({
+                "code": c["code"].lower(),
+                "name": c.get("name", c["code"].upper()),
+                "network": (c.get("network") or c["code"]).lower(),
+            })
+        if currencies:
+            cache.set(CACHE_KEY, currencies, timeout=3600)
+            return currencies
+    except Exception:
+        logger.warning("Could not fetch NOWPayments currencies, using fallback list")
+
+    return FALLBACK_CURRENCIES
 
 
-def create_payment(amount_usd, payment_method, order_id, ipn_callback_url):
+def create_payment(amount_usd, pay_currency, order_id, ipn_callback_url):
     """
     Create a new payment via the NOWPayments API.
+
+    pay_currency is a NOWPayments currency code (e.g. "btc", "eth", "usdcerc20").
 
     Returns the full response dict on success:
         {
@@ -52,7 +107,6 @@ def create_payment(amount_usd, payment_method, order_id, ipn_callback_url):
 
     Raises requests.HTTPError on API errors.
     """
-    pay_currency = get_pay_currency(payment_method)
     payload = {
         "price_amount": float(amount_usd),
         "price_currency": "usd",

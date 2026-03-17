@@ -34,6 +34,9 @@ CACHES = {
     }
 }
 
+# Disable NOWPayments API calls during tests (get_currencies returns fallback)
+NOWPAYMENTS_API_KEY = ""
+
 # Disable migrations for faster test setup
 # (comment out if you need migration testing)
 # MIGRATION_MODULES = {app: None for app in INSTALLED_APPS if 'django' not in app}

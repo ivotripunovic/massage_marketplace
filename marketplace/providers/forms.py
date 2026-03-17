@@ -99,18 +99,21 @@ class ProviderPhotoForm(forms.ModelForm):
 class SubscriptionSettingsForm(forms.Form):
     """Form for subscription payment method selection."""
 
-    PAYMENT_METHOD_CHOICES = [
-        ("crypto_bitcoin", "Bitcoin"),
-        ("crypto_ethereum", "Ethereum"),
-        ("crypto_usdc", "USDC"),
-    ]
-
     payment_method = forms.ChoiceField(
-        label="Payment Method",
-        choices=PAYMENT_METHOD_CHOICES,
+        label="Cryptocurrency",
+        choices=[],  # populated dynamically from NOWPayments in __init__
         widget=forms.RadioSelect(attrs={"class": "radio-button"}),
         required=True,
     )
+
+    def __init__(self, *args, currencies=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if currencies is None:
+            from payments.nowpayments import FALLBACK_CURRENCIES
+            currencies = FALLBACK_CURRENCIES
+        self.fields["payment_method"].choices = [
+            (c["code"], c["name"]) for c in currencies
+        ]
 
 
 class CryptoPaymentForm(forms.Form):
