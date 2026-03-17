@@ -287,18 +287,59 @@ RATE_LIMIT_RULES = {
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "formatters": {
+        # Human-readable for local development
+        "verbose": {
+            "format": "{asctime} {levelname} {name} {message}",
+            "style": "{",
+        },
+        # Structured JSON for production — parsed by journald / log shippers
+        "json": {
+            "()": "pythonjsonlogger.json.JsonFormatter",
+            "fmt": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        },
+    },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
+            "formatter": "verbose" if DEBUG else "json",
         },
     },
     "loggers": {
-        "django.core.mail": {
+        # Django internals — errors and security events
+        "django": {
             "handlers": ["console"],
-            "level": "DEBUG",  # This will log SMTP conversations
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        # App loggers — INFO and above in production, DEBUG locally
+        "payments": {
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
+        },
+        "providers": {
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
+            "propagate": False,
+        },
+        "users": {
+            "handlers": ["console"],
+            "level": "DEBUG" if DEBUG else "INFO",
             "propagate": False,
         },
     },
+    # Catch-all: WARNING+ for everything else
     "root": {
         "handlers": ["console"],
         "level": "WARNING",
