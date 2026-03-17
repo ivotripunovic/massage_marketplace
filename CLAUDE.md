@@ -11,7 +11,9 @@ This is a Django-based massage therapy marketplace platform that connects servic
 - Custom User model with three types: provider, client, admin
 - Server-side rendered HTML with Tailwind CSS
 - PostgreSQL for production, SQLite for development
-- Payment support: Cryptocurrency (BTC, ETH, USDC) and bank transfers
+- Payment support: Cryptocurrency via NOWPayments (dynamic coin list)
+- Error tracking: Sentry SDK (cloud, free tier)
+- Structured JSON logging to stdout → systemd journal
 
 ## Development Commands
 
@@ -115,7 +117,7 @@ marketplace/
 
 **Provider Model** (`providers/models.py`):
 - OneToOne with User
-- Fields: bio, phone, photo, subscription_status, subscription_payment_method, subscription_renewal_date, crypto_address, bank_account_encrypted
+- Fields: bio, phone, photo, subscription_status, subscription_payment_method, subscription_renewal_date, crypto_address
 - Methods: `is_subscription_active()`, `activate_subscription(payment_method)`, `deactivate_subscription()`
 - Related models: Service (many-to-one) and Certification (many-to-one)
 
@@ -142,13 +144,11 @@ marketplace/
 
 1. Provider completes profile
 2. Provider navigates to subscription page
-3. Provider selects payment method (crypto or bank transfer)
-4. Provider submits payment details
-5. `Provider.activate_subscription(payment_method)` is called
-6. SubscriptionPayment record created with status='pending'
-7. Email sent to provider with payment instructions
-8. Admin verifies payment in admin dashboard
-9. Admin marks payment as completed/failed
+3. Provider selects cryptocurrency from dynamic coin picker (fetched from NOWPayments API, cached 1 hour)
+4. NOWPayments creates a payment — provider pays to the generated address
+5. NOWPayments IPN webhook (`/payments/webhook/nowpayments/`) confirms payment
+6. `Provider.activate_subscription(payment_method)` is called automatically
+7. SubscriptionPayment record created with status='completed'
 
 ### Access Control Mixins
 
@@ -198,13 +198,14 @@ Both inherit from LoginRequiredMixin and redirect unauthorized users.
 
 ### Testing Best Practices
 
-- Use `--settings=marketplace.test_settings` for fast feedback (0.24s for 84 tests)
+- Use `--settings=marketplace.test_settings` for fast feedback (~6s for 372 tests)
 - Test both success and failure cases
 - Use Django's TestCase for database tests
 - Mock email sending in tests (already configured in test_settings)
 - Keep tests isolated (no dependencies between tests)
 - Use `setUp()` for test data creation
-- Current coverage: 84 tests across users, providers, reviews, payments
+- `NOWPAYMENTS_API_KEY = ""` in test_settings prevents real API calls; `get_currencies()` returns `FALLBACK_CURRENCIES` immediately when key is empty
+- Current coverage: 372 tests across users, providers, reviews, payments, clients
 
 ## Important Implementation Details
 
@@ -228,8 +229,10 @@ Both inherit from LoginRequiredMixin and redirect unauthorized users.
 - Subscriptions are 30-day recurring
 - Status: active, inactive, suspended
 - Renewal date tracked in `Provider.subscription_renewal_date`
-- Manual admin verification for payments (no automatic processing in MVP)
-- Payment methods: crypto (BTC/ETH/USDC) or bank transfer
+- Payments processed automatically via NOWPayments IPN webhook
+- Payment method stored as NOWPayments currency code (e.g. `btc`, `eth`, `usdterc20`)
+- Currency list fetched from NOWPayments `/v1/full-currencies` endpoint, cached 1 hour in Redis
+- Fallback currency list in `payments/nowpayments.py` used when API key is missing or API is unreachable
 
 ### Payment Verification Workflow
 
@@ -292,12 +295,16 @@ Key URL patterns to know:
 
 ## Environment Variables
 
-See `.env.example` for required environment variables:
-- Database configuration (PostgreSQL in production)
-- Email backend configuration
-- SECRET_KEY (change in production)
-- DEBUG setting
-- ALLOWED_HOSTS
+See `.env.example` for all variables. Key ones:
+- `SECRET_KEY` — change in production
+- `DEBUG` — `False` in production
+- `ALLOWED_HOSTS` — comma-separated hostnames
+- `DB_*` — PostgreSQL connection settings
+- `EMAIL_*` — SMTP configuration
+- `NOW_PAYMENTS_API_KEY`, `NOW_PAYMENTS_IPN` — NOWPayments credentials
+- `NOWPAYMENTS_SANDBOX` — `true` for sandbox testing
+- `SENTRY_DSN` — Sentry error tracking (leave blank to disable)
+- `REDIS_URL` — Redis connection (used for caching in production)
 
 ## Security Considerations
 
@@ -305,14 +312,40 @@ See `.env.example` for required environment variables:
 - Email-based authentication (more secure than usernames)
 - Password hashing: PBKDF2 in production, MD5 in tests only
 - Image upload validation (type, size, format)
-- Bank account details stored encrypted (TextField, encryption implementation TBD)
 - Admin access protected with AdminRequiredMixin
 - Session-based authentication
+- NOWPayments IPN webhook verified with HMAC-SHA512 signature
+
+## Observability
+
+### Error Tracking — Sentry
+
+Integrated via `sentry-sdk[django]`. Initialized in `settings.py` when `SENTRY_DSN` env var is set; no-op when blank (safe for local dev and CI).
+
+Env vars:
+- `SENTRY_DSN` — from Sentry project settings (leave blank to disable)
+- `SENTRY_ENVIRONMENT` — `production` / `staging` (default: `production`)
+- `SENTRY_TRACES_SAMPLE_RATE` — fraction of requests traced for performance (default: `0.1`)
+
+### Structured Logging
+
+`python-json-logger` formats log output as JSON in production (`DEBUG=False`) and human-readable text in development. Logs go to stdout and are collected by systemd journal.
+
+Log levels by logger:
+- `django.request` — ERROR (500s with tracebacks)
+- `django.security` — WARNING (CSRF failures, suspicious requests)
+- `payments`, `providers`, `users` — INFO in production, DEBUG locally
+
+Useful `journalctl` commands:
+```bash
+journalctl -u your-app -f                               # stream live
+journalctl -u your-app --since "1 hour ago"             # last hour
+journalctl -u your-app | grep '"levelname": "ERROR"'    # errors only (JSON)
+```
 
 ## Git Workflow
 
-Current branch: `master`
-Recent work: Sprint 1 complete (Admin Extensions & Subscription System)
+Current branch: `main`
 
 When committing:
 1. Make focused, atomic commits
