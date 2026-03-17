@@ -13,9 +13,25 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 import os
 from pathlib import Path
 
+import sentry_sdk
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")
+
+# ---------------------------------------------------------------------------
+# Sentry — error tracking and performance monitoring
+# ---------------------------------------------------------------------------
+_sentry_dsn = os.getenv("SENTRY_DSN", "")
+if _sentry_dsn:
+    sentry_sdk.init(
+        dsn=_sentry_dsn,
+        # Capture 100% of transactions in dev, 10% in production.
+        # Adjust traces_sample_rate down once you have traffic data.
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        # Send user info (email, id) with each event for easier debugging.
+        send_default_pii=True,
+        environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
+    )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
