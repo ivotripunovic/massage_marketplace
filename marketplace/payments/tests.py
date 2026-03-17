@@ -31,7 +31,7 @@ class SubscriptionPaymentModelTests(TestCase):
     def test_payment_default_amount(self):
         """Test payment default amount."""
         payment = SubscriptionPayment.objects.create(
-            provider=self.provider, payment_method="bank_transfer"
+            provider=self.provider, payment_method="crypto_bitcoin"
         )
         self.assertEqual(payment.amount, 29.99)
 
@@ -57,10 +57,10 @@ class SubscriptionPaymentModelTests(TestCase):
         """Test payment with admin notes."""
         payment = SubscriptionPayment.objects.create(
             provider=self.provider,
-            payment_method="bank_transfer",
-            notes="Waiting for bank confirmation",
+            payment_method="crypto_ethereum",
+            notes="Waiting for confirmation",
         )
-        self.assertEqual(payment.notes, "Waiting for bank confirmation")
+        self.assertEqual(payment.notes, "Waiting for confirmation")
 
     def test_payment_status_completed(self):
         """Test marking payment as completed."""
@@ -80,10 +80,10 @@ class SubscriptionPaymentModelTests(TestCase):
     def test_payment_status_failed(self):
         """Test marking payment as failed."""
         payment = SubscriptionPayment.objects.create(
-            provider=self.provider, payment_method="bank_transfer"
+            provider=self.provider, payment_method="crypto_usdc"
         )
         payment.status = "failed"
-        payment.notes = "Bank transfer bounced"
+        payment.notes = "Payment expired"
         payment.save()
 
         payment.refresh_from_db()
@@ -95,7 +95,6 @@ class SubscriptionPaymentModelTests(TestCase):
             "crypto_bitcoin",
             "crypto_ethereum",
             "crypto_usdc",
-            "bank_transfer",
         ]
         for i, method in enumerate(payment_methods):
             payment = SubscriptionPayment.objects.create(
@@ -121,7 +120,7 @@ class SubscriptionPaymentModelTests(TestCase):
             provider=self.provider, payment_method="crypto_bitcoin", status="completed"
         )
         SubscriptionPayment.objects.create(
-            provider=self.provider, payment_method="bank_transfer", status="pending"
+            provider=self.provider, payment_method="crypto_ethereum", status="pending"
         )
         self.assertEqual(self.provider.subscription_payments.count(), 2)
 
@@ -136,7 +135,7 @@ class SubscriptionPaymentModelTests(TestCase):
     def test_custom_amount(self):
         """Test payment with custom amount."""
         payment = SubscriptionPayment.objects.create(
-            provider=self.provider, amount=49.99, payment_method="bank_transfer"
+            provider=self.provider, amount=49.99, payment_method="crypto_usdc"
         )
         self.assertEqual(payment.amount, 49.99)
 
@@ -157,7 +156,7 @@ class SubscriptionPaymentModelTests(TestCase):
     def test_mark_failed(self):
         """Test mark_failed() sets status to failed."""
         payment = SubscriptionPayment.objects.create(
-            provider=self.provider, payment_method="bank_transfer"
+            provider=self.provider, payment_method="crypto_bitcoin"
         )
         payment.mark_failed()
         payment.refresh_from_db()
@@ -245,7 +244,7 @@ class AdminPaymentListViewTests(TestCase):
         response = self.client.get(reverse("admin_payments") + "?method=crypto_bitcoin")
         self.assertContains(response, self.provider_user.email)
 
-        response = self.client.get(reverse("admin_payments") + "?method=bank_transfer")
+        response = self.client.get(reverse("admin_payments") + "?method=crypto_ethereum")
         self.assertNotContains(response, self.provider_user.email)
 
     def test_payment_list_search(self):
@@ -642,24 +641,6 @@ class MonitorCryptoPaymentsCommandTests(TestCase):
             payment_method="crypto_bitcoin",
             status="completed",
             reference_id="0xabc123",
-        )
-
-        out = StringIO()
-        call_command("monitor_crypto_payments", stdout=out)
-        output = out.getvalue()
-        self.assertIn("Found 0 pending crypto payment", output)
-
-    def test_command_ignores_bank_transfers(self):
-        """Test that command ignores bank transfer payments."""
-        from io import StringIO
-        from django.core.management import call_command
-
-        SubscriptionPayment.objects.create(
-            provider=self.provider,
-            amount=29.99,
-            payment_method="bank_transfer",
-            status="pending",
-            reference_id="REF123",
         )
 
         out = StringIO()

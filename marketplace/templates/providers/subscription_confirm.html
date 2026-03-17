@@ -108,18 +108,6 @@
             {% endif %}
         </div>
 
-        {% elif provider.subscription_payment_method == 'bank_transfer' %}
-        <div class="space-y-3 text-sm text-blue-200">
-            <p class="text-blue-100"><strong>Bank Transfer Instructions:</strong></p>
-            <ol class="list-decimal list-inside space-y-2 ml-2">
-                <li>Our team will send you bank transfer details via email</li>
-                <li>Complete the transfer with payment amount: <strong class="text-gold">$29.99</strong></li>
-                <li>Once verified, we'll activate your full access</li>
-            </ol>
-            <div class="mt-4 p-3 bg-dark-100 rounded border border-blue-700">
-                <p class="text-text-secondary text-sm">Check your email for detailed bank transfer instructions.</p>
-            </div>
-        </div>
         {% endif %}
     </div>
     {% endif %}

@@ -79,7 +79,6 @@ class AdminPaymentListView(AdminRequiredMixin, ListView):
             ("crypto_bitcoin", "Bitcoin"),
             ("crypto_ethereum", "Ethereum"),
             ("crypto_usdc", "USDC"),
-            ("bank_transfer", "Bank Transfer"),
         ]
 
         return context

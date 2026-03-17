@@ -1064,7 +1064,7 @@ class AdminProviderListViewTests(TestCase):
             "active@test.com", "active", "crypto_bitcoin"
         )
         self.provider_inactive = self._create_provider(
-            "inactive@test.com", "inactive", "bank_transfer"
+            "inactive@test.com", "inactive", "crypto_ethereum"
         )
         self.provider_suspended = self._create_provider(
             "suspended@test.com", "suspended", None
@@ -1256,12 +1256,11 @@ class ProviderSubscriptionViewTests(TestCase):
 
         form = SubscriptionSettingsForm()
         choices = form.fields["payment_method"].choices
-        self.assertEqual(len(choices), 4)
+        self.assertEqual(len(choices), 3)
         choice_values = [choice[0] for choice in choices]
         self.assertIn("crypto_bitcoin", choice_values)
         self.assertIn("crypto_ethereum", choice_values)
         self.assertIn("crypto_usdc", choice_values)
-        self.assertIn("bank_transfer", choice_values)
 
     def test_subscription_status_displayed(self):
         """Test that current subscription status is displayed."""
@@ -1589,15 +1588,6 @@ class CryptoPaymentViewTests(TestCase):
         self.provider.refresh_from_db()
         self.assertEqual(self.provider.subscription_status, "inactive")
 
-    def test_crypto_rejects_bank_transfer_method(self):
-        """Test that crypto page rejects bank_transfer method."""
-        self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "bank_transfer"
-        session.save()
-        response = self.client.get(reverse("subscription_crypto_payment"))
-        self.assertRedirects(response, reverse("subscription"))
-
 
 class CryptoPaymentStatusViewTests(TestCase):
     """Test the JSON status polling endpoint."""
@@ -1672,160 +1662,6 @@ class CryptoPaymentStatusViewTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
-class BankTransferPaymentViewTests(TestCase):
-    """Test bank transfer payment view."""
-
-    def setUp(self):
-        self.user = User.objects.create_user(
-            email="provider@test.com",
-            password="testpass123",
-            user_type="provider",
-            is_email_verified=True,
-        )
-        self.provider = Provider.objects.create(
-            user=self.user, phone="+1234567890", subscription_status="inactive"
-        )
-        self.client = Client()
-
-    def test_bank_page_requires_login(self):
-        """Test that bank transfer page requires login."""
-        response = self.client.get(reverse("subscription_bank_payment"))
-        self.assertEqual(response.status_code, 302)
-
-    def test_bank_page_requires_session(self):
-        """Test that bank page redirects without session payment method."""
-        self.client.login(email=self.user.email, password="testpass123")
-        response = self.client.get(reverse("subscription_bank_payment"))
-        self.assertRedirects(response, reverse("subscription"))
-
-    def test_bank_page_loads_with_session(self):
-        """Test that bank page loads when session is set."""
-        self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "bank_transfer"
-        session.save()
-        response = self.client.get(reverse("subscription_bank_payment"))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, "providers/subscription_bank.html")
-
-    def test_bank_page_shows_platform_details(self):
-        """Test that bank page shows platform bank details."""
-        self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "bank_transfer"
-        session.save()
-        response = self.client.get(reverse("subscription_bank_payment"))
-        self.assertContains(response, "First National Bank")
-        self.assertContains(response, "Massage Marketplace LLC")
-        self.assertContains(response, "29.99")
-
-    def test_bank_page_shows_reference_number(self):
-        """Test that bank page generates and shows payment reference."""
-        self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "bank_transfer"
-        session.save()
-        response = self.client.get(reverse("subscription_bank_payment"))
-        self.assertContains(response, "SUB-")
-        self.assertContains(response, "Payment Reference")
-
-    def test_bank_submit_creates_payment(self):
-        """Test submitting bank transfer details creates payment record."""
-        from payments.models import SubscriptionPayment
-
-        self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "bank_transfer"
-        session["bank_payment_reference"] = "SUB-1-ABCD1234"
-        session.save()
-
-        response = self.client.post(
-            reverse("subscription_bank_payment"),
-            {
-                "sender_name": "John Doe",
-                "bank_name": "Chase Bank",
-                "reference_number": "REF123456",
-            },
-            follow=True,
-        )
-
-        self.assertEqual(response.status_code, 200)
-        payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
-        self.assertIsNotNone(payment)
-        self.assertEqual(payment.payment_method, "bank_transfer")
-        self.assertEqual(payment.reference_id, "REF123456")
-        self.assertEqual(payment.status, "pending")
-
-    def test_bank_submit_activates_subscription(self):
-        """Test that bank transfer submission activates subscription."""
-        self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "bank_transfer"
-        session.save()
-
-        self.client.post(
-            reverse("subscription_bank_payment"),
-            {
-                "sender_name": "Jane Smith",
-                "bank_name": "Wells Fargo",
-            },
-        )
-
-        self.provider.refresh_from_db()
-        self.assertEqual(self.provider.subscription_status, "active")
-        self.assertEqual(self.provider.subscription_payment_method, "bank_transfer")
-        self.assertIsNotNone(self.provider.subscription_renewal_date)
-
-    def test_bank_submit_stores_bank_info(self):
-        """Test that bank transfer stores sender details."""
-        self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "bank_transfer"
-        session.save()
-
-        self.client.post(
-            reverse("subscription_bank_payment"),
-            {
-                "sender_name": "John Doe",
-                "bank_name": "Chase Bank",
-            },
-        )
-
-        self.provider.refresh_from_db()
-        self.assertIn("John Doe", self.provider.bank_account_encrypted)
-        self.assertIn("Chase Bank", self.provider.bank_account_encrypted)
-
-    def test_bank_submit_uses_generated_reference(self):
-        """Test that submission uses generated reference when none provided."""
-        from payments.models import SubscriptionPayment
-
-        self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "bank_transfer"
-        session["bank_payment_reference"] = "SUB-1-GENERATED"
-        session.save()
-
-        self.client.post(
-            reverse("subscription_bank_payment"),
-            {
-                "sender_name": "Jane Smith",
-                "bank_name": "Wells Fargo",
-                "reference_number": "",
-            },
-        )
-
-        payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
-        self.assertEqual(payment.reference_id, "SUB-1-GENERATED")
-
-    def test_bank_rejects_crypto_method(self):
-        """Test that bank page rejects crypto payment methods."""
-        self.client.login(email=self.user.email, password="testpass123")
-        session = self.client.session
-        session["pending_payment_method"] = "crypto_bitcoin"
-        session.save()
-        response = self.client.get(reverse("subscription_bank_payment"))
-        self.assertRedirects(response, reverse("subscription"))
-
 
 class PaymentFormTests(TestCase):
     """Test payment forms."""
@@ -1845,56 +1681,6 @@ class PaymentFormTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn("transaction_id", form.errors)
 
-    def test_bank_form_valid(self):
-        """Test BankTransferForm with valid data."""
-        from providers.forms import BankTransferForm
-
-        form = BankTransferForm(
-            data={
-                "sender_name": "John Doe",
-                "bank_name": "Chase Bank",
-                "reference_number": "REF123",
-            }
-        )
-        self.assertTrue(form.is_valid())
-
-    def test_bank_form_reference_optional(self):
-        """Test BankTransferForm reference_number is optional."""
-        from providers.forms import BankTransferForm
-
-        form = BankTransferForm(
-            data={
-                "sender_name": "John Doe",
-                "bank_name": "Chase Bank",
-            }
-        )
-        self.assertTrue(form.is_valid())
-
-    def test_bank_form_requires_sender_name(self):
-        """Test BankTransferForm requires sender_name."""
-        from providers.forms import BankTransferForm
-
-        form = BankTransferForm(
-            data={
-                "sender_name": "",
-                "bank_name": "Chase Bank",
-            }
-        )
-        self.assertFalse(form.is_valid())
-        self.assertIn("sender_name", form.errors)
-
-    def test_bank_form_requires_bank_name(self):
-        """Test BankTransferForm requires bank_name."""
-        from providers.forms import BankTransferForm
-
-        form = BankTransferForm(
-            data={
-                "sender_name": "John Doe",
-                "bank_name": "",
-            }
-        )
-        self.assertFalse(form.is_valid())
-        self.assertIn("bank_name", form.errors)
 
 
 class GalleryImageModelTests(TestCase):

@@ -103,7 +103,6 @@ class SubscriptionSettingsForm(forms.Form):
         ("crypto_bitcoin", "Bitcoin"),
         ("crypto_ethereum", "Ethereum"),
         ("crypto_usdc", "USDC"),
-        ("bank_transfer", "Bank Transfer"),
     ]
 
     payment_method = forms.ChoiceField(
@@ -129,44 +128,6 @@ class CryptoPaymentForm(forms.Form):
         help_text="Paste the transaction hash from your wallet after sending payment.",
     )
 
-
-class BankTransferForm(forms.Form):
-    """Form for confirming bank transfer details."""
-
-    sender_name = forms.CharField(
-        label="Account Holder Name",
-        max_length=255,
-        widget=forms.TextInput(
-            attrs={
-                "class": "input-dark w-full",
-                "placeholder": "Name on bank account",
-            }
-        ),
-    )
-
-    bank_name = forms.CharField(
-        label="Bank Name",
-        max_length=255,
-        widget=forms.TextInput(
-            attrs={
-                "class": "input-dark w-full",
-                "placeholder": "e.g., Chase Bank",
-            }
-        ),
-    )
-
-    reference_number = forms.CharField(
-        label="Transfer Reference / Confirmation Number",
-        max_length=255,
-        required=False,
-        widget=forms.TextInput(
-            attrs={
-                "class": "input-dark w-full",
-                "placeholder": "Bank transfer reference (if available)",
-            }
-        ),
-        help_text="Enter your bank transfer confirmation number if you have one. You can also provide this later.",
-    )
 
 
 class GalleryImageForm(forms.ModelForm):

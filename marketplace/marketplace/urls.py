@@ -39,7 +39,6 @@ from providers.views import (
     SubscriptionConfirmView,
     CryptoPaymentView,
     CryptoPaymentStatusView,
-    BankTransferPaymentView,
     GalleryImageCreateView,
     GalleryImageDeleteView,
 )
@@ -128,11 +127,6 @@ urlpatterns = [
         "provider/subscription/crypto/",
         CryptoPaymentView.as_view(),
         name="subscription_crypto_payment",
-    ),
-    path(
-        "provider/subscription/bank/",
-        BankTransferPaymentView.as_view(),
-        name="subscription_bank_payment",
     ),
     path(
         "provider/subscription/confirm/",

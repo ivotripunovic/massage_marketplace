@@ -475,7 +475,7 @@ class Command(BaseCommand):
             "phone_hours": phone_hours,
             "country_id": country_id,
             "city_id": city_id,
-            "payment_method": rng.choice(["bank_transfer", "crypto"]),
+            "payment_method": rng.choice(["crypto_bitcoin", "crypto_ethereum", "crypto_usdc"]),
             "renewal_days": rng.randint(1, 30),
         }
 

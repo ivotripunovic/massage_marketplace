@@ -112,7 +112,6 @@ class Provider(models.Model):
 
     PAYMENT_METHOD_CHOICES = (
         ("crypto", "Cryptocurrency"),
-        ("bank_transfer", "Bank Transfer"),
     )
 
     user = models.OneToOneField(
@@ -166,10 +165,6 @@ class Provider(models.Model):
 
     crypto_address = models.CharField(
         max_length=255, blank=True, null=True, help_text="Bitcoin/Ethereum address"
-    )
-
-    bank_account_encrypted = models.TextField(
-        blank=True, null=True, help_text="Encrypted bank account details"
     )
 
     map_latitude = models.DecimalField(
