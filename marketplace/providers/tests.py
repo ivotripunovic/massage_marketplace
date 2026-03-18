@@ -1,6 +1,9 @@
+from datetime import date, timedelta
 from decimal import Decimal
+from io import StringIO
 from unittest.mock import patch, MagicMock
 
+from django.core.management import call_command
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -2873,3 +2876,126 @@ class ProviderProfileVideoTests(TestCase):
             reverse("provider_detail", kwargs={"slug": self.provider.slug})
         )
         self.assertNotContains(response, "<video")
+
+
+class ExpireSubscriptionsCommandTests(TestCase):
+    """Tests for the expire_subscriptions management command."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="provider@example.com",
+            password="testpass123",
+            user_type="provider",
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone="+1234567890",
+            subscription_status="active",
+        )
+
+    def _run(self, *args, **kwargs):
+        out = StringIO()
+        call_command("expire_subscriptions", *args, stdout=out, **kwargs)
+        return out.getvalue()
+
+    # --- expiry ---
+
+    def test_expires_overdue_subscription(self):
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
+        self.provider.save()
+
+        self._run()
+
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, "inactive")
+
+    def test_does_not_expire_future_subscription(self):
+        self.provider.subscription_renewal_date = date.today() + timedelta(days=5)
+        self.provider.save()
+
+        self._run()
+
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, "active")
+
+    def test_does_not_expire_subscription_due_today(self):
+        """Renewal date == today means still valid for today."""
+        self.provider.subscription_renewal_date = date.today()
+        self.provider.save()
+
+        self._run()
+
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, "active")
+
+    def test_does_not_expire_inactive_subscription(self):
+        self.provider.subscription_status = "inactive"
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=5)
+        self.provider.save()
+
+        self._run()
+
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, "inactive")
+
+    def test_expiry_sends_email(self):
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
+        self.provider.save()
+
+        with self.settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"):
+            from django.core import mail
+            self._run()
+            self.assertEqual(len(mail.outbox), 1)
+            self.assertIn("expired", mail.outbox[0].subject.lower())
+            self.assertEqual(mail.outbox[0].to, [self.user.email])
+
+    # --- dry run ---
+
+    def test_dry_run_does_not_expire(self):
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
+        self.provider.save()
+
+        self._run(dry_run=True)
+
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, "active")
+
+    def test_dry_run_does_not_send_email(self):
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
+        self.provider.save()
+
+        with self.settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"):
+            from django.core import mail
+            self._run(dry_run=True)
+            self.assertEqual(len(mail.outbox), 0)
+
+    # --- reminders ---
+
+    def test_sends_reminder_3_days_before(self):
+        self.provider.subscription_renewal_date = date.today() + timedelta(days=3)
+        self.provider.save()
+
+        with self.settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"):
+            from django.core import mail
+            self._run()
+            self.assertEqual(len(mail.outbox), 1)
+            self.assertIn("3 days", mail.outbox[0].subject.lower())
+            self.assertEqual(mail.outbox[0].to, [self.user.email])
+
+    def test_no_reminder_4_days_before(self):
+        self.provider.subscription_renewal_date = date.today() + timedelta(days=4)
+        self.provider.save()
+
+        with self.settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"):
+            from django.core import mail
+            self._run()
+            self.assertEqual(len(mail.outbox), 0)
+
+    def test_output_reports_counts(self):
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
+        self.provider.save()
+
+        output = self._run()
+
+        self.assertIn("Expired: 1", output)
+        self.assertIn("Reminders sent: 0", output)

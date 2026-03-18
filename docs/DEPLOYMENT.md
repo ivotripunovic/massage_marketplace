@@ -322,6 +322,28 @@ sudo chmod 640 /opt/massage_marketplace/.env
 
 ## 9. Backups
 
+### Subscription expiry (daily)
+
+Create `/etc/cron.d/massage_marketplace_subscriptions`:
+
+```cron
+# Deactivate expired subscriptions and send renewal reminders — runs at 01:00 daily
+0 1 * * * deploy /opt/massage_marketplace/venv/bin/python /opt/massage_marketplace/marketplace/manage.py expire_subscriptions >> /var/log/massage_marketplace_cron.log 2>&1
+```
+
+What it does each run:
+- Providers whose `subscription_renewal_date` is in the past → deactivated + expiry email sent
+- Providers whose `subscription_renewal_date` is exactly 3 days away → renewal reminder email sent
+
+Test it manually before relying on cron:
+```bash
+# Dry run — shows what would happen, no changes, no emails
+python manage.py expire_subscriptions --dry-run
+
+# Real run
+python manage.py expire_subscriptions
+```
+
 ### Database (daily, keep 7 days)
 
 Create `/etc/cron.d/massage_marketplace_backup`:
@@ -429,6 +451,7 @@ The post-receive hook handles everything. Output streams to your terminal in rea
 - [ ] `NOWPAYMENTS_SANDBOX=false` (not in sandbox mode)
 - [ ] Admin superuser created
 - [ ] `ADMIN_EMAILS` set for payment/subscription notifications
+- [ ] Subscription expiry cron job created (`/etc/cron.d/massage_marketplace_subscriptions`)
 - [ ] Backup cron job created and tested
 - [ ] UptimeRobot monitor created
 - [ ] Media directory writable by `www-data`
