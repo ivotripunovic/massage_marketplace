@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 REMINDER_DAYS_BEFORE = 3
 
 # Email domains treated as test addresses — no emails are sent to these.
-TEST_EMAIL_DOMAINS = {"example.com"}
+TEST_EMAIL_DOMAINS = {"example.com", "seed.example.com"}
 
 # Seconds to wait between outgoing emails to avoid SMTP rate-limit triggers.
 # Override with EMAIL_BULK_DELAY in settings if needed.
