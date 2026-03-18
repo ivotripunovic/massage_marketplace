@@ -2895,7 +2895,8 @@ class ExpireSubscriptionsCommandTests(TestCase):
 
     def _run(self, *args, **kwargs):
         out = StringIO()
-        call_command("expire_subscriptions", *args, stdout=out, **kwargs)
+        with patch("providers.management.commands.expire_subscriptions.time.sleep"):
+            call_command("expire_subscriptions", *args, stdout=out, **kwargs)
         return out.getvalue()
 
     # --- expiry ---

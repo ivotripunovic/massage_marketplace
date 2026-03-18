@@ -17,6 +17,7 @@ Runs where nothing happened produce no email.
 """
 
 import logging
+import time
 from datetime import date, timedelta
 
 from django.conf import settings
@@ -28,6 +29,10 @@ from providers.models import Provider
 logger = logging.getLogger(__name__)
 
 REMINDER_DAYS_BEFORE = 3
+
+# Seconds to wait between outgoing emails to avoid SMTP rate-limit triggers.
+# Override with EMAIL_BULK_DELAY in settings if needed.
+EMAIL_BULK_DELAY = 2
 
 
 class Command(BaseCommand):
@@ -86,6 +91,7 @@ class Command(BaseCommand):
         if count == 0:
             return 0
 
+        delay = getattr(settings, "EMAIL_BULK_DELAY", EMAIL_BULK_DELAY)
         for provider in overdue:
             self.stdout.write(
                 f"  Expiring {provider.user.email} "
@@ -99,6 +105,7 @@ class Command(BaseCommand):
                     provider.subscription_renewal_date,
                 )
                 self._send_expiry_email(provider, failures)
+                time.sleep(delay)
 
         return count
 
@@ -113,6 +120,7 @@ class Command(BaseCommand):
         if count == 0:
             return 0
 
+        delay = getattr(settings, "EMAIL_BULK_DELAY", EMAIL_BULK_DELAY)
         for provider in due:
             self.stdout.write(
                 f"  Reminding {provider.user.email} "
@@ -125,6 +133,7 @@ class Command(BaseCommand):
                     provider.user.email,
                     provider.subscription_renewal_date,
                 )
+                time.sleep(delay)
 
         return count
 
