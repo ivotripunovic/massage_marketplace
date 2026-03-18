@@ -1,0 +1,41 @@
+#!/bin/bash
+# post-receive hook — runs on the VPS after every `git push production main`
+#
+# Install:
+#   cp deploy/post-receive /var/repo/massage_marketplace.git/hooks/post-receive
+#   chmod +x /var/repo/massage_marketplace.git/hooks/post-receive
+#
+# Requires:
+#   deploy ALL=NOPASSWD: /bin/systemctl restart massage_marketplace
+#   (add via: sudo visudo -f /etc/sudoers.d/massage_marketplace)
+
+set -e  # exit immediately on any error
+
+GIT_DIR="/var/repo/massage_marketplace.git"
+APP_DIR="/opt/massage_marketplace"
+VENV="$APP_DIR/venv/bin"
+MANAGE="$APP_DIR/marketplace/manage.py"
+
+echo "-----> Deploying massage_marketplace..."
+
+# 1. Checkout latest code into working directory
+echo "-----> Checking out code..."
+git --work-tree="$APP_DIR" --git-dir="$GIT_DIR" checkout -f main
+
+# 2. Install / update Python dependencies
+echo "-----> Installing dependencies..."
+"$VENV/pip" install -r "$APP_DIR/requirements.txt" --quiet
+
+# 3. Apply database migrations
+echo "-----> Running migrations..."
+"$VENV/python" "$MANAGE" migrate --noinput
+
+# 4. Collect static files
+echo "-----> Collecting static files..."
+"$VENV/python" "$MANAGE" collectstatic --noinput --quiet
+
+# 5. Restart gunicorn
+echo "-----> Restarting application..."
+sudo /bin/systemctl restart massage_marketplace
+
+echo "-----> Deploy complete."

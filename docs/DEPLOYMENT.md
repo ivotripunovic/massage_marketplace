@@ -22,13 +22,37 @@ sudo apt install -y python3.11 python3.11-venv python3-pip \
 
 ## 1. Application Setup
 
-```bash
-git clone <repository-url> /srv/massage_marketplace
-cd /srv/massage_marketplace
+### Create a deploy user
 
-python3.11 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+```bash
+sudo adduser deploy
+sudo usermod -aG sudo deploy   # temporary, tightened below
+```
+
+### Bare repo (receives git push)
+
+```bash
+sudo mkdir -p /var/repo
+sudo chown -R deploy:deploy /var/repo
+sudo -u deploy git init --bare /var/repo/massage_marketplace.git
+```
+
+### Working directory (running app)
+
+```bash
+sudo mkdir -p /opt/massage_marketplace
+sudo chown -R deploy:deploy /opt/massage_marketplace
+```
+
+### Initial checkout and venv
+
+```bash
+sudo -u deploy git --work-tree=/opt/massage_marketplace \
+    --git-dir=/var/repo/massage_marketplace.git checkout -f main
+
+cd /opt/massage_marketplace
+sudo -u deploy python3.11 -m venv venv
+sudo -u deploy venv/bin/pip install -r requirements.txt
 ```
 
 ---
@@ -114,7 +138,64 @@ Redis is used for:
 
 ---
 
-## 5. Gunicorn (systemd service)
+## 5. Git Deployment (bare repo + post-receive hook)
+
+This is the recommended deployment model for a solo-dev VPS. Instead of SSH-ing in to run `git pull`, you simply run `git push production main` from your local machine and the server deploys itself automatically.
+
+### How it works
+
+```
+Local machine              VPS
+─────────────              ───
+git push production main → bare repo receives push
+                           post-receive hook fires:
+                             checkout code → /opt/massage_marketplace
+                             pip install -r requirements.txt
+                             python manage.py migrate
+                             python manage.py collectstatic
+                             systemctl restart massage_marketplace
+```
+
+### post-receive hook
+
+The hook script is kept in the repository at `deploy/post-receive` and symlinked into the bare repo. Install it on the server:
+
+```bash
+# Copy hook into bare repo
+sudo -u deploy cp /opt/massage_marketplace/deploy/post-receive \
+    /var/repo/massage_marketplace.git/hooks/post-receive
+sudo -u deploy chmod +x /var/repo/massage_marketplace.git/hooks/post-receive
+```
+
+### Allow deploy user to restart the service without a password
+
+```bash
+sudo visudo -f /etc/sudoers.d/massage_marketplace
+```
+
+Add this single line:
+
+```
+deploy ALL=NOPASSWD: /bin/systemctl restart massage_marketplace
+```
+
+### Add the remote on your local machine
+
+```bash
+git remote add production deploy@your_server_ip:/var/repo/massage_marketplace.git
+```
+
+### Deploy
+
+```bash
+git push production main
+```
+
+That's it. The hook output streams back to your terminal so you can see exactly what happened.
+
+---
+
+## 6. Gunicorn (systemd service)
 
 Create `/etc/systemd/system/massage_marketplace.service`:
 
@@ -126,10 +207,10 @@ After=network.target postgresql.service redis-server.service
 [Service]
 User=www-data
 Group=www-data
-WorkingDirectory=/srv/massage_marketplace/marketplace
-Environment="PATH=/srv/massage_marketplace/venv/bin"
-EnvironmentFile=/srv/massage_marketplace/.env
-ExecStart=/srv/massage_marketplace/venv/bin/gunicorn \
+WorkingDirectory=/opt/massage_marketplace/marketplace
+Environment="PATH=/opt/massage_marketplace/venv/bin"
+EnvironmentFile=/opt/massage_marketplace/.env
+ExecStart=/opt/massage_marketplace/venv/bin/gunicorn \
     marketplace.wsgi \
     --workers 2 \
     --worker-class sync \
@@ -183,14 +264,14 @@ server {
 
     # Static files — served directly by Nginx, never hits Django
     location /static/ {
-        alias /srv/massage_marketplace/marketplace/staticfiles/;
+        alias /opt/massage_marketplace/marketplace/staticfiles/;
         expires 30d;
         add_header Cache-Control "public, immutable";
     }
 
     # Media files — provider photos, gallery images
     location /media/ {
-        alias /srv/massage_marketplace/marketplace/media/;
+        alias /opt/massage_marketplace/marketplace/media/;
         expires 7d;
         add_header Cache-Control "public";
     }
@@ -229,12 +310,12 @@ sudo systemctl status certbot.timer
 
 ```bash
 # App files readable by www-data
-sudo chown -R www-data:www-data /srv/massage_marketplace/marketplace/media
-sudo chown -R www-data:www-data /srv/massage_marketplace/marketplace/staticfiles
+sudo chown -R www-data:www-data /opt/massage_marketplace/marketplace/media
+sudo chown -R www-data:www-data /opt/massage_marketplace/marketplace/staticfiles
 
 # .env must not be world-readable
-sudo chown root:www-data /srv/massage_marketplace/.env
-sudo chmod 640 /srv/massage_marketplace/.env
+sudo chown root:www-data /opt/massage_marketplace/.env
+sudo chmod 640 /opt/massage_marketplace/.env
 ```
 
 ---
@@ -246,24 +327,24 @@ sudo chmod 640 /srv/massage_marketplace/.env
 Create `/etc/cron.d/massage_marketplace_backup`:
 
 ```cron
-0 3 * * * www-data pg_dump massage_marketplace | gzip > /srv/backups/db_$(date +\%Y\%m\%d).sql.gz && find /srv/backups -name "db_*.sql.gz" -mtime +7 -delete
+0 3 * * * www-data pg_dump massage_marketplace | gzip > /opt/backups/db_$(date +\%Y\%m\%d).sql.gz && find /opt/backups -name "db_*.sql.gz" -mtime +7 -delete
 ```
 
 ```bash
-sudo mkdir -p /srv/backups
-sudo chown www-data: /srv/backups
+sudo mkdir -p /opt/backups
+sudo chown www-data: /opt/backups
 ```
 
 ### Media files
 
 Media files (provider photos, gallery images) should be backed up off-server. Options:
 - `rsync` to a second VPS or object storage (Hetzner Storage Box, Backblaze B2)
-- Daily cron: `rsync -az /srv/massage_marketplace/marketplace/media/ user@backup-host:/backups/media/`
+- Daily cron: `rsync -az /opt/massage_marketplace/marketplace/media/ user@backup-host:/backups/media/`
 
 ### Restore from backup
 
 ```bash
-gunzip -c /srv/backups/db_20260317.sql.gz | sudo -u postgres psql massage_marketplace
+gunzip -c /opt/backups/db_20260317.sql.gz | sudo -u postgres psql massage_marketplace
 ```
 
 ---
@@ -315,27 +396,25 @@ tail -f /var/log/nginx/access.log
 
 ---
 
-## 11. Deploying Updates
+## 12. Deploying Updates
 
 ```bash
-cd /srv/massage_marketplace
-source venv/bin/activate
-
-git pull
-pip install -r requirements.txt          # install new deps if any
-python marketplace/manage.py migrate     # apply DB migrations
-python marketplace/manage.py collectstatic --no-input
-
-sudo systemctl restart massage_marketplace
-sudo systemctl status massage_marketplace  # verify it came back up
+# From your local machine — that's it
+git push production main
 ```
 
-> **Zero-downtime:** Nginx continues serving requests while gunicorn restarts (takes ~2s). For longer maintenance, return a 503 from Nginx by temporarily enabling a maintenance page.
+The post-receive hook handles everything. Output streams to your terminal in real time.
+
+> **Downtime:** Gunicorn restart takes ~2s. Nginx keeps serving the old process until the new one is ready. Acceptable for a small VPS. For planned longer maintenance, temporarily return a 503 from Nginx by swapping in a maintenance config.
 
 ---
 
-## 12. Pre-launch Checklist
+## 13. Pre-launch Checklist
 
+- [ ] Bare repo created at `/var/repo/massage_marketplace.git`
+- [ ] `post-receive` hook installed and executable
+- [ ] `deploy` user can restart service without password (`sudoers.d`)
+- [ ] `production` remote added locally (`git remote add production ...`)
 - [ ] `DEBUG=False` in `.env`
 - [ ] `SECRET_KEY` is unique and not the default
 - [ ] `ALLOWED_HOSTS` set to production domain(s)
@@ -356,7 +435,7 @@ sudo systemctl status massage_marketplace  # verify it came back up
 
 ---
 
-## Troubleshooting
+## 14. Troubleshooting
 
 | Symptom | Check |
 |---------|-------|

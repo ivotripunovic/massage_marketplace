@@ -57,15 +57,13 @@ A Django-based marketplace platform for massage therapy services.
 
 See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for the full production deployment guide including Nginx config, systemd services, SSL, backups, and monitoring.
 
-**Quick reference — deploy update:**
+**Deploy update (bare repo + post-receive hook):**
 ```bash
-cd /srv/massage_marketplace && source venv/bin/activate
-git pull
-pip install -r requirements.txt
-python marketplace/manage.py migrate
-python marketplace/manage.py collectstatic --no-input
-sudo systemctl restart massage_marketplace
+# From your local machine — hook handles everything on the server
+git push production main
 ```
+
+See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for initial server setup.
 
 ---
 
