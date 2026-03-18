@@ -2938,16 +2938,19 @@ class ExpireSubscriptionsCommandTests(TestCase):
         self.provider.refresh_from_db()
         self.assertEqual(self.provider.subscription_status, "inactive")
 
-    def test_expiry_sends_email(self):
+    def test_expiry_sends_expiry_email_to_provider(self):
         self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
         self.provider.save()
 
-        with self.settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"):
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+            ADMIN_EMAILS=[],
+        ):
             from django.core import mail
             self._run()
-            self.assertEqual(len(mail.outbox), 1)
-            self.assertIn("expired", mail.outbox[0].subject.lower())
-            self.assertEqual(mail.outbox[0].to, [self.user.email])
+            provider_emails = [m for m in mail.outbox if self.user.email in m.to]
+            self.assertEqual(len(provider_emails), 1)
+            self.assertIn("expired", provider_emails[0].subject.lower())
 
     # --- dry run ---
 
@@ -2964,7 +2967,10 @@ class ExpireSubscriptionsCommandTests(TestCase):
         self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
         self.provider.save()
 
-        with self.settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"):
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+            ADMIN_EMAILS=["admin@example.com"],
+        ):
             from django.core import mail
             self._run(dry_run=True)
             self.assertEqual(len(mail.outbox), 0)
@@ -2975,18 +2981,24 @@ class ExpireSubscriptionsCommandTests(TestCase):
         self.provider.subscription_renewal_date = date.today() + timedelta(days=3)
         self.provider.save()
 
-        with self.settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"):
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+            ADMIN_EMAILS=[],
+        ):
             from django.core import mail
             self._run()
-            self.assertEqual(len(mail.outbox), 1)
-            self.assertIn("3 days", mail.outbox[0].subject.lower())
-            self.assertEqual(mail.outbox[0].to, [self.user.email])
+            provider_emails = [m for m in mail.outbox if self.user.email in m.to]
+            self.assertEqual(len(provider_emails), 1)
+            self.assertIn("3 days", provider_emails[0].subject.lower())
 
     def test_no_reminder_4_days_before(self):
         self.provider.subscription_renewal_date = date.today() + timedelta(days=4)
         self.provider.save()
 
-        with self.settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"):
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+            ADMIN_EMAILS=[],
+        ):
             from django.core import mail
             self._run()
             self.assertEqual(len(mail.outbox), 0)
@@ -2999,3 +3011,86 @@ class ExpireSubscriptionsCommandTests(TestCase):
 
         self.assertIn("Expired: 1", output)
         self.assertIn("Reminders sent: 0", output)
+
+    # --- admin summary ---
+
+    def test_admin_summary_sent_on_expiry(self):
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
+        self.provider.save()
+
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+            ADMIN_EMAILS=["admin@example.com"],
+        ):
+            from django.core import mail
+            self._run()
+            admin_emails = [m for m in mail.outbox if "admin@example.com" in m.to]
+            self.assertEqual(len(admin_emails), 1)
+            self.assertIn("Subscription cron", admin_emails[0].subject)
+            self.assertIn("completed successfully", admin_emails[0].subject)
+            self.assertIn("Subscriptions expired:   1", admin_emails[0].body)
+
+    def test_admin_summary_sent_on_reminder(self):
+        self.provider.subscription_renewal_date = date.today() + timedelta(days=3)
+        self.provider.save()
+
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+            ADMIN_EMAILS=["admin@example.com"],
+        ):
+            from django.core import mail
+            self._run()
+            admin_emails = [m for m in mail.outbox if "admin@example.com" in m.to]
+            self.assertEqual(len(admin_emails), 1)
+            self.assertIn("Renewal reminders sent:  1", admin_emails[0].body)
+
+    def test_admin_summary_not_sent_when_nothing_happened(self):
+        # Subscription is active, renewal is far in the future — nothing to do
+        self.provider.subscription_renewal_date = date.today() + timedelta(days=20)
+        self.provider.save()
+
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+            ADMIN_EMAILS=["admin@example.com"],
+        ):
+            from django.core import mail
+            self._run()
+            admin_emails = [m for m in mail.outbox if "admin@example.com" in m.to]
+            self.assertEqual(len(admin_emails), 0)
+
+    def test_admin_summary_shows_failures(self):
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
+        self.provider.save()
+
+        from providers.management.commands.expire_subscriptions import Command
+
+        # Simulate _send_expiry_email recording a failure without affecting send_mail
+        def fake_expiry_email(self_cmd, provider, failures):
+            failures.append((provider.user.email, "expiry notification", "SMTP timeout"))
+
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+            ADMIN_EMAILS=["admin@example.com"],
+        ):
+            from django.core import mail
+            with patch.object(Command, "_send_expiry_email", fake_expiry_email):
+                self._run()
+
+            admin_emails = [m for m in mail.outbox if "admin@example.com" in m.to]
+            self.assertEqual(len(admin_emails), 1)
+            self.assertIn("completed with failures", admin_emails[0].subject)
+            self.assertIn("SMTP timeout", admin_emails[0].body)
+            self.assertIn("Email failures:          1", admin_emails[0].body)
+
+    def test_admin_summary_not_sent_on_dry_run(self):
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
+        self.provider.save()
+
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+            ADMIN_EMAILS=["admin@example.com"],
+        ):
+            from django.core import mail
+            self._run(dry_run=True)
+            admin_emails = [m for m in mail.outbox if "admin@example.com" in m.to]
+            self.assertEqual(len(admin_emails), 0)
