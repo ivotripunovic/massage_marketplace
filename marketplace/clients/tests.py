@@ -1340,3 +1340,242 @@ class LocationAPICacheTests(TestCase):
         """Country API with no query and no all=1 returns empty (not cached)."""
         response = self.client.get(reverse("api_country_search"))
         self.assertEqual(response.json(), {"continents": []})
+
+
+class ProviderAdvancedFilteringTests(TestCase):
+    """Tests for advanced provider filtering (price, availability, rating, photo, pref, attr)."""
+
+    def setUp(self):
+        from decimal import Decimal
+        from providers.models import (
+            ProviderPricing,
+            ProviderAttributeDefinition,
+            ProviderAttributeValue,
+            PreferenceGroup,
+            PreferenceSubgroup,
+            ProviderPreference,
+        )
+
+        self.client = Client()
+
+        # ---- Shared attribute definition (bool) ----
+        self.bool_attr_def = ProviderAttributeDefinition.objects.create(
+            name="Outcall",
+            data_type=ProviderAttributeDefinition.DATA_TYPE_BOOLEAN,
+            is_active=True,
+            display_order=1,
+        )
+
+        # ---- Shared preference group / subgroup ----
+        self.pref_group = PreferenceGroup.objects.create(
+            name="TestGroup", is_active=True, display_order=1
+        )
+        self.subgroup1 = PreferenceSubgroup.objects.create(
+            group=self.pref_group, name="SubA", is_active=True, display_order=1
+        )
+        self.subgroup2 = PreferenceSubgroup.objects.create(
+            group=self.pref_group, name="SubB", is_active=True, display_order=2
+        )
+
+        # ---- Provider 1: apartment, price=100, has bool attr, pref subgroup1 checked ----
+        user1 = User.objects.create_user(
+            email="adv1@example.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+            first_name="Alice",
+            last_name="One",
+        )
+        self.provider1 = Provider.objects.create(
+            user=user1,
+            phone="+1000000001",
+            bio="Provider one",
+            subscription_status="active",
+        )
+        ProviderPricing.objects.create(
+            provider=self.provider1,
+            apartment_available=True,
+            outside_available=False,
+            apartment_day_1h=Decimal("100.00"),
+            apartment_day_2h=Decimal("180.00"),
+        )
+        ProviderAttributeValue.objects.create(
+            provider=self.provider1,
+            definition=self.bool_attr_def,
+            value_text="1",
+        )
+        ProviderPreference.objects.create(
+            provider=self.provider1,
+            subgroup=self.subgroup1,
+            is_checked=True,
+        )
+
+        # ---- Provider 2: outside, price=200, no bool attr, pref subgroup2 not checked ----
+        user2 = User.objects.create_user(
+            email="adv2@example.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+            first_name="Bob",
+            last_name="Two",
+        )
+        self.provider2 = Provider.objects.create(
+            user=user2,
+            phone="+1000000002",
+            bio="Provider two",
+            subscription_status="active",
+        )
+        ProviderPricing.objects.create(
+            provider=self.provider2,
+            apartment_available=False,
+            outside_available=True,
+            apartment_day_1h=Decimal("200.00"),
+            apartment_day_2h=Decimal("350.00"),
+        )
+        ProviderPreference.objects.create(
+            provider=self.provider2,
+            subgroup=self.subgroup2,
+            is_checked=False,
+        )
+
+    def _provider_emails(self, response):
+        """Return set of provider emails from providers_with_stats context."""
+        return {
+            item["provider"].user.email
+            for item in response.context["providers_with_stats"]
+        }
+
+    # ------------------------------------------------------------------
+    # Price filters
+    # ------------------------------------------------------------------
+
+    def test_filter_price_min(self):
+        """price_min=150 returns only the provider with price 200."""
+        response = self.client.get(reverse("providers"), {"price_min": "150"})
+        self.assertEqual(response.status_code, 200)
+        emails = self._provider_emails(response)
+        self.assertIn("adv2@example.com", emails)
+        self.assertNotIn("adv1@example.com", emails)
+
+    def test_filter_price_max(self):
+        """price_max=150 returns only the provider with price 100."""
+        response = self.client.get(reverse("providers"), {"price_max": "150"})
+        self.assertEqual(response.status_code, 200)
+        emails = self._provider_emails(response)
+        self.assertIn("adv1@example.com", emails)
+        self.assertNotIn("adv2@example.com", emails)
+
+    # ------------------------------------------------------------------
+    # Availability filters
+    # ------------------------------------------------------------------
+
+    def test_filter_apartment(self):
+        """apartment=1 returns only provider1 (apartment_available=True)."""
+        response = self.client.get(reverse("providers"), {"apartment": "1"})
+        self.assertEqual(response.status_code, 200)
+        emails = self._provider_emails(response)
+        self.assertIn("adv1@example.com", emails)
+        self.assertNotIn("adv2@example.com", emails)
+
+    def test_filter_outside(self):
+        """outside=1 returns only provider2 (outside_available=True)."""
+        response = self.client.get(reverse("providers"), {"outside": "1"})
+        self.assertEqual(response.status_code, 200)
+        emails = self._provider_emails(response)
+        self.assertIn("adv2@example.com", emails)
+        self.assertNotIn("adv1@example.com", emails)
+
+    # ------------------------------------------------------------------
+    # Has photo filter
+    # ------------------------------------------------------------------
+
+    def test_filter_has_photo(self):
+        """has_photo=1 returns only providers that have a photo set."""
+        # Neither provider has a photo yet — result should be empty
+        response = self.client.get(reverse("providers"), {"has_photo": "1"})
+        self.assertEqual(response.status_code, 200)
+        emails = self._provider_emails(response)
+        self.assertNotIn("adv1@example.com", emails)
+        self.assertNotIn("adv2@example.com", emails)
+
+    # ------------------------------------------------------------------
+    # Preference filter
+    # ------------------------------------------------------------------
+
+    def test_filter_preference(self):
+        """pref=subgroup1_id returns only provider1 (is_checked=True for that subgroup)."""
+        response = self.client.get(
+            reverse("providers"), {"pref": str(self.subgroup1.id)}
+        )
+        self.assertEqual(response.status_code, 200)
+        emails = self._provider_emails(response)
+        self.assertIn("adv1@example.com", emails)
+        self.assertNotIn("adv2@example.com", emails)
+
+    # ------------------------------------------------------------------
+    # Bool attribute filter
+    # ------------------------------------------------------------------
+
+    def test_filter_bool_attribute(self):
+        """attr_{def_id}=1 returns only provider1 (value_text='1')."""
+        response = self.client.get(
+            reverse("providers"), {f"attr_{self.bool_attr_def.id}": "1"}
+        )
+        self.assertEqual(response.status_code, 200)
+        emails = self._provider_emails(response)
+        self.assertIn("adv1@example.com", emails)
+        self.assertNotIn("adv2@example.com", emails)
+
+    # ------------------------------------------------------------------
+    # Min rating filter
+    # ------------------------------------------------------------------
+
+    def test_filter_min_rating(self):
+        """min_rating=4 includes provider with avg_rating >= 4, excludes others."""
+        from reviews.models import ReviewCategory, ReviewCategoryRating
+
+        client_user = User.objects.create_user(
+            email="rater@example.com",
+            password="testpass123",
+            user_type="client",
+        )
+        cat = ReviewCategory.objects.create(name="AdvQuality")
+
+        # Give provider1 a high rating (5)
+        review1 = Review.objects.create(
+            provider=self.provider1,
+            client=client_user,
+            comment="Great",
+        )
+        ReviewCategoryRating.objects.create(review=review1, category=cat, rating=5)
+
+        # Give provider2 a low rating (2) — need a different client user
+        client_user2 = User.objects.create_user(
+            email="rater2@example.com",
+            password="testpass123",
+            user_type="client",
+        )
+        review2 = Review.objects.create(
+            provider=self.provider2,
+            client=client_user2,
+            comment="Meh",
+        )
+        ReviewCategoryRating.objects.create(review=review2, category=cat, rating=2)
+
+        response = self.client.get(reverse("providers"), {"min_rating": "4"})
+        self.assertEqual(response.status_code, 200)
+        emails = self._provider_emails(response)
+        self.assertIn("adv1@example.com", emails)
+        self.assertNotIn("adv2@example.com", emails)
+
+    # ------------------------------------------------------------------
+    # No filter — returns all active providers
+    # ------------------------------------------------------------------
+
+    def test_no_filter_returns_all_active(self):
+        """No filter params returns all active verified providers (at least our two)."""
+        response = self.client.get(reverse("providers"))
+        self.assertEqual(response.status_code, 200)
+        emails = self._provider_emails(response)
+        self.assertIn("adv1@example.com", emails)
+        self.assertIn("adv2@example.com", emails)

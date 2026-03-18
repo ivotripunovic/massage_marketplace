@@ -1,4 +1,6 @@
+from decimal import Decimal, InvalidOperation
 from functools import cached_property
+from urllib.parse import urlencode
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -41,7 +43,9 @@ from providers.models import (
     Country,
     City,
     ProviderAttributeValue,
+    ProviderAttributeDefinition,
     PreferenceGroup,
+    PreferenceSubgroup,
     ProviderPreference,
     ProviderPreferenceCustomOption,
     ProviderCustomPreference,
@@ -170,6 +174,9 @@ def city_search_api(request):
     return JsonResponse(data)
 
 
+PREF_GROUPS_FILTER_CACHE_KEY = "pref_groups_filter_v1"
+
+
 class ProviderDirectoryView(ListView):
     """Public provider directory view - no authentication required."""
 
@@ -178,6 +185,14 @@ class ProviderDirectoryView(ListView):
     context_object_name = "providers"
     paginate_by = 20
     paginator_class = CachedCountPaginator
+
+    @cached_property
+    def _filter_attribute_definitions(self):
+        return list(
+            ProviderAttributeDefinition.objects.filter(is_active=True)
+            .exclude(data_type=ProviderAttributeDefinition.DATA_TYPE_STRING)
+            .order_by("display_order", "name")
+        )
 
     def get_queryset(self):
         """Get all active verified providers with related data."""
@@ -238,6 +253,91 @@ class ProviderDirectoryView(ListView):
                 | Q(user__first_name__icontains=keyword)
                 | Q(user__last_name__icontains=keyword)
             ).distinct()
+
+        # --- Advanced filters ---
+
+        # Price range (filters on pricing__apartment_day_1h)
+        price_min = self.request.GET.get("price_min", "").strip()
+        price_max = self.request.GET.get("price_max", "").strip()
+        if price_min:
+            try:
+                queryset = queryset.filter(
+                    pricing__apartment_day_1h__gte=Decimal(price_min)
+                )
+            except InvalidOperation:
+                pass
+        if price_max:
+            try:
+                queryset = queryset.filter(
+                    pricing__apartment_day_1h__lte=Decimal(price_max)
+                )
+            except InvalidOperation:
+                pass
+
+        # Availability
+        apartment = self.request.GET.get("apartment", "").strip()
+        if apartment == "1":
+            queryset = queryset.filter(pricing__apartment_available=True)
+
+        outside = self.request.GET.get("outside", "").strip()
+        if outside == "1":
+            queryset = queryset.filter(pricing__outside_available=True)
+
+        # Minimum rating (filter on annotated avg_rating subquery)
+        min_rating = self.request.GET.get("min_rating", "").strip()
+        if min_rating:
+            try:
+                queryset = queryset.filter(avg_rating__gte=Decimal(min_rating))
+            except InvalidOperation:
+                pass
+
+        # Has photo
+        has_photo = self.request.GET.get("has_photo", "").strip()
+        if has_photo == "1":
+            queryset = queryset.exclude(
+                Q(photo="") | Q(photo__isnull=True)
+            )
+
+        # Preference subgroups (OR semantics — any match)
+        pref_ids_raw = self.request.GET.getlist("pref")
+        pref_ids = []
+        for pid in pref_ids_raw:
+            try:
+                pref_ids.append(int(pid))
+            except (ValueError, TypeError):
+                pass
+        if pref_ids:
+            queryset = queryset.filter(
+                preferences__subgroup_id__in=pref_ids,
+                preferences__is_checked=True,
+            ).distinct()
+
+        # Attribute filters: bool (attr_{id}=1) and int (attr_{id}_min=N)
+        for attr_def in self._filter_attribute_definitions:
+            if attr_def.data_type == ProviderAttributeDefinition.DATA_TYPE_BOOLEAN:
+                val = self.request.GET.get(f"attr_{attr_def.id}", "").strip()
+                if val == "1":
+                    queryset = queryset.filter(
+                        attribute_values__definition_id=attr_def.id,
+                        attribute_values__value_text__in=["1", "true", "yes", "on"],
+                    ).distinct()
+            elif attr_def.data_type == ProviderAttributeDefinition.DATA_TYPE_INTEGER:
+                val = self.request.GET.get(f"attr_{attr_def.id}_min", "").strip()
+                if val:
+                    try:
+                        min_int = int(val)
+                        # Fetch matching provider IDs in Python (value_text is text)
+                        matching_ids = [
+                            av.provider_id
+                            for av in ProviderAttributeValue.objects.filter(
+                                definition_id=attr_def.id,
+                                value_text__regex=r"^-?\d+$",
+                            )
+                            if int(av.value_text) >= min_int
+                        ]
+                        queryset = queryset.filter(id__in=matching_ids)
+                    except (ValueError, TypeError):
+                        pass
 
         # Order by created date (newest first)
         queryset = queryset.order_by("-created_at")
@@ -324,6 +424,83 @@ class ProviderDirectoryView(ListView):
                 context["current_city_name"] = ""
         else:
             context["current_city_name"] = ""
+
+        # --- Advanced filter context ---
+
+        # Preference groups for filter sidebar (cached)
+        pref_groups_for_filter = cache.get(PREF_GROUPS_FILTER_CACHE_KEY)
+        if pref_groups_for_filter is None:
+            active_subgroups_qs = PreferenceSubgroup.objects.filter(
+                is_active=True
+            ).order_by("display_order", "name")
+            groups_qs = (
+                PreferenceGroup.objects.filter(is_active=True)
+                .prefetch_related(
+                    Prefetch("subgroups", queryset=active_subgroups_qs, to_attr="active_subgroups")
+                )
+                .order_by("display_order", "name")
+            )
+            pref_groups_for_filter = [
+                {
+                    "name": group.name,
+                    "subgroups": [
+                        {"id": sg.id, "name": sg.name}
+                        for sg in group.active_subgroups
+                    ],
+                }
+                for group in groups_qs
+            ]
+            cache.set(PREF_GROUPS_FILTER_CACHE_KEY, pref_groups_for_filter, PREF_GROUPS_CACHE_TTL)
+        context["pref_groups_for_filter"] = pref_groups_for_filter
+
+        # Attribute definitions for filter sidebar
+        context["filter_attribute_definitions"] = self._filter_attribute_definitions
+
+        # Current advanced filter values
+        context["current_price_min"] = self.request.GET.get("price_min", "")
+        context["current_price_max"] = self.request.GET.get("price_max", "")
+        context["current_apartment"] = self.request.GET.get("apartment", "")
+        context["current_outside"] = self.request.GET.get("outside", "")
+        context["current_min_rating"] = self.request.GET.get("min_rating", "")
+        context["current_has_photo"] = self.request.GET.get("has_photo", "")
+
+        # Count active advanced filters
+        active_filter_count = 0
+        if context["current_price_min"]:
+            active_filter_count += 1
+        if context["current_price_max"]:
+            active_filter_count += 1
+        if context["current_apartment"] == "1":
+            active_filter_count += 1
+        if context["current_outside"] == "1":
+            active_filter_count += 1
+        if context["current_min_rating"]:
+            active_filter_count += 1
+        if context["current_has_photo"] == "1":
+            active_filter_count += 1
+        # Pref filter counts as 1 if any pref IDs selected
+        pref_ids_raw = self.request.GET.getlist("pref")
+        if pref_ids_raw:
+            active_filter_count += 1
+        # Each distinct attr definition with a value counts as 1
+        for attr_def in self._filter_attribute_definitions:
+            if attr_def.data_type == ProviderAttributeDefinition.DATA_TYPE_BOOLEAN:
+                if self.request.GET.get(f"attr_{attr_def.id}", "") == "1":
+                    active_filter_count += 1
+            elif attr_def.data_type == ProviderAttributeDefinition.DATA_TYPE_INTEGER:
+                if self.request.GET.get(f"attr_{attr_def.id}_min", "").strip():
+                    active_filter_count += 1
+        context["active_filter_count"] = active_filter_count
+
+        # Base filter params (just country_id / city_id / keyword, no advanced filters)
+        base_params = {}
+        if context["current_country_id"]:
+            base_params["country_id"] = context["current_country_id"]
+        if context["current_city_id"]:
+            base_params["city_id"] = context["current_city_id"]
+        if context["current_keyword"]:
+            base_params["keyword"] = context["current_keyword"]
+        context["base_filter_params"] = urlencode(base_params)
 
         return context
 

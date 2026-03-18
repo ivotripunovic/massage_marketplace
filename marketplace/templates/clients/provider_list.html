@@ -38,6 +38,9 @@
                autocomplete="off">
         <input type="hidden" name="city_id" id="city_id" value="{{ current_city_id }}">
     </div>
+    {% if current_keyword %}
+    <input type="hidden" name="keyword" value="{{ current_keyword }}">
+    {% endif %}
     <button type="submit" class="bg-gold hover:bg-gold-light text-dark p-1.5 rounded transition-colors" title="Search">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -67,6 +70,9 @@
                autocomplete="off">
         <input type="hidden" name="city_id" id="city_id_mobile" value="{{ current_city_id }}">
     </div>
+    {% if current_keyword %}
+    <input type="hidden" name="keyword" value="{{ current_keyword }}">
+    {% endif %}
     <button type="submit" class="bg-gold text-dark p-1 rounded flex-shrink-0">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -78,163 +84,394 @@
 {% block content %}
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-3 pb-4">
 
-    {% if providers_with_stats %}
-    <!-- Provider Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 mb-6">
-        {% for item in providers_with_stats %}
-        {% with provider=item.provider %}
-        <a href="{% url 'provider_detail' provider.slug %}" class="card-dark provider-card group block overflow-hidden flex flex-row sm:flex-col p-2 sm:p-0 gap-3 sm:gap-0 mx-2 sm:mx-0">
-            <!-- Provider Photo -->
-            <div class="card-image-container bg-dark-200 relative w-1/3 sm:w-full order-2 sm:order-1 flex-shrink-0 p-2 sm:p-0 rounded-lg sm:rounded-none">
-                {% if provider.photo %}
-                <img src="{{ provider.photo.url }}" alt="{{ provider.get_name }}"
-                     class="card-image w-full h-full object-cover transition-transform duration-300">
-                {% else %}
-                <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-dark-200 to-dark-300">
-                    <svg class="w-12 h-12 text-dark-400" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path>
-                    </svg>
-                </div>
-                {% endif %}
+    <!-- Mobile filter toggle bar -->
+    <div class="lg:hidden flex items-center justify-between mb-3 pb-3 border-b border-dark-300">
+        <button id="mobile-filter-toggle" type="button" class="flex items-center gap-2 text-text-secondary hover:text-gold transition-colors text-sm font-medium">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"></path>
+            </svg>
+            Filters
+            {% if active_filter_count > 0 %}
+            <span class="bg-gold text-dark text-xs font-bold px-1.5 py-0.5 rounded-full">{{ active_filter_count }}</span>
+            {% endif %}
+        </button>
+        <span class="text-text-muted text-sm">{{ paginator.count }} providers</span>
+    </div>
 
-                <!-- Rating Badge -->
-                {% if item.avg_rating > 0 %}
-                <div class="absolute top-2 right-2 bg-dark/80 backdrop-blur-sm rounded-full px-1.5 py-0.5 flex items-center gap-0.5">
-                    <svg class="w-3 h-3 text-gold" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                    </svg>
-                    <span class="text-text-primary text-xs font-medium">{{ item.avg_rating }}</span>
-                </div>
-                {% endif %}
-            </div>
+    <!-- Two-column layout: sidebar + grid -->
+    <div class="flex gap-5 items-start">
 
-            <!-- Provider Info -->
-            <div class="p-3 w-2/3 sm:w-full order-1 sm:order-2">
-                <!-- Name & Location -->
-                <div class="flex items-baseline justify-between gap-1.5 mb-1 min-w-0">
-                    <h3 class="font-semibold text-base text-text-primary group-hover:text-gold transition-colors truncate flex-shrink-0 max-w-[60%]">
-                        {{ provider.get_name }}
-                    </h3>
-                    {% if provider.city or provider.country %}
-                    <span class="text-text-muted text-xs truncate">
-                        {% if provider.city %}{{ provider.city.name }}{% endif %}{% if provider.city and provider.country %}, {% endif %}{% if provider.country %}{{ provider.country.name }}{% endif %}
+        <!-- Filter sidebar -->
+        <aside id="filter-sidebar" class="hidden lg:block w-56 flex-shrink-0 self-start sticky top-20">
+            <form method="get" action="{% url 'providers' %}" id="filter-form">
+                <!-- Preserve location/keyword from nav -->
+                {% if current_country_id %}<input type="hidden" name="country_id" value="{{ current_country_id }}">{% endif %}
+                {% if current_city_id %}<input type="hidden" name="city_id" value="{{ current_city_id }}">{% endif %}
+                {% if current_keyword %}<input type="hidden" name="keyword" value="{{ current_keyword }}">{% endif %}
+
+                <!-- Sidebar header -->
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-text-primary font-semibold text-sm flex items-center gap-2">
+                        Filters
+                        {% if active_filter_count > 0 %}
+                        <span class="bg-gold text-dark text-xs font-bold px-1.5 py-0.5 rounded-full">{{ active_filter_count }}</span>
+                        {% endif %}
                     </span>
+                    {% if active_filter_count > 0 %}
+                    <a href="{% url 'providers' %}{% if base_filter_params %}?{{ base_filter_params }}{% endif %}"
+                       class="text-xs text-text-muted hover:text-gold transition-colors">Clear</a>
                     {% endif %}
                 </div>
 
-                <!-- Two-column: Attributes (left) | Services (right) -->
-                <div class="flex gap-3 mt-2">
-                    <!-- Left: Attributes -->
-                    <div class="w-1/2 min-w-0">
-                        {% if item.card_attributes %}
-                        <div class="flex flex-col gap-1 text-xs">
-                            {% for attr in item.card_attributes %}
-                            <div class="flex items-center gap-1 min-w-0">
-                                <span class="font-semibold text-text-primary whitespace-nowrap">{{ attr.name }}:</span>
-                                <span class="text-text-muted truncate">{{ attr.value }}</span>
-                            </div>
+                <!-- Price (1h) -->
+                <details open class="mb-2 bg-dark-100 border border-dark-300 rounded-lg overflow-hidden">
+                    <summary class="px-3 py-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none list-none flex items-center justify-between">
+                        Price (1h)
+                        <svg class="w-3 h-3 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </summary>
+                    <div class="px-3 pb-3 flex gap-2">
+                        <input type="number" name="price_min" placeholder="Min"
+                               value="{{ current_price_min }}"
+                               class="input-dark w-full text-xs py-1 px-2" min="0" step="1">
+                        <input type="number" name="price_max" placeholder="Max"
+                               value="{{ current_price_max }}"
+                               class="input-dark w-full text-xs py-1 px-2" min="0" step="1">
+                    </div>
+                </details>
+
+                <!-- Availability -->
+                <details open class="mb-2 bg-dark-100 border border-dark-300 rounded-lg overflow-hidden">
+                    <summary class="px-3 py-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none list-none flex items-center justify-between">
+                        Availability
+                        <svg class="w-3 h-3 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </summary>
+                    <div class="px-3 pb-3 flex flex-col gap-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="apartment" value="1"
+                                   {% if current_apartment == "1" %}checked{% endif %}
+                                   class="rounded border-dark-400 bg-dark-200 text-gold focus:ring-gold">
+                            <span class="text-sm text-text-secondary">Apartment</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="outside" value="1"
+                                   {% if current_outside == "1" %}checked{% endif %}
+                                   class="rounded border-dark-400 bg-dark-200 text-gold focus:ring-gold">
+                            <span class="text-sm text-text-secondary">Outside</span>
+                        </label>
+                    </div>
+                </details>
+
+                <!-- Min rating -->
+                <details open class="mb-2 bg-dark-100 border border-dark-300 rounded-lg overflow-hidden">
+                    <summary class="px-3 py-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none list-none flex items-center justify-between">
+                        Min Rating
+                        <svg class="w-3 h-3 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </summary>
+                    <div class="px-3 pb-3">
+                        <input type="hidden" name="min_rating" id="min_rating_input" value="{{ current_min_rating }}">
+                        <div class="flex gap-1">
+                            {% for i in "12345" %}
+                            <button type="button" class="rating-btn text-dark-400 hover:text-gold transition-colors"
+                                    data-rating="{{ i }}">
+                                <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                                </svg>
+                            </button>
                             {% endfor %}
+                        </div>
+                    </div>
+                </details>
+
+                <!-- Has photo -->
+                <details open class="mb-2 bg-dark-100 border border-dark-300 rounded-lg overflow-hidden">
+                    <summary class="px-3 py-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none list-none flex items-center justify-between">
+                        Photo
+                        <svg class="w-3 h-3 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </summary>
+                    <div class="px-3 pb-3">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="has_photo" value="1"
+                                   {% if current_has_photo == "1" %}checked{% endif %}
+                                   class="rounded border-dark-400 bg-dark-200 text-gold focus:ring-gold">
+                            <span class="text-sm text-text-secondary">Has photo</span>
+                        </label>
+                    </div>
+                </details>
+
+                <!-- Preference groups -->
+                {% for group in pref_groups_for_filter %}
+                {% if group.subgroups %}
+                <details class="mb-2 bg-dark-100 border border-dark-300 rounded-lg overflow-hidden">
+                    <summary class="px-3 py-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none list-none flex items-center justify-between">
+                        {{ group.name }}
+                        <svg class="w-3 h-3 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </summary>
+                    <div class="px-3 pb-3 flex flex-col gap-2">
+                        {% for sg in group.subgroups %}
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="pref" value="{{ sg.id }}"
+                                   class="pref-checkbox rounded border-dark-400 bg-dark-200 text-gold focus:ring-gold">
+                            <span class="text-sm text-text-secondary">{{ sg.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </details>
+                {% endif %}
+                {% endfor %}
+
+                <!-- More (attribute definitions) -->
+                {% if filter_attribute_definitions %}
+                <details class="mb-2 bg-dark-100 border border-dark-300 rounded-lg overflow-hidden">
+                    <summary class="px-3 py-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none list-none flex items-center justify-between">
+                        More
+                        <svg class="w-3 h-3 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </summary>
+                    <div class="px-3 pb-3 flex flex-col gap-3">
+                        {% for attr in filter_attribute_definitions %}
+                        {% if attr.data_type == "bool" %}
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" name="attr_{{ attr.id }}" value="1"
+                                   class="attr-checkbox rounded border-dark-400 bg-dark-200 text-gold focus:ring-gold">
+                            <span class="text-sm text-text-secondary">{{ attr.name }}</span>
+                        </label>
+                        {% elif attr.data_type == "int" %}
+                        <div>
+                            <label class="text-xs text-text-muted mb-1 block">{{ attr.name }}</label>
+                            <input type="number" name="attr_{{ attr.id }}_min"
+                                   placeholder="Min {{ attr.name }}"
+                                   class="attr-int-input input-dark w-full text-xs py-1 px-2" min="0">
+                        </div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </details>
+                {% endif %}
+
+                <!-- Apply button -->
+                <button type="submit" class="w-full btn-gold text-sm py-2 rounded-lg font-medium mt-1">
+                    Apply Filters
+                </button>
+            </form>
+        </aside>
+
+        <!-- Provider grid -->
+        <div class="flex-1 min-w-0">
+
+            {% if providers_with_stats %}
+            <!-- Provider Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                {% for item in providers_with_stats %}
+                {% with provider=item.provider %}
+                <a href="{% url 'provider_detail' provider.slug %}" class="card-dark provider-card group block overflow-hidden flex flex-row sm:flex-col p-2 sm:p-0 gap-3 sm:gap-0 mx-2 sm:mx-0">
+                    <!-- Provider Photo -->
+                    <div class="card-image-container bg-dark-200 relative w-1/3 sm:w-full order-2 sm:order-1 flex-shrink-0 p-2 sm:p-0 rounded-lg sm:rounded-none">
+                        {% if provider.photo %}
+                        <img src="{{ provider.photo.url }}" alt="{{ provider.get_name }}"
+                             class="card-image w-full h-full object-cover transition-transform duration-300">
+                        {% else %}
+                        <div class="w-full h-full flex items-center justify-center bg-gradient-to-br from-dark-200 to-dark-300">
+                            <svg class="w-12 h-12 text-dark-400" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"></path>
+                            </svg>
+                        </div>
+                        {% endif %}
+
+                        <!-- Rating Badge -->
+                        {% if item.avg_rating > 0 %}
+                        <div class="absolute top-2 right-2 bg-dark/80 backdrop-blur-sm rounded-full px-1.5 py-0.5 flex items-center gap-0.5">
+                            <svg class="w-3 h-3 text-gold" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                            </svg>
+                            <span class="text-text-primary text-xs font-medium">{{ item.avg_rating }}</span>
                         </div>
                         {% endif %}
                     </div>
 
-                    <!-- Right: Pricing -->
-                    {% if item.card_pricing %}
-                    <div class="w-1/2 min-w-0">
-                        <div class="flex flex-col gap-1 text-xs">
-                            {% if item.card_pricing.price_1h %}
-                            <div class="flex items-baseline justify-between gap-2 min-w-0">
-                                <span class="text-text-secondary">1h</span>
-                                <span class="text-gold font-semibold whitespace-nowrap">{{ item.card_pricing.price_1h|floatformat:0 }}</span>
-                            </div>
-                            {% endif %}
-                            {% if item.card_pricing.price_2h %}
-                            <div class="flex items-baseline justify-between gap-2 min-w-0">
-                                <span class="text-text-secondary">2h</span>
-                                <span class="text-gold font-semibold whitespace-nowrap">{{ item.card_pricing.price_2h|floatformat:0 }}</span>
-                            </div>
-                            {% endif %}
-                            {% if item.card_pricing.price_whole %}
-                            <div class="flex items-baseline justify-between gap-2 min-w-0">
-                                <span class="text-text-secondary">Whole night</span>
-                                <span class="text-gold font-semibold whitespace-nowrap">{{ item.card_pricing.price_whole|floatformat:0 }}</span>
-                            </div>
-                            {% endif %}
-                            {% if item.card_pricing.location == "Outside" %}
-                            <span class="text-text-muted text-xs">(Outside)</span>
+                    <!-- Provider Info -->
+                    <div class="p-3 w-2/3 sm:w-full order-1 sm:order-2">
+                        <!-- Name & Location -->
+                        <div class="flex items-baseline justify-between gap-1.5 mb-1 min-w-0">
+                            <h3 class="font-semibold text-base text-text-primary group-hover:text-gold transition-colors truncate flex-shrink-0 max-w-[60%]">
+                                {{ provider.get_name }}
+                            </h3>
+                            {% if provider.city or provider.country %}
+                            <span class="text-text-muted text-xs truncate">
+                                {% if provider.city %}{{ provider.city.name }}{% endif %}{% if provider.city and provider.country %}, {% endif %}{% if provider.country %}{{ provider.country.name }}{% endif %}
+                            </span>
                             {% endif %}
                         </div>
+
+                        <!-- Two-column: Attributes (left) | Services (right) -->
+                        <div class="flex gap-3 mt-2">
+                            <!-- Left: Attributes -->
+                            <div class="w-1/2 min-w-0">
+                                {% if item.card_attributes %}
+                                <div class="flex flex-col gap-1 text-xs">
+                                    {% for attr in item.card_attributes %}
+                                    <div class="flex items-center gap-1 min-w-0">
+                                        <span class="font-semibold text-text-primary whitespace-nowrap">{{ attr.name }}:</span>
+                                        <span class="text-text-muted truncate">{{ attr.value }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Right: Pricing -->
+                            {% if item.card_pricing %}
+                            <div class="w-1/2 min-w-0">
+                                <div class="flex flex-col gap-1 text-xs">
+                                    {% if item.card_pricing.price_1h %}
+                                    <div class="flex items-baseline justify-between gap-2 min-w-0">
+                                        <span class="text-text-secondary">1h</span>
+                                        <span class="text-gold font-semibold whitespace-nowrap">{{ item.card_pricing.price_1h|floatformat:0 }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if item.card_pricing.price_2h %}
+                                    <div class="flex items-baseline justify-between gap-2 min-w-0">
+                                        <span class="text-text-secondary">2h</span>
+                                        <span class="text-gold font-semibold whitespace-nowrap">{{ item.card_pricing.price_2h|floatformat:0 }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if item.card_pricing.price_whole %}
+                                    <div class="flex items-baseline justify-between gap-2 min-w-0">
+                                        <span class="text-text-secondary">Whole night</span>
+                                        <span class="text-gold font-semibold whitespace-nowrap">{{ item.card_pricing.price_whole|floatformat:0 }}</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if item.card_pricing.location == "Outside" %}
+                                    <span class="text-text-muted text-xs">(Outside)</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Separator -->
+                        <hr class="border-dark-300 my-2">
+
+                        <!-- Description -->
+                        {% if provider.bio %}
+                        <p class="text-text-secondary text-xs leading-relaxed">
+                            {{ provider.bio|truncatechars:100 }}
+                        </p>
+                        {% endif %}
                     </div>
-                    {% endif %}
-                </div>
-
-                <!-- Separator -->
-                <hr class="border-dark-300 my-2">
-
-                <!-- Description -->
-                {% if provider.bio %}
-                <p class="text-text-secondary text-xs leading-relaxed">
-                    {{ provider.bio|truncatechars:100 }}
-                </p>
-                {% endif %}
+                </a>
+                {% endwith %}
+                {% endfor %}
             </div>
-        </a>
-        {% endwith %}
-        {% endfor %}
-    </div>
 
-    <!-- Pagination -->
-    {% if is_paginated %}
-    <nav class="flex items-center justify-center gap-2 py-8" aria-label="Pagination">
-        {% if page_obj.has_previous %}
-        <a href="?{% if current_keyword %}keyword={{ current_keyword }}&{% endif %}{% if current_country_id %}country_id={{ current_country_id }}&{% endif %}{% if current_city_id %}city_id={{ current_city_id }}&{% endif %}page={{ page_obj.previous_page_number }}"
-           class="px-4 py-2 bg-dark-200 text-text-secondary rounded-lg hover:bg-dark-300 hover:text-gold transition-colors">
-            Previous
-        </a>
-        {% endif %}
-
-        <div class="flex items-center gap-1">
-            {% for num in page_obj.paginator.page_range %}
-                {% if page_obj.number == num %}
-                <span class="px-4 py-2 bg-gold text-dark font-semibold rounded-lg">{{ num }}</span>
-                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
-                <a href="?{% if current_keyword %}keyword={{ current_keyword }}&{% endif %}{% if current_country_id %}country_id={{ current_country_id }}&{% endif %}{% if current_city_id %}city_id={{ current_city_id }}&{% endif %}page={{ num }}"
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <nav class="flex items-center justify-center gap-2 py-8" aria-label="Pagination">
+                {% if page_obj.has_previous %}
+                <a href="{% querystring page=page_obj.previous_page_number %}"
                    class="px-4 py-2 bg-dark-200 text-text-secondary rounded-lg hover:bg-dark-300 hover:text-gold transition-colors">
-                    {{ num }}
+                    Previous
                 </a>
                 {% endif %}
-            {% endfor %}
-        </div>
 
-        {% if page_obj.has_next %}
-        <a href="?{% if current_keyword %}keyword={{ current_keyword }}&{% endif %}{% if current_country_id %}country_id={{ current_country_id }}&{% endif %}{% if current_city_id %}city_id={{ current_city_id }}&{% endif %}page={{ page_obj.next_page_number }}"
-           class="px-4 py-2 bg-dark-200 text-text-secondary rounded-lg hover:bg-dark-300 hover:text-gold transition-colors">
-            Next
-        </a>
-        {% endif %}
-    </nav>
-    {% endif %}
+                <div class="flex items-center gap-1">
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <span class="px-4 py-2 bg-gold text-dark font-semibold rounded-lg">{{ num }}</span>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <a href="{% querystring page=num %}"
+                           class="px-4 py-2 bg-dark-200 text-text-secondary rounded-lg hover:bg-dark-300 hover:text-gold transition-colors">
+                            {{ num }}
+                        </a>
+                        {% endif %}
+                    {% endfor %}
+                </div>
 
-    {% else %}
-    <!-- Empty State -->
-    <div class="bg-dark-100 rounded-xl border border-dark-300 p-12 text-center">
-        <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-dark-200 flex items-center justify-center">
-            <svg class="w-10 h-10 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-            </svg>
-        </div>
-        <h3 class="text-xl font-semibold text-text-primary mb-2">No Providers Found</h3>
-        <p class="text-text-muted mb-6 max-w-md mx-auto">
-            We couldn't find any providers matching your criteria. Try adjusting your filters or check back later.
-        </p>
-        <a href="{% url 'providers' %}" class="btn-gold inline-block">
-            Clear All Filters
-        </a>
-    </div>
-    {% endif %}
+                {% if page_obj.has_next %}
+                <a href="{% querystring page=page_obj.next_page_number %}"
+                   class="px-4 py-2 bg-dark-200 text-text-secondary rounded-lg hover:bg-dark-300 hover:text-gold transition-colors">
+                    Next
+                </a>
+                {% endif %}
+            </nav>
+            {% endif %}
+
+            {% else %}
+            <!-- Empty State -->
+            <div class="bg-dark-100 rounded-xl border border-dark-300 p-12 text-center">
+                <div class="w-20 h-20 mx-auto mb-6 rounded-full bg-dark-200 flex items-center justify-center">
+                    <svg class="w-10 h-10 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-xl font-semibold text-text-primary mb-2">No Providers Found</h3>
+                <p class="text-text-muted mb-6 max-w-md mx-auto">
+                    We couldn't find any providers matching your criteria. Try adjusting your filters or check back later.
+                </p>
+                <a href="{% url 'providers' %}" class="btn-gold inline-block">
+                    Clear All Filters
+                </a>
+            </div>
+            {% endif %}
+
+        </div><!-- end provider grid column -->
+    </div><!-- end flex container -->
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'js/location-autocomplete.js' %}?v=3"></script>
+<script>
+// Mobile filter toggle
+document.getElementById('mobile-filter-toggle')?.addEventListener('click', function() {
+    const sidebar = document.getElementById('filter-sidebar');
+    sidebar.classList.toggle('hidden');
+    sidebar.classList.toggle('block');
+});
+
+// Pre-check pref and attr checkboxes + inputs from URL params
+const params = new URLSearchParams(window.location.search);
+params.getAll('pref').forEach(id => {
+    const el = document.querySelector(`input[name="pref"][value="${id}"]`);
+    if (el) el.checked = true;
+});
+document.querySelectorAll('input[name^="attr_"]').forEach(el => {
+    const val = params.get(el.name);
+    if (!val) return;
+    if (el.type === 'checkbox' && val === '1') el.checked = true;
+    if (el.type === 'number') el.value = val;
+});
+
+// Min rating stars
+const minRatingInput = document.getElementById('min_rating_input');
+const ratingBtns = document.querySelectorAll('.rating-btn');
+function setRating(val) {
+    if (minRatingInput) minRatingInput.value = val;
+    ratingBtns.forEach(btn => {
+        const n = parseInt(btn.dataset.rating);
+        btn.classList.toggle('text-gold', n <= val);
+        btn.classList.toggle('text-dark-400', n > val);
+    });
+}
+// Pre-fill rating from URL
+const currentRating = parseInt(params.get('min_rating') || '0');
+if (currentRating > 0) setRating(currentRating);
+ratingBtns.forEach(btn => {
+    btn.addEventListener('click', function() {
+        const val = parseInt(this.dataset.rating);
+        const current = parseInt(minRatingInput?.value || '0');
+        setRating(current === val ? 0 : val);  // click same = clear
+    });
+});
+</script>
 {% endblock %}
