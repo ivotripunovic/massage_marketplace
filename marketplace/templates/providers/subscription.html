@@ -98,9 +98,9 @@
             </div>
             {% endif %}
 
-            <!-- Other coins -->
+            <!-- Other coins — hidden until search reveals them -->
             {% if other_currencies %}
-            <div id="other-section">
+            <div id="other-section" class="hidden">
                 <p class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">All Currencies</p>
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2" id="other-grid">
                     {% for coin in other_currencies %}
@@ -212,14 +212,21 @@ document.getElementById("coin-search").addEventListener("input", function () {
         if (match) anyVisible = true;
     });
 
-    // Show/hide section headers based on visible children
-    ["popular-section", "other-section"].forEach(id => {
-        const section = document.getElementById(id);
-        if (!section) return;
-        const hasVisible = Array.from(section.querySelectorAll(".coin-card"))
+    // Popular section: always visible when no query; hide only if query returns no matches there
+    const popularSection = document.getElementById("popular-section");
+    if (popularSection) {
+        const hasVisible = Array.from(popularSection.querySelectorAll(".coin-card"))
             .some(c => c.style.display !== "none");
-        section.style.display = hasVisible ? "" : "none";
-    });
+        popularSection.style.display = hasVisible ? "" : "none";
+    }
+
+    // Other section: only show when there is an active search query with matches
+    const otherSection = document.getElementById("other-section");
+    if (otherSection) {
+        const hasVisible = q && Array.from(otherSection.querySelectorAll(".coin-card"))
+            .some(c => c.style.display !== "none");
+        otherSection.classList.toggle("hidden", !hasVisible);
+    }
 
     document.getElementById("no-results").classList.toggle("hidden", anyVisible);
 });
