@@ -30,6 +30,9 @@ logger = logging.getLogger(__name__)
 
 REMINDER_DAYS_BEFORE = 3
 
+# Email domains treated as test addresses — no emails are sent to these.
+TEST_EMAIL_DOMAINS = {"example.com"}
+
 # Seconds to wait between outgoing emails to avoid SMTP rate-limit triggers.
 # Override with EMAIL_BULK_DELAY in settings if needed.
 EMAIL_BULK_DELAY = 2
@@ -141,7 +144,16 @@ class Command(BaseCommand):
     # Provider emails
     # -------------------------------------------------------------------------
 
+    @staticmethod
+    def _is_test_email(email):
+        domain = email.split("@")[-1].lower()
+        return domain in TEST_EMAIL_DOMAINS
+
     def _send_reminder_email(self, provider, failures):
+        if self._is_test_email(provider.user.email):
+            logger.debug("Skipping renewal reminder for test address %s", provider.user.email)
+            return
+
         renewal_date = provider.subscription_renewal_date.strftime("%B %d, %Y")
         name = provider.get_name()
         host = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else "your-domain.com"
@@ -167,6 +179,10 @@ class Command(BaseCommand):
             failures.append((provider.user.email, "renewal reminder", msg))
 
     def _send_expiry_email(self, provider, failures):
+        if self._is_test_email(provider.user.email):
+            logger.debug("Skipping expiry email for test address %s", provider.user.email)
+            return
+
         name = provider.get_name()
         host = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else "your-domain.com"
 

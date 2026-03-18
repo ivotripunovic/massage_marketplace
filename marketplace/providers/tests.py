@@ -2940,6 +2940,8 @@ class ExpireSubscriptionsCommandTests(TestCase):
         self.assertEqual(self.provider.subscription_status, "inactive")
 
     def test_expiry_sends_expiry_email_to_provider(self):
+        self.user.email = "provider@testprovider.com"
+        self.user.save()
         self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
         self.provider.save()
 
@@ -2979,6 +2981,8 @@ class ExpireSubscriptionsCommandTests(TestCase):
     # --- reminders ---
 
     def test_sends_reminder_3_days_before(self):
+        self.user.email = "provider@testprovider.com"
+        self.user.save()
         self.provider.subscription_renewal_date = date.today() + timedelta(days=3)
         self.provider.save()
 
@@ -2991,6 +2995,20 @@ class ExpireSubscriptionsCommandTests(TestCase):
             provider_emails = [m for m in mail.outbox if self.user.email in m.to]
             self.assertEqual(len(provider_emails), 1)
             self.assertIn("3 days", provider_emails[0].subject.lower())
+
+    def test_skips_email_for_example_com_address(self):
+        # provider@example.com (from setUp) should never receive emails
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
+        self.provider.save()
+
+        with self.settings(
+            EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+            ADMIN_EMAILS=[],
+        ):
+            from django.core import mail
+            self._run()
+            provider_emails = [m for m in mail.outbox if self.user.email in m.to]
+            self.assertEqual(len(provider_emails), 0)
 
     def test_no_reminder_4_days_before(self):
         self.provider.subscription_renewal_date = date.today() + timedelta(days=4)
