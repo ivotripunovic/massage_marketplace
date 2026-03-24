@@ -10,24 +10,13 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Popular cryptocurrency codes to feature prominently in the UI
-POPULAR_CURRENCY_CODES = [
-    "btc", "eth", "usdterc20", "usdttrc20", "usdcerc20",
-    "ltc", "sol", "xmr", "doge", "trx",
-]
+# Accepted payment currencies — USDT only
+USDT_CURRENCY_CODES = {"usdterc20", "usdttrc20"}
 
 # Fallback list used when the API is unavailable or the API key is not configured
 FALLBACK_CURRENCIES = [
-    {"code": "btc",       "name": "Bitcoin",              "network": "btc"},
-    {"code": "eth",       "name": "Ethereum",             "network": "eth"},
-    {"code": "usdcerc20", "name": "USD Coin",             "network": "eth"},
-    {"code": "usdterc20", "name": "Tether USD (ERC-20)",  "network": "eth"},
-    {"code": "usdttrc20", "name": "Tether USD (TRC-20)",  "network": "trx"},
-    {"code": "ltc",       "name": "Litecoin",             "network": "ltc"},
-    {"code": "sol",       "name": "Solana",               "network": "sol"},
-    {"code": "xmr",       "name": "Monero",               "network": "xmr"},
-    {"code": "doge",      "name": "Dogecoin",             "network": "doge"},
-    {"code": "trx",       "name": "TRON",                 "network": "trx"},
+    {"code": "usdterc20", "name": "Tether USD (ERC-20)", "network": "eth"},
+    {"code": "usdttrc20", "name": "Tether USD (TRC-20)", "network": "trx"},
 ]
 
 
@@ -73,10 +62,13 @@ def get_currencies():
         data = resp.json()
         currencies = []
         for c in data.get("currencies", []):
+            code = c["code"].lower()
+            if code not in USDT_CURRENCY_CODES:
+                continue
             if not c.get("enable") or not c.get("isDepositEnabled", True):
                 continue
             currencies.append({
-                "code": c["code"].lower(),
+                "code": code,
                 "name": c.get("name", c["code"].upper()),
                 "network": (c.get("network") or c["code"]).lower(),
             })

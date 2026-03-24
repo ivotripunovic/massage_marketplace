@@ -737,11 +737,7 @@ class ProviderSubscriptionView(ProviderRequiredMixin, FormView):
             context["provider"] = provider
         except Provider.DoesNotExist:
             context["provider"] = None
-        from payments.nowpayments import POPULAR_CURRENCY_CODES
-        currencies = self._get_currencies()
-        popular_set = set(POPULAR_CURRENCY_CODES)
-        context["popular_currencies"] = [c for c in currencies if c["code"] in popular_set]
-        context["other_currencies"] = [c for c in currencies if c["code"] not in popular_set]
+        context["currencies"] = self._get_currencies()
         return context
 
     def form_valid(self, form):

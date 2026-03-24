@@ -1261,8 +1261,8 @@ class ProviderSubscriptionViewTests(TestCase):
         choices = form.fields["payment_method"].choices
         self.assertGreater(len(choices), 0)
         choice_values = [choice[0] for choice in choices]
-        self.assertIn("btc", choice_values)
-        self.assertIn("eth", choice_values)
+        self.assertIn("usdterc20", choice_values)
+        self.assertIn("usdttrc20", choice_values)
 
     def test_subscription_status_displayed(self):
         """Test that current subscription status is displayed."""
@@ -1275,7 +1275,7 @@ class ProviderSubscriptionViewTests(TestCase):
         """Test that form submission redirects to payment page."""
         self.client.login(email=self.user.email, password="testpass123")
         response = self.client.post(
-            reverse("subscription"), {"payment_method": "btc"}
+            reverse("subscription"), {"payment_method": "usdterc20"}
         )
         self.assertRedirects(
             response, reverse("subscription_crypto_payment"), fetch_redirect_response=False
@@ -1358,14 +1358,14 @@ class ProviderSubscriptionActivationTests(TestCase):
         self.client.login(email=self.user.email, password="testpass123")
 
         # Step 1: Select payment method
-        self.client.post(reverse("subscription"), {"payment_method": "btc"})
+        self.client.post(reverse("subscription"), {"payment_method": "usdterc20"})
 
         # Step 2: GET crypto payment page — NOWPayments API is called here
         mock_result = {
             "payment_id": "test-nowpay-123",
-            "pay_address": "1BitcoinAddressABC",
-            "pay_amount": 0.00085,
-            "pay_currency": "btc",
+            "pay_address": "0xUsdtAddressABC",
+            "pay_amount": 29.99,
+            "pay_currency": "usdterc20",
             "payment_status": "waiting",
         }
         with patch("payments.nowpayments.create_payment", return_value=mock_result):
@@ -1374,11 +1374,11 @@ class ProviderSubscriptionActivationTests(TestCase):
         # Should have created a payment record
         payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
         self.assertIsNotNone(payment)
-        self.assertEqual(payment.payment_method, "btc")
+        self.assertEqual(payment.payment_method, "usdterc20")
         self.assertEqual(payment.status, "pending")
         self.assertEqual(float(payment.amount), 29.99)
         self.assertEqual(payment.nowpayments_payment_id, "test-nowpay-123")
-        self.assertEqual(payment.pay_address, "1BitcoinAddressABC")
+        self.assertEqual(payment.pay_address, "0xUsdtAddressABC")
 
     def test_subscription_activation_flow(self):
         """Test that subscription is activated via NOWPayments webhook, not form submit."""
@@ -1388,14 +1388,14 @@ class ProviderSubscriptionActivationTests(TestCase):
         self.client.login(email=self.user.email, password="testpass123")
 
         # Step 1: Select payment method
-        self.client.post(reverse("subscription"), {"payment_method": "eth"})
+        self.client.post(reverse("subscription"), {"payment_method": "usdttrc20"})
 
         # Step 2: GET crypto page — creates pending payment via NOWPayments
         mock_result = {
-            "payment_id": "eth-nowpay-456",
-            "pay_address": "0xEthAddressXYZ",
-            "pay_amount": 0.015,
-            "pay_currency": "eth",
+            "payment_id": "usdt-nowpay-456",
+            "pay_address": "TUsdtAddressTRX",
+            "pay_amount": 29.99,
+            "pay_currency": "usdttrc20",
             "payment_status": "waiting",
         }
         with patch("payments.nowpayments.create_payment", return_value=mock_result):
@@ -1417,7 +1417,7 @@ class ProviderSubscriptionActivationTests(TestCase):
         payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
         self.assertIsNotNone(payment)
         self.assertEqual(payment.status, "pending")
-        self.assertEqual(payment.nowpayments_payment_id, "eth-nowpay-456")
+        self.assertEqual(payment.nowpayments_payment_id, "usdt-nowpay-456")
 
     def test_subscription_confirm_view_loads(self):
         """Test that subscription confirmation view loads."""

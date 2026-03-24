@@ -62,76 +62,34 @@
         </div>
         {% endif %}
 
-        <form method="post" id="payment-form">
+        <form method="post">
             {% csrf_token %}
-            <!-- Hidden input updated by JS when a coin card is clicked -->
             <input type="hidden" name="payment_method" id="payment_method_input" value="">
 
-            <!-- Search -->
-            <div class="relative mb-5">
-                <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                </svg>
-                <input type="text" id="coin-search" placeholder="Search coins…"
-                       class="w-full bg-dark-100 border border-dark-300 rounded-lg pl-10 pr-4 py-2.5 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-gold transition">
-            </div>
-
-            <!-- Popular coins -->
-            {% if popular_currencies %}
-            <div id="popular-section">
-                <p class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Popular</p>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6" id="popular-grid">
-                    {% for coin in popular_currencies %}
-                    <div class="coin-card cursor-pointer rounded-xl border border-dark-300 p-4 transition select-none
-                                hover:border-gold/60 hover:bg-dark-100"
-                         data-code="{{ coin.code }}"
-                         data-name="{{ coin.name|lower }}"
-                         onclick="selectCoin('{{ coin.code }}', this)">
-                        <div class="flex items-start justify-between mb-2">
-                            <span class="font-mono font-bold text-sm text-gold uppercase">{{ coin.code }}</span>
-                            <span class="network-badge text-xs px-1.5 py-0.5 rounded font-medium uppercase" data-net="{{ coin.network }}">{{ coin.network }}</span>
-                        </div>
-                        <p class="text-text-primary text-sm font-medium leading-tight">{{ coin.name }}</p>
+            <p class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">Select Network</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                {% for coin in currencies %}
+                <div class="coin-card cursor-pointer rounded-xl border border-dark-300 p-5 transition select-none
+                            hover:border-gold/60 hover:bg-dark-100"
+                     data-code="{{ coin.code }}"
+                     onclick="selectCoin('{{ coin.code }}', this)">
+                    <div class="flex items-start justify-between mb-2">
+                        <span class="font-mono font-bold text-base text-gold uppercase">USDT</span>
+                        <span class="network-badge text-xs px-2 py-0.5 rounded font-medium uppercase" data-net="{{ coin.network }}">{{ coin.network }}</span>
                     </div>
-                    {% endfor %}
+                    <p class="text-text-primary text-sm font-medium">{{ coin.name }}</p>
                 </div>
-            </div>
-            {% endif %}
-
-            <!-- Other coins — hidden until search reveals them -->
-            {% if other_currencies %}
-            <div id="other-section" class="hidden">
-                <p class="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">All Currencies</p>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2" id="other-grid">
-                    {% for coin in other_currencies %}
-                    <div class="coin-card cursor-pointer rounded-lg border border-dark-300 p-3 transition select-none
-                                hover:border-gold/60 hover:bg-dark-100"
-                         data-code="{{ coin.code }}"
-                         data-name="{{ coin.name|lower }}"
-                         onclick="selectCoin('{{ coin.code }}', this)">
-                        <div class="flex items-center gap-1.5 mb-1">
-                            <span class="font-mono font-bold text-xs text-gold uppercase">{{ coin.code }}</span>
-                        </div>
-                        <p class="text-text-secondary text-xs leading-tight">{{ coin.name }}</p>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- No results message -->
-            <div id="no-results" class="hidden text-center py-8 text-text-muted text-sm">
-                No coins match your search.
+                {% endfor %}
             </div>
 
             <!-- Selected coin display + submit -->
-            <div class="mt-6 pt-5 border-t border-dark-300">
+            <div class="pt-5 border-t border-dark-300">
                 <div id="selection-summary" class="hidden mb-4 p-4 bg-dark-100 border border-gold/40 rounded-xl flex items-center gap-4">
                     <div class="w-10 h-10 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center flex-shrink-0">
-                        <span id="selected-code-icon" class="font-mono font-bold text-gold text-xs uppercase"></span>
+                        <span class="font-mono font-bold text-gold text-xs">USDT</span>
                     </div>
                     <div class="flex-1 min-w-0">
-                        <p class="text-text-muted text-xs">Selected currency</p>
+                        <p class="text-text-muted text-xs">Selected network</p>
                         <p id="selected-name-display" class="font-semibold text-text-primary"></p>
                     </div>
                     <button type="button" onclick="clearSelection()" class="text-text-muted hover:text-text-secondary text-xs transition">Change</button>
@@ -162,73 +120,26 @@
     border-color: #d4a042;
     background-color: rgba(212, 160, 66, 0.08);
 }
-.network-badge[data-net="btc"]      { background: rgba(247,147,26,0.15);  color: #f7931a; }
-.network-badge[data-net="eth"]      { background: rgba(98,126,234,0.15);  color: #8a98db; }
-.network-badge[data-net="trx"]      { background: rgba(235,84,55,0.15);   color: #eb5437; }
-.network-badge[data-net="bsc"]      { background: rgba(243,186,47,0.15);  color: #f3ba2f; }
-.network-badge[data-net="sol"]      { background: rgba(20,241,149,0.15);  color: #14f195; }
-.network-badge[data-net="ltc"]      { background: rgba(162,162,162,0.15); color: #a2a2a2; }
-.network-badge[data-net="xmr"]      { background: rgba(255,102,0,0.15);   color: #ff6600; }
-.network-badge[data-net="doge"]     { background: rgba(194,161,72,0.15);  color: #c2a148; }
-.network-badge                      { background: rgba(100,100,100,0.15); color: #888; }
+.network-badge[data-net="eth"] { background: rgba(98,126,234,0.15); color: #8a98db; }
+.network-badge[data-net="trx"] { background: rgba(235,84,55,0.15);  color: #eb5437; }
+.network-badge                 { background: rgba(100,100,100,0.15); color: #888; }
 </style>
 
 <script>
-let selectedCode = "";
-
 function selectCoin(code, el) {
-    // Clear previous selection
     document.querySelectorAll(".coin-card").forEach(c => c.classList.remove("selected"));
     el.classList.add("selected");
-
-    selectedCode = code;
     document.getElementById("payment_method_input").value = code;
     document.getElementById("submit-btn").disabled = false;
-
-    const name = el.querySelector("p").textContent.trim();
-    document.getElementById("selected-code-icon").textContent = code.length > 4 ? code.slice(0,4) : code;
-    document.getElementById("selected-name-display").textContent = name;
+    document.getElementById("selected-name-display").textContent = el.querySelector("p").textContent.trim();
     document.getElementById("selection-summary").classList.remove("hidden");
 }
 
 function clearSelection() {
-    selectedCode = "";
     document.getElementById("payment_method_input").value = "";
     document.getElementById("submit-btn").disabled = true;
     document.getElementById("selection-summary").classList.add("hidden");
     document.querySelectorAll(".coin-card").forEach(c => c.classList.remove("selected"));
 }
-
-// Search / filter
-document.getElementById("coin-search").addEventListener("input", function () {
-    const q = this.value.toLowerCase().trim();
-    let anyVisible = false;
-
-    document.querySelectorAll(".coin-card").forEach(card => {
-        const match = !q ||
-            card.dataset.code.includes(q) ||
-            card.dataset.name.includes(q);
-        card.style.display = match ? "" : "none";
-        if (match) anyVisible = true;
-    });
-
-    // Popular section: always visible when no query; hide only if query returns no matches there
-    const popularSection = document.getElementById("popular-section");
-    if (popularSection) {
-        const hasVisible = Array.from(popularSection.querySelectorAll(".coin-card"))
-            .some(c => c.style.display !== "none");
-        popularSection.style.display = hasVisible ? "" : "none";
-    }
-
-    // Other section: only show when there is an active search query with matches
-    const otherSection = document.getElementById("other-section");
-    if (otherSection) {
-        const hasVisible = q && Array.from(otherSection.querySelectorAll(".coin-card"))
-            .some(c => c.style.display !== "none");
-        otherSection.classList.toggle("hidden", !hasVisible);
-    }
-
-    document.getElementById("no-results").classList.toggle("hidden", anyVisible);
-});
 </script>
 {% endblock %}
