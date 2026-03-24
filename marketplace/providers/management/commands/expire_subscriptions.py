@@ -94,7 +94,6 @@ class Command(BaseCommand):
         if count == 0:
             return 0
 
-        delay = getattr(settings, "EMAIL_BULK_DELAY", EMAIL_BULK_DELAY)
         for provider in overdue:
             self.stdout.write(
                 f"  Expiring {provider.user.email} "
@@ -108,7 +107,6 @@ class Command(BaseCommand):
                     provider.subscription_renewal_date,
                 )
                 self._send_expiry_email(provider, failures)
-                time.sleep(delay)
 
         return count
 
@@ -185,6 +183,9 @@ class Command(BaseCommand):
 
         name = provider.get_name()
         host = settings.ALLOWED_HOSTS[0] if settings.ALLOWED_HOSTS else "your-domain.com"
+
+        delay = getattr(settings, "EMAIL_BULK_DELAY", EMAIL_BULK_DELAY)
+        time.sleep(delay)
 
         try:
             send_mail(
