@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
 import os
+from decimal import Decimal
 from pathlib import Path
 
 import sentry_sdk
@@ -94,6 +95,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "marketplace.context_processors.subscription_price",
             ],
         },
     },
@@ -184,7 +186,7 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # Subscription Settings
-SUBSCRIPTION_AMOUNT = 29.99
+SUBSCRIPTION_AMOUNT = Decimal(os.getenv("SUBSCRIPTION_MONTHLY_PRICE", "29.99"))
 
 # NOWPayments Settings
 NOWPAYMENTS_API_KEY = os.getenv("NOW_PAYMENTS_API_KEY", "")
