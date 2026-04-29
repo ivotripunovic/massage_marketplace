@@ -32,6 +32,8 @@ if _sentry_dsn:
         # Send user info (email, id) with each event for easier debugging.
         send_default_pii=True,
         environment=os.getenv("SENTRY_ENVIRONMENT", "production"),
+        # Enable logs to be sent to Sentry
+        enable_logs=True,
     )
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
