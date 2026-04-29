@@ -37,6 +37,10 @@ CACHES = {
 # Disable NOWPayments API calls during tests (get_currencies returns fallback)
 NOWPAYMENTS_API_KEY = ""
 
+# Pin subscription price so tests are unaffected by SUBSCRIPTION_MONTHLY_PRICE env var
+from decimal import Decimal
+SUBSCRIPTION_AMOUNT = Decimal("29.99")
+
 # Disable migrations for faster test setup
 # (comment out if you need migration testing)
 # MIGRATION_MODULES = {app: None for app in INSTALLED_APPS if 'django' not in app}

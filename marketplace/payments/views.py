@@ -227,6 +227,12 @@ class AdminPaymentApproveView(AdminRequiredMixin, View):
             if notes:
                 payment.notes = notes
                 payment.save(update_fields=["notes"])
+            logger.error(
+                "Payment #%s for %s rejected by admin %s",
+                payment.pk,
+                payment.provider.user.email,
+                request.user.email,
+            )
             messages.success(
                 request,
                 f"Payment #{payment.pk} for {payment.provider.user.email} marked as failed.",
@@ -311,7 +317,7 @@ class NowPaymentsWebhookView(View):
             )
         elif status in self.TERMINAL_FAILURE:
             payment.mark_failed()
-            logger.info(
+            logger.error(
                 "NOWPayments IPN: payment %s %s for %s",
                 nowpayments_id,
                 status,

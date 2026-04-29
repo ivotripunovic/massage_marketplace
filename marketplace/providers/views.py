@@ -27,6 +27,9 @@ from providers.forms import (
     SubscriptionSettingsForm,
     GalleryImageForm,
 )
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class ProviderRequiredMixin(LoginRequiredMixin):
@@ -721,7 +724,8 @@ class ProviderSubscriptionView(ProviderRequiredMixin, FormView):
         try:
             import payments.nowpayments as nowpayments
             return nowpayments.get_currencies()
-        except Exception:
+        except Exception as exc:
+            logger.error("Failed to fetch NOWPayments currencies: %s", exc)
             from payments.nowpayments import FALLBACK_CURRENCIES
             return FALLBACK_CURRENCIES
 
@@ -810,6 +814,15 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
                     ipn_callback_url=ipn_url,
                 )
             except Exception as exc:
+                response = getattr(exc, "response", None)
+                response_text = response.text if response is not None else ""
+                logger.error(
+                    "NOWPayments create_payment failed for provider %s (%s): %s %s",
+                    provider.pk,
+                    request.user.email,
+                    exc,
+                    response_text,
+                )
                 messages.error(
                     request,
                     "Could not create payment. Please try again or contact support.",
