@@ -48,7 +48,7 @@ class AdminPaymentListView(AdminRequiredMixin, ListView):
 
         # Filter by status
         status = self.request.GET.get("status", "").strip()
-        if status and status in ["pending", "completed", "failed"]:
+        if status and status in ["pending", "completed", "failed", "partial"]:
             queryset = queryset.filter(status=status)
 
         # Filter by payment method
@@ -74,7 +74,7 @@ class AdminPaymentListView(AdminRequiredMixin, ListView):
         context["method"] = self.request.GET.get("method", "")
         context["search"] = self.request.GET.get("search", "")
 
-        context["status_choices"] = ["pending", "completed", "failed"]
+        context["status_choices"] = ["pending", "completed", "failed", "partial"]
         context["method_choices"] = [
             ("crypto_bitcoin", "Bitcoin"),
             ("crypto_ethereum", "Ethereum"),
@@ -262,6 +262,7 @@ class NowPaymentsWebhookView(View):
 
     TERMINAL_SUCCESS = "finished"
     TERMINAL_FAILURE = {"failed", "expired", "refunded"}
+    PARTIAL = "partially_paid"
 
     def post(self, request):
         from payments.nowpayments import verify_ipn_signature
@@ -323,8 +324,50 @@ class NowPaymentsWebhookView(View):
                 status,
                 payment.provider.user.email,
             )
+        elif status == self.PARTIAL:
+            actually_paid = data.get("actually_paid")
+            payment.mark_partial(actually_paid=actually_paid)
+            logger.error(
+                "NOWPayments IPN: partial payment %s for %s — required %s %s, received %s",
+                nowpayments_id,
+                payment.provider.user.email,
+                payment.pay_amount,
+                payment.pay_currency,
+                actually_paid,
+            )
+            self._send_partial_payment_alert(payment, actually_paid)
 
         return HttpResponse(status=200)
+
+    def _send_partial_payment_alert(self, payment, actually_paid):
+        from django.core.mail import send_mail
+        from django.conf import settings as django_settings
+
+        admin_emails = getattr(django_settings, "ADMIN_EMAILS", [])
+        if not admin_emails:
+            return
+
+        required = f"{payment.pay_amount} {(payment.pay_currency or '').upper()}"
+        received = f"{actually_paid} {(payment.pay_currency or '').upper()}"
+        body = (
+            f"Partial payment received and requires manual review.\n\n"
+            f"Provider:  {payment.provider.user.email}\n"
+            f"Payment ID: {payment.nowpayments_payment_id}\n"
+            f"Required:  {required}\n"
+            f"Received:  {received}\n"
+            f"USD amount: ${payment.amount}\n\n"
+            f"Review at: /internal/admin/payments/{payment.pk}/\n"
+        )
+        try:
+            send_mail(
+                f"[Action Required] Partial payment from {payment.provider.user.email}",
+                body,
+                "noreply@massagemarketplace.com",
+                admin_emails,
+                fail_silently=True,
+            )
+        except Exception:
+            pass
 
     def _send_confirmation_email(self, payment):
         from django.core.mail import send_mail

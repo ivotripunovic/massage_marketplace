@@ -14,6 +14,7 @@ class SubscriptionPayment(models.Model):
         ("pending", "Pending"),
         ("completed", "Completed"),
         ("failed", "Failed"),
+        ("partial", "Partially Paid"),
     )
 
     provider = models.ForeignKey(
@@ -66,6 +67,14 @@ class SubscriptionPayment(models.Model):
         help_text="NOWPayments currency code (e.g. usdterc20, usdttrc20)",
     )
 
+    actually_paid = models.DecimalField(
+        max_digits=20,
+        decimal_places=8,
+        blank=True,
+        null=True,
+        help_text="Actual crypto amount received (from NOWPayments IPN)",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(blank=True, null=True)
@@ -92,4 +101,11 @@ class SubscriptionPayment(models.Model):
     def mark_failed(self):
         """Mark payment as failed."""
         self.status = "failed"
+        self.save()
+
+    def mark_partial(self, actually_paid=None):
+        """Mark payment as partially paid and record the amount received."""
+        self.status = "partial"
+        if actually_paid is not None:
+            self.actually_paid = actually_paid
         self.save()

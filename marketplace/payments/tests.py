@@ -828,3 +828,44 @@ class NowPaymentsWebhookViewTests(TestCase):
                 self._make_request(payload)
         self.payment.refresh_from_db()
         self.assertEqual(self.payment.status, "pending")
+
+    def _build_partial_payload(self, actually_paid):
+        import json
+        return json.dumps({
+            "payment_id": "test-nowpay-111",
+            "payment_status": "partially_paid",
+            "pay_amount": 0.00085,
+            "actually_paid": actually_paid,
+            "pay_currency": "usdterc20",
+            "price_amount": 29.99,
+            "price_currency": "usd",
+        }).encode()
+
+    def test_partial_payment_marks_status_partial(self):
+        """Partial payment IPN sets status to 'partial' and records actually_paid."""
+        payload = self._build_partial_payload(0.00040)
+        with patch("payments.nowpayments.verify_ipn_signature", return_value=True):
+            response = self._make_request(payload)
+        self.assertEqual(response.status_code, 200)
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.status, "partial")
+        self.assertEqual(float(self.payment.actually_paid), 0.00040)
+
+    def test_partial_payment_does_not_activate_subscription(self):
+        """Partial payment must not activate the provider's subscription."""
+        payload = self._build_partial_payload(0.00040)
+        with patch("payments.nowpayments.verify_ipn_signature", return_value=True):
+            self._make_request(payload)
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, "inactive")
+
+    def test_partial_payment_sends_admin_alert(self):
+        """Partial payment IPN sends an alert email to admins."""
+        from django.core import mail
+        payload = self._build_partial_payload(0.00040)
+        with patch("payments.nowpayments.verify_ipn_signature", return_value=True):
+            self._make_request(payload)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn("Partial payment", mail.outbox[0].subject)
+        self.assertIn("provider@test.com", mail.outbox[0].subject)
+        self.assertIn("0.0004", mail.outbox[0].body)
