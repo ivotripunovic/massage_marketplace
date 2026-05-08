@@ -842,12 +842,13 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
             request.session["nowpayments_payment_id"] = str(result["payment_id"])
 
         # Build wallet URI for QR code and deeplink
+        from payments.nowpayments import SUPPORTED_CURRENCIES
         pay_currency_lower = (payment_record.pay_currency or "").lower()
-        if pay_currency_lower == "usdttrc20":
-            wallet_uri = f"tron:{payment_record.pay_address}"
-        else:
-            # ERC-20 and other Ethereum-based tokens
-            wallet_uri = f"ethereum:{payment_record.pay_address}"
+        currency_meta = next(
+            (c for c in SUPPORTED_CURRENCIES if c["code"] == pay_currency_lower), None
+        )
+        uri_scheme = currency_meta["uri_scheme"] if currency_meta else "ethereum"
+        wallet_uri = f"{uri_scheme}:{payment_record.pay_address}"
 
         qr_data_uri = ""
         if payment_record.pay_address:

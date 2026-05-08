@@ -10,14 +10,19 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-# Accepted payment currencies — USDT only
-USDT_CURRENCY_CODES = {"usdterc20", "usdttrc20"}
-
-# Fallback list used when the API is unavailable or the API key is not configured
-FALLBACK_CURRENCIES = [
-    {"code": "usdterc20", "name": "Tether USD (ERC-20)", "network": "eth"},
-    {"code": "usdttrc20", "name": "Tether USD (TRC-20)", "network": "trx"},
+# Accepted payment currencies.
+# Each entry defines: code (NOWPayments currency code), name (display),
+# network (badge label), uri_scheme (wallet deep-link prefix for QR codes).
+# To add a new coin: append an entry here — no other code needs to change.
+SUPPORTED_CURRENCIES = [
+    {"code": "usdterc20", "name": "Tether USD (ERC-20)", "network": "eth", "uri_scheme": "ethereum"},
+    {"code": "usdttrc20", "name": "Tether USD (TRC-20)", "network": "trx", "uri_scheme": "tron"},
 ]
+
+SUPPORTED_CURRENCY_CODES = {c["code"] for c in SUPPORTED_CURRENCIES}
+
+# Used when the API is unavailable or the API key is not configured
+FALLBACK_CURRENCIES = SUPPORTED_CURRENCIES
 
 
 def _base_url():
@@ -63,7 +68,7 @@ def get_currencies():
         currencies = []
         for c in data.get("currencies", []):
             code = c["code"].lower()
-            if code not in USDT_CURRENCY_CODES:
+            if code not in SUPPORTED_CURRENCY_CODES:
                 continue
             if not c.get("enable") or not c.get("isDepositEnabled", True):
                 continue
