@@ -324,15 +324,15 @@ sudo chmod 640 /opt/massage_marketplace/.env
 
 ### Subscription expiry (daily)
 
-Create `/etc/cron.d/massage_marketplace_subscriptions`:
-
-```cron
-# Deactivate expired subscriptions and send renewal reminders — runs at 01:00 daily
-0 1 * * * /opt/marketplace/venv/bin/python /opt/marketplace/marketplace/manage.py expire_subscriptions >> /var/log/marketplace/cron_expire_subscriptions.log 2>&1
+Installed automatically by `deploy/setup.sh` (runs at 01:00 daily):
 ```
+0 1 * * * /opt/marketplace/venv/bin/python /opt/marketplace/marketplace/manage.py expire_subscriptions >> /var/log/marketplace/expire_subscriptions.log 2>&1
+```
+
 What it does each run:
 - Providers whose `subscription_renewal_date` is in the past → deactivated + expiry email sent
 - Providers whose `subscription_renewal_date` is exactly 3 days away → renewal reminder email sent
+- Admin summary email sent when any action was taken or an error occurred
 
 Test it manually before relying on cron:
 ```bash

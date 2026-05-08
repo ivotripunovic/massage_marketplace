@@ -81,6 +81,13 @@ if [ "${DOMAIN}" != "YOUR_DOMAIN" ]; then
         echo "WARNING: SSL certificate setup failed. Run certbot manually."
 fi
 
+# ---- Subscription expiry cron job ----
+# Runs daily at 01:00 to deactivate expired subscriptions and send renewal reminders.
+echo "Setting up subscription expiry cron job..."
+EXPIRE_CMD="${APP_DIR}/venv/bin/python ${APP_DIR}/marketplace/manage.py expire_subscriptions"
+EXPIRE_LOG="/var/log/marketplace/expire_subscriptions.log"
+(crontab -l 2>/dev/null || true; echo "0 1 * * * ${EXPIRE_CMD} >> ${EXPIRE_LOG} 2>&1") | crontab -
+
 # ---- Backup cron job ----
 echo "Setting up daily backup cron job..."
 (crontab -l 2>/dev/null || true; echo "0 2 * * * ${APP_DIR}/deploy/backup.sh >> /var/log/marketplace/backup.log 2>&1") | crontab -
