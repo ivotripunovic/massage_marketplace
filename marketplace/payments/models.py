@@ -1,14 +1,13 @@
 from django.db import models
 from providers.models import Provider
+from payments.nowpayments import SUPPORTED_CURRENCIES
 
 
 class SubscriptionPayment(models.Model):
     """Payment record for provider subscriptions."""
 
-    PAYMENT_METHOD_CHOICES = (
-        ("crypto_bitcoin", "Bitcoin"),
-        ("crypto_ethereum", "Ethereum"),
-        ("crypto_usdc", "USDC"),
+    PAYMENT_METHOD_CHOICES = tuple(
+        (c["code"], c["name"]) for c in SUPPORTED_CURRENCIES
     )
 
     STATUS_CHOICES = (
@@ -28,7 +27,7 @@ class SubscriptionPayment(models.Model):
         help_text="Subscription cost in USD",
     )
 
-    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
+    payment_method = models.CharField(max_length=50, choices=PAYMENT_METHOD_CHOICES)
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
 
@@ -64,7 +63,7 @@ class SubscriptionPayment(models.Model):
         max_length=20,
         blank=True,
         null=True,
-        help_text="Cryptocurrency code (e.g. btc, eth)",
+        help_text="NOWPayments currency code (e.g. usdterc20, usdttrc20)",
     )
 
     created_at = models.DateTimeField(auto_now_add=True)
