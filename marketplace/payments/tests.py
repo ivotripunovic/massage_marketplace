@@ -869,3 +869,17 @@ class NowPaymentsWebhookViewTests(TestCase):
         self.assertIn("Partial payment", mail.outbox[0].subject)
         self.assertIn("provider@test.com", mail.outbox[0].subject)
         self.assertIn("0.0004", mail.outbox[0].body)
+
+    def test_webhook_finished_sets_renewal_date_30_days_out(self):
+        # When NOWPayments confirms a payment, the provider's subscription renewal
+        # date must be set to exactly 30 days from today. This ensures the
+        # expire_subscriptions cron deactivates the account at the right time.
+        from datetime import date, timedelta
+
+        payload = self._build_payload("finished")
+        with patch("payments.nowpayments.verify_ipn_signature", return_value=True):
+            self._make_request(payload)
+
+        self.provider.refresh_from_db()
+        expected_renewal = date.today() + timedelta(days=30)
+        self.assertEqual(self.provider.subscription_renewal_date, expected_renewal)

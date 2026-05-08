@@ -3113,3 +3113,93 @@ class ExpireSubscriptionsCommandTests(TestCase):
             self._run(dry_run=True)
             admin_emails = [m for m in mail.outbox if "admin@example.com" in m.to]
             self.assertEqual(len(admin_emails), 0)
+
+
+class SubscriptionRenewalCycleTests(TestCase):
+    """
+    End-to-end tests for the full subscription lifecycle:
+    pay → active → renewal date passes → inactive → pay again → active.
+    """
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            email="cycle@testprovider.com",
+            password="testpass123",
+            user_type="provider",
+            is_email_verified=True,
+        )
+        self.provider = Provider.objects.create(
+            user=self.user,
+            phone="+1234567890",
+            subscription_status="inactive",
+        )
+
+    def _run_expiry(self):
+        """Run the expire_subscriptions command with sleep patched out."""
+        out = StringIO()
+        with patch("providers.management.commands.expire_subscriptions.time.sleep"):
+            call_command("expire_subscriptions", stdout=out)
+        return out.getvalue()
+
+    def test_subscription_active_after_payment(self):
+        # Simulates a NOWPayments IPN confirming the payment. After activation
+        # the subscription status must be 'active' and a renewal date must exist.
+        self.provider.activate_subscription("usdterc20")
+        self.provider.refresh_from_db()
+
+        self.assertEqual(self.provider.subscription_status, "active")
+        self.assertIsNotNone(self.provider.subscription_renewal_date)
+        self.assertEqual(
+            self.provider.subscription_renewal_date,
+            date.today() + timedelta(days=30),
+        )
+
+    def test_subscription_inactive_after_renewal_date_passes(self):
+        # Provider paid and was active, but the renewal date has now passed
+        # and no new payment was made. The expire_subscriptions cron must
+        # deactivate the account.
+        self.provider.activate_subscription("usdterc20")
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
+        self.provider.save()
+
+        self._run_expiry()
+
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, "inactive")
+
+    def test_is_subscription_active_false_after_expiry(self):
+        # is_subscription_active() is used throughout the codebase to gate
+        # provider visibility. It must return False once the cron deactivates
+        # the account — not just rely on the status field directly.
+        self.provider.activate_subscription("usdterc20")
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
+        self.provider.save()
+
+        self._run_expiry()
+
+        self.provider.refresh_from_db()
+        self.assertFalse(self.provider.is_subscription_active())
+
+    def test_reactivation_after_expiry(self):
+        # Full cycle: activate → expire → pay again → active again.
+        # Verifies the system can handle repeated subscription cycles for the
+        # same provider without leaving stale state.
+        self.provider.activate_subscription("usdterc20")
+        self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
+        self.provider.save()
+
+        self._run_expiry()
+
+        self.provider.refresh_from_db()
+        self.assertEqual(self.provider.subscription_status, "inactive")
+
+        # Provider pays again
+        self.provider.activate_subscription("usdttrc20")
+        self.provider.refresh_from_db()
+
+        self.assertEqual(self.provider.subscription_status, "active")
+        self.assertEqual(
+            self.provider.subscription_renewal_date,
+            date.today() + timedelta(days=30),
+        )
+        self.assertTrue(self.provider.is_subscription_active())
