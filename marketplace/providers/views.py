@@ -843,9 +843,10 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
 
         # Build wallet URI for QR code and deeplink
         pay_currency_lower = (payment_record.pay_currency or "").lower()
-        if pay_currency_lower == "btc":
-            wallet_uri = f"bitcoin:{payment_record.pay_address}?amount={payment_record.pay_amount}"
+        if pay_currency_lower == "usdttrc20":
+            wallet_uri = f"tron:{payment_record.pay_address}"
         else:
+            # ERC-20 and other Ethereum-based tokens
             wallet_uri = f"ethereum:{payment_record.pay_address}"
 
         qr_data_uri = ""
