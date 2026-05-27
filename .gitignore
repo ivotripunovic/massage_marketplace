@@ -53,3 +53,6 @@ htmlcov/
 .dmypy.json
 dmypy.json
 marketplace/media/
+
+# ignore this file, it is used to track TODOs in the project
+TODO.md
