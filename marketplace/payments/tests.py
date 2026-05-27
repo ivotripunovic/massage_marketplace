@@ -90,11 +90,10 @@ class SubscriptionPaymentModelTests(TestCase):
         self.assertEqual(payment.status, "failed")
 
     def test_all_payment_methods(self):
-        """Test all payment method choices."""
+        """Test all supported payment method choices (currently USDT on Polygon)."""
         payment_methods = [
-            "crypto_bitcoin",
-            "crypto_ethereum",
-            "crypto_usdc",
+            "usdtmatic",
+            "usdtbsc",
         ]
         for i, method in enumerate(payment_methods):
             payment = SubscriptionPayment.objects.create(
@@ -836,7 +835,7 @@ class NowPaymentsWebhookViewTests(TestCase):
             "payment_status": "partially_paid",
             "pay_amount": 0.00085,
             "actually_paid": actually_paid,
-            "pay_currency": "usdterc20",
+            "pay_currency": "usdtmatic",
             "price_amount": 29.99,
             "price_currency": "usd",
         }).encode()

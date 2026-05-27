@@ -1261,8 +1261,8 @@ class ProviderSubscriptionViewTests(TestCase):
         choices = form.fields["payment_method"].choices
         self.assertGreater(len(choices), 0)
         choice_values = [choice[0] for choice in choices]
-        self.assertIn("usdterc20", choice_values)
-        self.assertIn("usdttrc20", choice_values)
+        self.assertIn("usdtmatic", choice_values)
+        self.assertIn("usdtbsc", choice_values)
 
     def test_subscription_status_displayed(self):
         """Test that current subscription status is displayed."""
@@ -1275,7 +1275,7 @@ class ProviderSubscriptionViewTests(TestCase):
         """Test that form submission redirects to payment page."""
         self.client.login(email=self.user.email, password="testpass123")
         response = self.client.post(
-            reverse("subscription"), {"payment_method": "usdterc20"}
+            reverse("subscription"), {"payment_method": "usdtmatic"}
         )
         self.assertRedirects(
             response, reverse("subscription_crypto_payment"), fetch_redirect_response=False
@@ -1358,15 +1358,16 @@ class ProviderSubscriptionActivationTests(TestCase):
         self.client.login(email=self.user.email, password="testpass123")
 
         # Step 1: Select payment method
-        self.client.post(reverse("subscription"), {"payment_method": "usdterc20"})
+        self.client.post(reverse("subscription"), {"payment_method": "usdtmatic"})
 
         # Step 2: GET crypto payment page — NOWPayments API is called here
         mock_result = {
             "payment_id": "test-nowpay-123",
             "pay_address": "0xUsdtAddressABC",
             "pay_amount": 29.99,
-            "pay_currency": "usdterc20",
+            "pay_currency": "usdtmatic",
             "payment_status": "waiting",
+            "invoice_url": "https://nowpayments.io/payment/?iid=test-nowpay-123",
         }
         with patch("payments.nowpayments.create_payment", return_value=mock_result):
             self.client.get(reverse("subscription_crypto_payment"))
@@ -1374,11 +1375,13 @@ class ProviderSubscriptionActivationTests(TestCase):
         # Should have created a payment record
         payment = SubscriptionPayment.objects.filter(provider=self.provider).first()
         self.assertIsNotNone(payment)
-        self.assertEqual(payment.payment_method, "usdterc20")
+        self.assertEqual(payment.payment_method, "usdtmatic")
         self.assertEqual(payment.status, "pending")
         self.assertEqual(float(payment.amount), 29.99)
         self.assertEqual(payment.nowpayments_payment_id, "test-nowpay-123")
         self.assertEqual(payment.pay_address, "0xUsdtAddressABC")
+        # invoice_url is stored and used as the QR code / wallet deeplink
+        self.assertEqual(payment.invoice_url, "https://nowpayments.io/payment/?iid=test-nowpay-123")
 
     def test_subscription_activation_flow(self):
         """Test that subscription is activated via NOWPayments webhook, not form submit."""
@@ -1388,15 +1391,16 @@ class ProviderSubscriptionActivationTests(TestCase):
         self.client.login(email=self.user.email, password="testpass123")
 
         # Step 1: Select payment method
-        self.client.post(reverse("subscription"), {"payment_method": "usdttrc20"})
+        self.client.post(reverse("subscription"), {"payment_method": "usdtmatic"})
 
         # Step 2: GET crypto page — creates pending payment via NOWPayments
         mock_result = {
             "payment_id": "usdt-nowpay-456",
-            "pay_address": "TUsdtAddressTRX",
+            "pay_address": "0xUsdtAddressMATIC",
             "pay_amount": 29.99,
-            "pay_currency": "usdttrc20",
+            "pay_currency": "usdtmatic",
             "payment_status": "waiting",
+            "invoice_url": "https://nowpayments.io/payment/?iid=usdt-nowpay-456",
         }
         with patch("payments.nowpayments.create_payment", return_value=mock_result):
             self.client.get(reverse("subscription_crypto_payment"))
@@ -3144,7 +3148,7 @@ class SubscriptionRenewalCycleTests(TestCase):
     def test_subscription_active_after_payment(self):
         # Simulates a NOWPayments IPN confirming the payment. After activation
         # the subscription status must be 'active' and a renewal date must exist.
-        self.provider.activate_subscription("usdterc20")
+        self.provider.activate_subscription("usdtmatic")
         self.provider.refresh_from_db()
 
         self.assertEqual(self.provider.subscription_status, "active")
@@ -3158,7 +3162,7 @@ class SubscriptionRenewalCycleTests(TestCase):
         # Provider paid and was active, but the renewal date has now passed
         # and no new payment was made. The expire_subscriptions cron must
         # deactivate the account.
-        self.provider.activate_subscription("usdterc20")
+        self.provider.activate_subscription("usdtmatic")
         self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
         self.provider.save()
 
@@ -3171,7 +3175,7 @@ class SubscriptionRenewalCycleTests(TestCase):
         # is_subscription_active() is used throughout the codebase to gate
         # provider visibility. It must return False once the cron deactivates
         # the account — not just rely on the status field directly.
-        self.provider.activate_subscription("usdterc20")
+        self.provider.activate_subscription("usdtmatic")
         self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
         self.provider.save()
 
@@ -3184,7 +3188,7 @@ class SubscriptionRenewalCycleTests(TestCase):
         # Full cycle: activate → expire → pay again → active again.
         # Verifies the system can handle repeated subscription cycles for the
         # same provider without leaving stale state.
-        self.provider.activate_subscription("usdterc20")
+        self.provider.activate_subscription("usdtmatic")
         self.provider.subscription_renewal_date = date.today() - timedelta(days=1)
         self.provider.save()
 
@@ -3194,7 +3198,7 @@ class SubscriptionRenewalCycleTests(TestCase):
         self.assertEqual(self.provider.subscription_status, "inactive")
 
         # Provider pays again
-        self.provider.activate_subscription("usdttrc20")
+        self.provider.activate_subscription("usdtmatic")
         self.provider.refresh_from_db()
 
         self.assertEqual(self.provider.subscription_status, "active")

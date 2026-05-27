@@ -756,7 +756,6 @@ def _qr_data_uri(data: str) -> str:
     import base64
     import io
     import qrcode
-    from PIL import Image
 
     qr = qrcode.QRCode(
         version=1,
@@ -838,24 +837,27 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
                 pay_address=result.get("pay_address", ""),
                 pay_amount=result.get("pay_amount"),
                 pay_currency=result.get("pay_currency", ""),
+                invoice_url=result.get("invoice_url") or "",
             )
             request.session["nowpayments_payment_id"] = str(result["payment_id"])
 
-        # Build wallet URI for QR code and deeplink
-        from payments.nowpayments import SUPPORTED_CURRENCIES
-        pay_currency_lower = (payment_record.pay_currency or "").lower()
-        currency_meta = next(
-            (c for c in SUPPORTED_CURRENCIES if c["code"] == pay_currency_lower), None
-        )
-        uri_scheme = currency_meta["uri_scheme"] if currency_meta else "ethereum"
-        wallet_uri = f"{uri_scheme}:{payment_record.pay_address}"
-
+        # QR encodes the plain address — compatible with all wallets including
+        # Binance (which rejects EIP-681 ERC-20 function-call URIs).
+        # The amount is displayed separately on the page with a copy button.
         qr_data_uri = ""
         if payment_record.pay_address:
             try:
-                qr_data_uri = _qr_data_uri(wallet_uri)
+                qr_data_uri = _qr_data_uri(payment_record.pay_address)
             except Exception:
-                pass
+                logger.exception(
+                    "QR code generation failed for payment %s (address=%r)",
+                    payment_record.pk, payment_record.pay_address,
+                )
+
+        # "Open in Wallet" deeplink: invoice_url opens the NOWPayments hosted
+        # page which provides wallet-specific deeplinks with amount pre-filled.
+        # Falls back to a plain ethereum:<address> URI if the URL is absent.
+        wallet_uri = payment_record.invoice_url or f"ethereum:{payment_record.pay_address}"
 
         try:
             currencies = nowpayments.get_currencies()
@@ -873,6 +875,7 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
             "pay_address": payment_record.pay_address,
             "pay_amount": payment_record.pay_amount,
             "pay_currency": (payment_record.pay_currency or "").upper(),
+            "invoice_url": payment_record.invoice_url or "",
             "wallet_uri": wallet_uri,
             "qr_data_uri": qr_data_uri,
             "payment": payment_record,

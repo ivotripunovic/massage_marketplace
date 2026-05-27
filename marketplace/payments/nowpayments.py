@@ -15,8 +15,26 @@ logger = logging.getLogger(__name__)
 # network (badge label), uri_scheme (wallet deep-link prefix for QR codes).
 # To add a new coin: append an entry here — no other code needs to change.
 SUPPORTED_CURRENCIES = [
-    {"code": "usdterc20", "name": "Tether USD (ERC-20)", "network": "eth", "uri_scheme": "ethereum"},
-    {"code": "usdttrc20", "name": "Tether USD (TRC-20)", "network": "trx", "uri_scheme": "tron"},
+    {
+        "code": "usdtmatic",
+        "name": "Tether USD (Polygon)",
+        "network": "polygon",
+        "uri_scheme": "ethereum",
+        # EIP-681: USDT contract on Polygon PoS, 6 decimal places
+        "erc20_contract": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+        "chain_id": 137,
+        "token_decimals": 6,
+    },
+    {
+        "code": "usdtbsc",
+        "name": "Tether USD (BSC)",
+        "network": "bsc",
+        "uri_scheme": "ethereum",
+        # EIP-681: BSC-pegged USDT contract, 18 decimal places
+        "erc20_contract": "0x55d398326f99059fF775485246999027B3197955",
+        "chain_id": 56,
+        "token_decimals": 18,
+    },
 ]
 
 SUPPORTED_CURRENCY_CODES = {c["code"] for c in SUPPORTED_CURRENCIES}

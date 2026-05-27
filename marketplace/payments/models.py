@@ -64,7 +64,14 @@ class SubscriptionPayment(models.Model):
         max_length=20,
         blank=True,
         null=True,
-        help_text="NOWPayments currency code (e.g. usdterc20, usdttrc20)",
+        help_text="NOWPayments currency code (e.g. usdtmatic)",
+    )
+
+    invoice_url = models.URLField(
+        max_length=500,
+        blank=True,
+        null=True,
+        help_text="NOWPayments hosted invoice URL (encodes address + amount + network; used as QR code content)",
     )
 
     actually_paid = models.DecimalField(
