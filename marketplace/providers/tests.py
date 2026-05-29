@@ -1070,7 +1070,7 @@ class AdminProviderListViewTests(TestCase):
             "inactive@test.com", "inactive", "crypto_ethereum"
         )
         self.provider_suspended = self._create_provider(
-            "suspended@test.com", "suspended", None
+            "suspended@test.com", "suspended", ""
         )
 
         # Add a review to provider_active

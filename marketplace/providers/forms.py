@@ -47,8 +47,8 @@ class ProviderPhotoForm(forms.ModelForm):
             img.verify()
             # Reset file pointer after verification
             photo.seek(0)
-        except Exception:
-            raise ValidationError("The uploaded file is not a valid image")
+        except Exception as exc:
+            raise ValidationError("The uploaded file is not a valid image") from exc
 
         return photo
 
@@ -178,8 +178,8 @@ class GalleryImageForm(forms.ModelForm):
                 img = Image.open(image)
                 img.verify()
                 image.seek(0)
-            except Exception:
-                raise ValidationError("The uploaded file is not a valid image")
+            except Exception as exc:
+                raise ValidationError("The uploaded file is not a valid image") from exc
 
         return image
 

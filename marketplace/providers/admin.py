@@ -132,7 +132,7 @@ class ProviderAdmin(admin.ModelAdmin):
         """Display location in list view."""
         if obj.city and obj.country:
             return f"{obj.city.name}, {obj.country.name}"
-        elif obj.country:
+        if obj.country:
             return obj.country.name
         return "-"
 
@@ -163,13 +163,14 @@ class ProviderAdmin(admin.ModelAdmin):
 
     def activate_subscriptions(self, request, queryset):
         """Bulk action to activate subscriptions."""
-        from datetime import timedelta, date
+        from datetime import timedelta
+        from django.utils import timezone
 
         count = 0
         for provider in queryset:
             if provider.subscription_status != "active":
                 provider.subscription_status = "active"
-                provider.subscription_renewal_date = date.today() + timedelta(days=30)
+                provider.subscription_renewal_date = timezone.localdate() + timedelta(days=30)
                 provider.save()
                 count += 1
         self.message_user(request, f"{count} provider subscription(s) activated.")

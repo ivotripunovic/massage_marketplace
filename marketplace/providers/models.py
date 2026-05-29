@@ -1,7 +1,8 @@
 from django.db import models
 from django.conf import settings
 from django.utils.text import slugify
-from datetime import timedelta, date
+from datetime import timedelta
+from django.utils import timezone
 
 
 class Continent(models.Model):
@@ -122,7 +123,7 @@ class Provider(models.Model):
 
     slug = models.SlugField(max_length=200, unique=True, blank=True)
 
-    bio = models.TextField(blank=True, null=True)
+    bio = models.TextField(blank=True, default="")
     phone = models.CharField(max_length=20)
     phone_hours = models.CharField(
         max_length=50,
@@ -158,13 +159,13 @@ class Provider(models.Model):
     )
 
     subscription_payment_method = models.CharField(
-        max_length=20, choices=PAYMENT_METHOD_CHOICES, blank=True, null=True
+        max_length=20, choices=PAYMENT_METHOD_CHOICES, blank=True, default=""
     )
 
     subscription_renewal_date = models.DateField(blank=True, null=True)
 
     crypto_address = models.CharField(
-        max_length=255, blank=True, null=True, help_text="Bitcoin/Ethereum address"
+        max_length=255, blank=True, default="", help_text="Bitcoin/Ethereum address"
     )
 
     map_latitude = models.DecimalField(
@@ -225,7 +226,7 @@ class Provider(models.Model):
         """Activate subscription for 30 days from today."""
         self.subscription_status = "active"
         self.subscription_payment_method = payment_method
-        self.subscription_renewal_date = date.today() + timedelta(days=30)
+        self.subscription_renewal_date = timezone.localdate() + timedelta(days=30)
         self.save()
 
     def deactivate_subscription(self):

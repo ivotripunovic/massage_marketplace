@@ -35,7 +35,6 @@ class Command(BaseCommand):
             SubscriptionPayment.objects.filter(
                 status="pending",
                 payment_method__startswith="crypto_",
-                reference_id__isnull=False,
             )
             .exclude(reference_id="")
             .select_related("provider__user")
@@ -95,13 +94,12 @@ class Command(BaseCommand):
         try:
             if method == "crypto_bitcoin":
                 return self._check_bitcoin_transaction(tx_hash, payment.amount)
-            elif method in ("crypto_ethereum", "crypto_usdc"):
+            if method in ("crypto_ethereum", "crypto_usdc"):
                 return self._check_ethereum_transaction(tx_hash, payment.amount)
-            else:
-                return {"verified": False, "reason": f"Unknown method: {method}"}
-        except Exception as e:
-            logger.error(f"Error verifying payment #{payment.pk}: {e}")
-            return {"verified": False, "reason": str(e)}
+            return {"verified": False, "reason": f"Unknown method: {method}"}
+        except Exception:
+            logger.exception("Error verifying payment #%s", payment.pk)
+            return {"verified": False, "reason": "Verification error"}
 
     def _check_bitcoin_transaction(self, tx_hash, expected_amount):
         """
@@ -149,7 +147,5 @@ class Command(BaseCommand):
                 [payment.provider.user.email],
                 fail_silently=True,
             )
-        except Exception as e:
-            logger.error(
-                f"Failed to send confirmation email for payment #{payment.pk}: {e}"
-            )
+        except Exception:
+            logger.exception("Failed to send confirmation email for payment #%s", payment.pk)

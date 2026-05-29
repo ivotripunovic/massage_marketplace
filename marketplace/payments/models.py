@@ -35,7 +35,7 @@ class SubscriptionPayment(models.Model):
     reference_id = models.CharField(
         max_length=255,
         blank=True,
-        null=True,
+        default="",
         help_text="Transaction hash for crypto, transaction ID for bank",
     )
 
@@ -43,14 +43,14 @@ class SubscriptionPayment(models.Model):
     nowpayments_payment_id = models.CharField(
         max_length=255,
         blank=True,
-        null=True,
+        default="",
         db_index=True,
         help_text="NOWPayments internal payment ID",
     )
     pay_address = models.CharField(
         max_length=255,
         blank=True,
-        null=True,
+        default="",
         help_text="Crypto address the provider must send funds to",
     )
     pay_amount = models.DecimalField(
@@ -63,14 +63,14 @@ class SubscriptionPayment(models.Model):
     pay_currency = models.CharField(
         max_length=20,
         blank=True,
-        null=True,
+        default="",
         help_text="NOWPayments currency code (e.g. usdtmatic)",
     )
 
     invoice_url = models.URLField(
         max_length=500,
         blank=True,
-        null=True,
+        default="",
         help_text="NOWPayments hosted invoice URL (encodes address + amount + network; used as QR code content)",
     )
 
@@ -86,7 +86,7 @@ class SubscriptionPayment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(blank=True, null=True)
 
-    notes = models.TextField(blank=True, null=True, help_text="Admin notes")
+    notes = models.TextField(blank=True, default="", help_text="Admin notes")
 
     class Meta:
         db_table = "payments_subscription_payment"

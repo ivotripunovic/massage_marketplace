@@ -18,9 +18,10 @@ Runs where nothing happened produce no email.
 
 import logging
 import time
-from datetime import date, timedelta
+from datetime import timedelta
 
 from django.conf import settings
+from django.utils import timezone
 from django.core.mail import send_mail
 from django.core.management.base import BaseCommand
 
@@ -50,7 +51,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
-        today = date.today()
+        today = timezone.localdate()
         reminder_date = today + timedelta(days=REMINDER_DAYS_BEFORE)
 
         if dry_run:
