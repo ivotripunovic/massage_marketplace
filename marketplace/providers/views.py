@@ -867,6 +867,16 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
         except Exception:
             currency_name = self.payment_method.upper()
 
+        # Derive display values from SUPPORTED_CURRENCIES, not the NOWPayments
+        # response — the API may return a different internal code (e.g. "usdterc20"
+        # for a request for "usdtmatic").
+        from payments.nowpayments import SUPPORTED_CURRENCIES as _SC
+        _currency_meta = next((c for c in _SC if c["code"] == self.payment_method), None)
+        display_ticker = "USDT"
+        display_network = (
+            _currency_meta["network"].upper() if _currency_meta else self.payment_method.upper()
+        )
+
         context = {
             "provider": provider,
             "payment_method": self.payment_method,
@@ -874,7 +884,8 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
             "amount": amount,
             "pay_address": payment_record.pay_address,
             "pay_amount": payment_record.pay_amount,
-            "pay_currency": (payment_record.pay_currency or "").upper(),
+            "pay_currency": display_ticker,
+            "pay_network": display_network,
             "invoice_url": payment_record.invoice_url or "",
             "wallet_uri": wallet_uri,
             "qr_data_uri": qr_data_uri,
