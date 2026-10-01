@@ -17,24 +17,6 @@ This is a Django-based massage therapy marketplace platform that connects servic
 
 ## Development Commands
 
-### Environment Setup
-```bash
-# Activate virtual environment
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run migrations
-python marketplace/manage.py migrate
-
-# Create superuser
-python marketplace/manage.py createsuperuser
-
-# Run development server
-python marketplace/manage.py runserver
-```
-
 ### Testing
 ```bash
 # Run all tests with optimized settings (84 tests in ~0.24s)
@@ -56,80 +38,7 @@ python marketplace/manage.py test users providers reviews payments
 
 **Important:** Always use `--settings=marketplace.test_settings` for fast development testing. The test settings use MD5 hashing (196x faster) and in-memory database.
 
-### Database Management
-```bash
-# Create migrations after model changes
-python marketplace/manage.py makemigrations
-
-# Apply migrations
-python marketplace/manage.py migrate
-
-# Access Django shell
-python marketplace/manage.py shell
-```
-
 ## Code Architecture
-
-### Application Structure
-
-The project follows Django's app-based architecture with clear separation:
-
-```
-marketplace/
-├── marketplace/          # Project settings and configuration
-│   ├── settings.py       # Main settings (DEBUG=True, production settings)
-│   ├── test_settings.py  # Optimized test settings (MD5 hashing, in-memory DB)
-│   └── urls.py           # Root URL configuration
-│
-├── users/                # Authentication and user management
-│   ├── models.py         # Custom User model (email-based, no username)
-│   ├── backends.py       # EmailBackend for authentication
-│   ├── utils.py          # Email verification token utilities
-│   └── views.py          # Signup, login, email verification flows
-│
-├── providers/            # Provider profiles and service management
-│   ├── models.py         # Provider, Service, Certification models
-│   ├── views.py          # Provider dashboard, profile editing, subscription
-│   └── forms.py          # Provider forms with validation
-│
-├── payments/             # Subscription payment processing
-│   ├── models.py         # SubscriptionPayment model
-│   ├── views.py          # Admin payment verification views
-│   └── admin.py          # Payment admin interface
-│
-├── reviews/              # Review and rating system
-│   └── models.py         # Review model
-│
-└── templates/            # HTML templates (server-side rendered)
-    ├── base.html         # Base template with navigation
-    ├── includes/         # Reusable components (_messages, _form, _cards)
-    ├── users/            # Auth templates
-    ├── providers/        # Provider templates
-    └── admin/            # Admin templates
-```
-
-### Key Models and Relationships
-
-**User Model** (`users/models.py`):
-- Custom AbstractUser with email as USERNAME_FIELD (no username)
-- Fields: email (unique), user_type (provider/client/admin), is_email_verified, email_verification_token, phone_number
-- Manager: CustomUserManager handles email normalization
-
-**Provider Model** (`providers/models.py`):
-- OneToOne with User
-- Fields: bio, phone, photo, subscription_status, subscription_payment_method, subscription_renewal_date, crypto_address
-- Methods: `is_subscription_active()`, `activate_subscription(payment_method)`, `deactivate_subscription()`
-- Related models: Service (many-to-one) and Certification (many-to-one)
-
-**Service Model** (`providers/models.py`):
-- ForeignKey to Provider
-- Fields: service_type, description, price (min $5.00), duration (30/60/90 minutes), is_active
-- Validation: price must be >= 5.00, duration must be in (30, 60, 90)
-
-**SubscriptionPayment Model** (`payments/models.py`):
-- ForeignKey to Provider
-- Fields: amount, status (pending/completed/failed), payment_method, transaction_reference
-- Used for admin payment verification workflow
 
 ### Authentication Flow
 
@@ -161,51 +70,13 @@ Both inherit from LoginRequiredMixin and redirect unauthorized users.
 
 ## Development Guidelines
 
-### When Modifying Models
-
-1. Make changes to model in respective app's `models.py`
-2. Run `python marketplace/manage.py makemigrations`
-3. Review generated migration file
-4. Run `python marketplace/manage.py migrate`
-5. Update corresponding forms in `forms.py` if needed
-6. Add/update tests in `tests.py`
-7. Run tests to ensure nothing breaks: `./test.sh`
-
-### When Adding New Views
-
-1. Define view in app's `views.py` (prefer class-based views)
-2. Add URL pattern to `marketplace/urls.py`
-3. Create template in `templates/[app_name]/`
-4. Use appropriate mixin for access control (ProviderRequiredMixin, AdminRequiredMixin)
-5. Handle form validation and error messages
-6. Add tests for the view
-
-### When Working with Forms
-
-1. Use Django ModelForms for model-backed forms
-2. Implement custom validation in `clean_[field]()` methods
-3. Handle image uploads with proper validation (file type, size)
-4. Use the reusable `_form.html` template for consistent form rendering
-5. Display validation errors using Django messages framework
-
 ### Template Development
 
-- Base template: `templates/base.html` includes navigation and message display
-- Reusable includes: `_messages.html`, `_form.html`, `_service_card.html`, `_certification_card.html`
 - Tailwind CSS via CDN (no build process required)
-- Minimal JavaScript (prefer server-side rendering)
-- Always use `{% csrf_token %}` in forms
 
 ### Testing Best Practices
 
-- Use `--settings=marketplace.test_settings` for fast feedback (~6s for 372 tests)
-- Test both success and failure cases
-- Use Django's TestCase for database tests
-- Mock email sending in tests (already configured in test_settings)
-- Keep tests isolated (no dependencies between tests)
-- Use `setUp()` for test data creation
 - `NOWPAYMENTS_API_KEY = ""` in test_settings prevents real API calls; `get_currencies()` returns `FALLBACK_CURRENCIES` immediately when key is empty
-- Current coverage: 372 tests across users, providers, reviews, payments, clients
 
 ## Important Implementation Details
 
@@ -241,58 +112,6 @@ Both inherit from LoginRequiredMixin and redirect unauthorized users.
 - Admin marks payments as completed/failed
 - Confirmation emails sent automatically
 
-## Common Patterns
-
-### Creating a Provider Profile
-
-```python
-# User must be created first
-user = User.objects.create_user(
-    email='provider@example.com',
-    password='password',
-    user_type='provider'
-)
-
-# Create provider profile
-provider = Provider.objects.create(
-    user=user,
-    phone='+1234567890',
-    bio='Experienced massage therapist...'
-)
-```
-
-### Checking Subscription Status
-
-```python
-# In view or template
-if request.user.provider_profile.is_subscription_active():
-    # Allow provider actions
-    pass
-```
-
-### Adding Services
-
-```python
-# Service creation with validation
-service = Service.objects.create(
-    provider=provider,
-    service_type='swedish',
-    description='Relaxing Swedish massage',
-    price=50.00,  # Must be >= 5.00
-    duration=60,  # Must be 30, 60, or 90
-    is_active=True
-)
-```
-
-## URL Patterns
-
-Key URL patterns to know:
-
-- Auth: `/auth/signup/`, `/auth/login/`, `/auth/logout/`
-- Provider: `/provider/dashboard/`, `/provider/profile/`, `/provider/subscription/`
-- Services: `/provider/services/`, `/provider/services/create/`, `/provider/services/<id>/edit/`
-- Admin: `/internal/admin/providers/`, `/internal/admin/payments/`
-
 ## Environment Variables
 
 See `.env.example` for all variables. Key ones:
@@ -308,40 +127,7 @@ See `.env.example` for all variables. Key ones:
 
 ## Security Considerations
 
-- CSRF protection enabled on all forms
-- Email-based authentication (more secure than usernames)
-- Password hashing: PBKDF2 in production, MD5 in tests only
-- Image upload validation (type, size, format)
-- Admin access protected with AdminRequiredMixin
-- Session-based authentication
 - NOWPayments IPN webhook verified with HMAC-SHA512 signature
-
-## Observability
-
-### Error Tracking — Sentry
-
-Integrated via `sentry-sdk[django]`. Initialized in `settings.py` when `SENTRY_DSN` env var is set; no-op when blank (safe for local dev and CI).
-
-Env vars:
-- `SENTRY_DSN` — from Sentry project settings (leave blank to disable)
-- `SENTRY_ENVIRONMENT` — `production` / `staging` (default: `production`)
-- `SENTRY_TRACES_SAMPLE_RATE` — fraction of requests traced for performance (default: `0.1`)
-
-### Structured Logging
-
-`python-json-logger` formats log output as JSON in production (`DEBUG=False`) and human-readable text in development. Logs go to stdout and are collected by systemd journal.
-
-Log levels by logger:
-- `django.request` — ERROR (500s with tracebacks)
-- `django.security` — WARNING (CSRF failures, suspicious requests)
-- `payments`, `providers`, `users` — INFO in production, DEBUG locally
-
-Useful `journalctl` commands:
-```bash
-journalctl -u your-app -f                               # stream live
-journalctl -u your-app --since "1 hour ago"             # last hour
-journalctl -u your-app | grep '"levelname": "ERROR"'    # errors only (JSON)
-```
 
 ## Git Workflow
 
