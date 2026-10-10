@@ -1,350 +1,169 @@
-# Massage Marketplace - Provider User Flows
+# Massage Marketplace — Provider Flows
 
-## 1. Signup Flow
+How a service provider signs up, builds a listing, and pays to be visible.
+All routes and view/class names below match `marketplace/marketplace/urls.py`
+and `providers/views.py`.
 
-**Overview**: New massage therapy professionals create an account and become verified providers.
+---
+
+## 1. Signup & email verification
 
 **Path**: `/auth/signup/`
 
-**Steps**:
-1. User visits signup page (`/auth/signup/`)
-2. User enters:
-   - Email address
-   - Password (minimum 8 characters)
-   - Password confirmation
-   - User type selection: "Provider"
-3. System validates:
-   - Email is unique (case-insensitive)
-   - Passwords match
-   - Password is strong enough
-4. User account created with:
-   - `user_type = 'provider'`
-   - `is_email_verified = False`
-   - Verification token generated
-5. Verification email sent (console output in development)
-6. User redirected to `/auth/check-email/`
-7. User clicks verification link from email
-8. User account marked as verified (`is_email_verified = True`)
-9. User redirected to login page
+1. User submits email + password (min 8 chars) + confirmation. There is no
+   separate "user type" field on the form; the account starts as `client` and is
+   promoted to `provider` when the provider profile flow is used.
+2. `SignupForm` validates a unique, case-insensitive email and matching,
+   ≥8-char password.
+3. On success the `User` is created with `is_email_verified = False` and an
+   `email_verification_token` (from `users/utils.py`).
+4. A verification email is sent (console backend in dev) and the user is sent to
+   `/auth/check-email/` (`CheckEmailView`).
+5. `VerifyEmailView` (`/auth/verify-email/<token>/`) marks the account verified
+   and clears the one-time token. Unverified users can request a new link at
+   `/auth/resend-email/` (`ResendVerificationView`), which is rate-limited.
 
-**Related Views**:
-- `SignupView` - Form display and processing
-- `VerifyEmailView` - Token validation
-- `CheckEmailView` - Status page after signup
-
-**Database Changes**:
-- User record created with pending verification status
+Related: `SignupView`, `LoginView`, `LogoutView`, `PasswordResetView`,
+`PasswordResetSentView`, `PasswordResetConfirmView`.
 
 ---
 
-## 2. Profile Completion
-
-**Overview**: New provider fills in their professional information.
+## 2. Profile & listing
 
 **Path**: `/provider/profile/`
 
-**Prerequisites**:
-- User must be logged in
-- User type must be 'provider'
-- Provider profile auto-created if missing
+**Prerequisites**: logged in, `user_type = 'provider'`. Access is enforced by
+`ProviderRequiredMixin`; the `Provider` row is created on first access if needed.
 
-**Steps**:
-1. Provider views dashboard (`/provider/dashboard/`)
-2. Sees "Complete your profile" message if profile incomplete
-3. Clicks "Edit Profile" button
-4. Fills in form:
-   - First Name (optional)
-   - Last Name (optional)
-   - Phone Number (required, e.g., "+1 (555) 123-4567")
-   - Bio (optional, max 500 characters)
-   - Profile Photo (optional, JPEG/PNG/GIF, max 5MB)
-5. System validates:
-   - Phone number is present (required)
-   - Image is valid format and size
-   - Bio doesn't exceed 250 characters
-6. Photo is processed:
-   - Resized to maximum 800x800 pixels
-   - Original format preserved
-7. Provider record updated
-8. User record updated with first/last name
-9. User redirected to dashboard with success message
+`ProviderProfileUpdateView` renders `ProviderProfileForm`, `ProviderPricingForm`
+and the preference-selection form together. It saves:
 
-**Related Views**:
-- `ProviderProfileUpdateView` - Profile form
-- `ProviderProfileForm` - Form with validation and image processing
+- **Identity**: `first_name`, `last_name` (on the User), `bio`, `phone`
+  (required), `phone_hours`.
+- **Media**: `photo` (JPEG/PNG/GIF, ≤5 MB, auto-resized to ≤800×800 with PIL,
+  stored in `media/providers/photos/`), `profile_video` (MP4, ≤50 MB,
+  `media/providers/videos/`).
+- **Location**: `country` and `city` (city choices are filtered by the selected
+  country). Location autocomplete is served by `/api/countries/search/` and
+  `/api/cities/search/`.
+- **Attributes**: admin-defined `ProviderAttributeDefinition`s are rendered as
+  typed fields (string/int/bool) and persisted to `ProviderAttributeValue`.
+- **Pricing** (`ProviderPricing`): apartment/outside availability plus the
+  day/night × 1h/2h price grid and day/night notes.
+- **Preferences**: checked subgroups from the admin catalog
+  (`ProviderPreference`) plus provider free-text options
+  (`ProviderPreferenceCustomOption`) and provider-created items
+  (`ProviderCustomPreference`).
 
-**Database Changes**:
-- Provider record fields updated: `phone`, `bio`, `photo`
-- User record fields updated: `first_name`, `last_name`
-
-**File Storage**:
-- Photos stored in `media/providers/photos/`
-- Automatic filename generation based on upload time
+Validated on submit: phone present, image format/size, video format/size.
+Success returns to the profile page with a message.
 
 ---
 
-## 3. Service Creation
+## 3. Gallery
 
-**Overview**: Provider lists the massage services they offer with pricing.
+**Paths**: `/provider/gallery/upload/`, `/provider/gallery/<pk>/delete/`
 
-**Path**: `/provider/services/create/`
-
-**Prerequisites**:
-- User must be logged in and be a provider
-- Provider profile must exist
-
-**Steps**:
-1. Provider views dashboard or service list
-2. Clicks "+ Add Service" button
-3. Fills in service form:
-   - Service Type: Select from dropdown
-     - Swedish massage
-     - Deep tissue
-     - Thai massage
-     - Reflexology
-     - Hot stone
-     - Aromatherapy
-   - Description (optional, e.g., "Relaxing full-body Swedish massage")
-   - Price (required, must be >= $5.00)
-   - Duration (required):
-     - 30 minutes
-     - 60 minutes
-     - 90 minutes
-4. System validates:
-   - Price is decimal number >= 5.00
-   - Duration is one of the allowed values
-   - Service type is selected
-5. Service record created:
-   - `provider_id` = current provider
-   - `is_active = True` (default)
-   - `created_at`, `updated_at` set
-6. User redirected to dashboard with success message
-7. Service appears in "Your Services" list on dashboard
-
-**Related Views**:
-- `ServiceCreateView` - Service form display and processing
-- `ServiceForm` - Form with validation
-
-**Database Changes**:
-- Service record created with all provided fields
-- Unique constraint: (provider, service_type) - one service type per provider
-
-**Service Listing**:
-Services are displayed on provider dashboard with:
-- Service type and duration
-- Price
-- Description (if provided)
-- Edit and Delete buttons
+- `GalleryImageCreateView` lets a provider add a `ProviderGalleryImage`
+  (image + optional caption). `GalleryImageForm` enforces the limit of
+  `ProviderGalleryImage.MAX_IMAGES_PER_PROVIDER = 10`.
+- `GalleryImageDeleteView` is POST-only and verifies ownership before deleting.
 
 ---
 
-## 4. Certification Upload
-
-**Overview**: Provider uploads images of professional certifications to build trust.
-
-**Path**: `/provider/certifications/add/`
-
-**Prerequisites**:
-- User must be logged in and be a provider
-- Provider profile must exist
-
-**Steps**:
-1. Provider views dashboard or certifications section
-2. Clicks "+ Add Certification" button
-3. Fills in certification form:
-   - Certification Name (required)
-     - Examples: "Licensed Massage Therapist", "Swedish Massage Certification", "LMT"
-   - Certification Image (required)
-     - Formats: JPEG, PNG, GIF
-     - Size limit: 5MB
-     - Recommended: Photo of certificate or credential
-4. System validates:
-   - Name is provided and not empty
-   - Image exists and is valid format
-   - Image file size < 5MB
-5. Certification record created:
-   - `provider_id` = current provider
-   - `name` = provided name
-   - `image` = uploaded and stored
-   - `uploaded_at` = current timestamp
-6. User redirected with success message
-7. Certification appears in certifications grid
-
-**Related Views**:
-- `CertificationCreateView` - Certification form
-- `CertificationForm` - Form with image validation
-
-**Database Changes**:
-- Certification record created
-
-**File Storage**:
-- Images stored in `media/providers/certifications/`
-- Automatic filename generation
-
-**Display**:
-Certifications shown as grid of:
-- Certification image (or text if no image)
-- Certification name
-- Delete button
-
----
-
-## 5. Provider Dashboard
-
-**Overview**: Central hub where provider manages all account aspects.
+## 4. Dashboard
 
 **Path**: `/provider/dashboard/`
 
-**Prerequisites**:
-- User must be logged in
-- User type must be 'provider'
-- Provider profile must exist (or will show prompt to create)
-
-**Display Sections**:
-
-### Profile Summary
-- Provider photo (or placeholder avatar)
-- Email address
-- Subscription status (active/inactive/suspended)
-- Edit Profile button
-- Quick stats:
-  - Active Services count
-  - Certifications count
-  - Total Reviews count
-  - Average Rating (if reviews exist)
-
-### Subscription Card
-- Current subscription status
-- Renewal date (if active)
-- Manage/Activate Subscription button
-
-### Services Section
-- List of all active services in grid layout
-- For each service:
-  - Service type and duration
-  - Price
-  - Description (if provided)
-  - Edit button
-  - Delete button
-- "Add Service" button if no services
-- Empty state message if no services
-
-### Certifications Section
-- Grid of certification images
-- Certification name under each
-- Delete button for each certification
-- "Add Certification" button
-- Empty state message if no certifications
-
-**Navigation Links**:
-- Edit Profile → `/provider/profile/`
-- Add Service → `/provider/services/create/`
-- Edit Service → `/provider/services/{id}/edit/`
-- Add Certification → `/provider/certifications/add/`
-- Manage Subscription → `/provider/subscription/`
+`ProviderDashboardView` is the provider hub: profile summary and avatar,
+subscription status / renewal date, and links to edit the profile, manage the
+subscription, and manage gallery images. Query counts are kept low with
+`select_related` / `prefetch_related`.
 
 ---
 
-## 6. Subscription Management
+## 5. Subscription & crypto payment
 
-**Overview**: Provider activates subscription to appear in marketplace.
+**Paths**: `/provider/subscription/` → `/provider/subscription/crypto/` →
+`/provider/subscription/confirm/`
 
-**Path**: `/provider/subscription/`
+1. `ProviderSubscriptionView` shows the current status and a dynamic coin picker.
+   The coin list comes from `payments.nowpayments.get_currencies()` (cached 1 h,
+   falls back to `FALLBACK_CURRENCIES`). The chosen code is stored in the session
+   as `pending_payment_method`.
+2. `CryptoPaymentView` calls `create_payment(amount_usd, pay_currency,
+   order_id, ipn_callback_url)`, creates a `SubscriptionPayment`
+   (status `pending`) with `nowpayments_payment_id`, `pay_address`,
+   `pay_amount`, `pay_currency` and `invoice_url`, and renders the deposit
+   address with a QR code and a wallet deep-link. An existing pending payment in
+   the session is reused rather than creating duplicates.
+3. `CryptoPaymentStatusView` is a JSON endpoint
+   (`/provider/subscription/status/<nowpayments_payment_id>/`) the page polls to
+   detect confirmation.
+4. The provider clicks "I've sent the payment" → `SubscriptionConfirmView`,
+   which shows `payment_pending` while the record is still `pending`.
+5. `NowPaymentsWebhookView` (IPN, `/payments/webhook/nowpayments/`) verifies the
+   HMAC-SHA512 signature, updates `actually_paid`/status, and on a completed
+   payment calls `Provider.activate_subscription(payment_method)` (status
+   `active`, renewal = today + 30 days).
+6. The `expire_subscriptions` management command deactivates overdue providers
+   and sends renewal reminders / an admin summary.
 
-**Prerequisites**:
-- User must be logged in and be a provider
-- Provider profile must be complete
-
-**Current Features**:
-- View current subscription status
-- View renewal date
-- Select payment method (UI only in Week 3)
-
-**Future Features** (Week 4+):
-- Complete payment processing
-- Crypto payment setup
-- Bank transfer details
-- Automatic renewal management
+Supported coins are defined in `payments/nowpayments.py::SUPPORTED_CURRENCIES`.
+Adding a coin is a one-line-list change; `SubscriptionPayment.PAYMENT_METHOD_CHOICES`
+derives from that list.
 
 ---
 
-## Database Model Relationships
+## 6. Reviews
+
+A provider can reply once to each review of their profile. `ReviewReplyView`
+(`/providers/<slug>/review/<pk>/reply/`) enforces ownership and the 500-char
+reply limit. The provider's average rating comes from
+`Provider.average_rating()` across all category ratings.
+
+---
+
+## 7. Relationships
 
 ```
-User (auth_user)
-  ├── Provider (one-to-one)
-  │   ├── Service (one-to-many)
-  │   ├── Certification (one-to-many)
-  │   ├── Review (one-to-many)
-  │   └── SubscriptionPayment (one-to-many)
-  └── Group (many-to-many, for permissions)
+User (users_user)
+  └── Provider (one-to-one, user.provider_profile)
+        ├── ProviderGalleryImage (1:N, ≤10)
+        ├── ProviderAttributeValue (1:N, per definition)
+        ├── ProviderPricing (1:1)
+        ├── ProviderPreference / …CustomOption (1:N)
+        ├── ProviderCustomPreference (1:N)
+        ├── Review (1:N)  └── ReviewReply (1:1)
+        └── SubscriptionPayment (1:N)
 ```
+
+See [`DATABASE_SCHEMA.md`](DATABASE_SCHEMA.md) for field-level detail.
 
 ---
 
-## Common Error Scenarios
+## 8. Errors & handling
 
-### Signup Errors
-- **Email already exists**: Show "Email already registered. Please login or use different email."
-- **Passwords don't match**: Show "Passwords do not match."
-- **Password too short**: Show "Password must be at least 8 characters."
-
-### Profile Completion Errors
-- **Phone required**: Show "Phone number is required."
-- **Invalid image**: Show "Please upload a valid image (JPEG, PNG, or GIF)."
-- **Image too large**: Show "Image must be smaller than 5MB."
-
-### Service Creation Errors
-- **Price too low**: Show "Price must be at least $5.00."
-- **Invalid duration**: Show "Duration must be 30, 60, or 90 minutes."
-- **Missing service type**: Show "Service type is required."
-
-### Certification Upload Errors
-- **Image required**: Show "Certification image is required."
-- **Invalid image format**: Show "Only JPEG, PNG, and GIF images are allowed."
+- Missing session payment method → redirected to `/provider/subscription/` with
+  an error.
+- NOWPayments `create_payment` failure → error message, redirect to the
+  subscription page, exception logged.
+- Non-provider or anonymous access to `/provider/…` → login redirect / denied by
+  `ProviderRequiredMixin`.
+- Invalid/oversized image or video → form validation message.
 
 ---
 
-## Testing the Flows
+## 9. Manual test checklist
 
-### Manual Testing Steps
+1. Sign up, verify via the console email link, log in.
+2. Edit profile: name, phone, bio, photo (resized), location, pricing,
+   attributes, preferences.
+3. Upload gallery images until the 10-image cap blocks further uploads; delete
+   one (POST) and confirm another provider's image cannot be deleted.
+4. Start a subscription: pick a coin, confirm address + QR render, simulate IPN,
+   confirm the provider becomes active with a renewal date.
+5. Post a review as a client and reply to it as the provider.
 
-1. **Signup and Email Verification**:
-   - Go to `/auth/signup/`
-   - Sign up with email, password
-   - Check console output for verification link
-   - Click link to verify email
-   - Login with credentials
-
-2. **Complete Profile**:
-   - Click "Dashboard"
-   - Click "Edit Profile"
-   - Fill in phone number and bio
-   - Upload profile photo
-   - Click "Save Changes"
-   - Verify data appears on dashboard
-
-3. **Create Services**:
-   - Click "Services" in navbar
-   - Click "+ Add Service"
-   - Fill in all required fields
-   - Click "Create Service"
-   - Verify service appears in list
-   - Edit and delete service to test
-
-4. **Upload Certifications**:
-   - Click "+ Add Certification"
-   - Fill in certification name
-   - Upload image
-   - Verify certification appears in grid
-   - Test deletion
-
-### Automated Testing
-
-Run test suite:
-```bash
-cd marketplace
-python manage.py test --settings=marketplace.test_settings providers -v 2
-```
-
-This runs 141 tests covering all provider flows with 100% code coverage.
+Automated coverage runs via `./test.sh providers` (see
+[`../CONTRIBUTING.md`](../CONTRIBUTING.md#4-testing-requirements)).

@@ -1,3 +1,7 @@
+> **Historical / archived.** This is the original product spec. Some details
+> diverge from the shipped implementation (e.g. NOWPayments instead of
+> BTCPay/Coinbase, USDT-focused crypto). See `README.md` for current behaviour.
+
 # Massage Service Marketplace - Product Requirements Document
 
 **Document Version:** 1.0  

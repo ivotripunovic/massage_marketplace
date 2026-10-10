@@ -145,33 +145,42 @@ Same as input-dark with custom dropdown arrow styling.
 
 ### Country Search
 ```
-GET /api/countries/search/?q={query}
+GET /api/countries/search/?q={query}      # search by name or ISO code
+GET /api/countries/search/?all=1          # list every active country
 ```
+
 **Parameters:**
-- `q` (required): Search query (min 2 characters)
+- `q` (optional): search query; a single character is enough
+- `all=1` (optional): ignore `q` and list all active countries
+- Results are grouped by continent and cached
 
 **Response:**
 ```json
 {
-  "results": [
+  "continents": [
     {
-      "id": 3,
-      "name": "United Kingdom",
-      "code": "GB",
-      "continent": "Europe",
-      "continent_code": "EU"
+      "name": "Europe",
+      "code": "EU",
+      "order": 1,
+      "countries": [
+        { "id": 3, "name": "United Kingdom", "code": "GB", "provider_count": 4 }
+      ]
     }
   ]
 }
 ```
+Returns `{"continents": []}` when the query is empty and `all` is not set.
 
 ### City Search
 ```
-GET /api/cities/search/?q={query}&country={country_id}
+GET /api/cities/search/?country={country_id}&q={query}
+GET /api/cities/search/?country={country_id}&all=1
 ```
+
 **Parameters:**
-- `q` (required): Search query (min 2 characters)
-- `country` (required): Country ID
+- `country` (required): country ID — empty returns `{"results": []}`
+- `q` (optional): name filter
+- `all=1` (optional): return all cities instead of the first 20
 
 **Response:**
 ```json
@@ -182,7 +191,8 @@ GET /api/cities/search/?q={query}&country={country_id}
       "name": "London",
       "country": "United Kingdom",
       "is_capital": true,
-      "is_major_city": true
+      "is_major_city": true,
+      "provider_count": 4
     }
   ]
 }
@@ -209,7 +219,7 @@ initLocationAutocomplete();
 ```
 
 ### Features
-- Debounced search (300ms)
+- Debounced search (150ms)
 - Keyboard navigation (Arrow Up/Down, Enter, Escape)
 - Continent grouping in country results
 - City selector disabled until country selected
@@ -260,7 +270,7 @@ All text colors meet WCAG AA contrast requirements (4.5:1 minimum).
 ## Performance Optimization
 
 ### Debouncing
-- Autocomplete searches debounced at 300ms
+- Autocomplete searches debounced at 150ms
 - Prevents excessive API calls
 
 ### Indexes
@@ -280,14 +290,13 @@ Database indexes on:
 
 ### Loading Fixtures
 ```bash
-cd marketplace
-python manage.py loaddata 001_continents.json
-python manage.py loaddata 002_countries.json
-python manage.py loaddata 003_cities_europe.json
-python manage.py loaddata 004_cities_asia.json
-python manage.py loaddata 005_cities_africa.json
-python manage.py loaddata 006_cities_south_america.json
-python manage.py loaddata 007_cities_oceania.json
+python marketplace/manage.py loaddata 001_continents.json
+python marketplace/manage.py loaddata 002_countries.json
+python marketplace/manage.py loaddata 003_cities_europe.json
+python marketplace/manage.py loaddata 004_cities_asia.json
+python marketplace/manage.py loaddata 005_cities_africa.json
+python marketplace/manage.py loaddata 006_cities_south_america.json
+python marketplace/manage.py loaddata 007_cities_oceania.json
 ```
 
 ### Data Sources

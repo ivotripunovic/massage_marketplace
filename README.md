@@ -70,18 +70,16 @@ See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for initial server setup.
 ## Testing
 
 ```bash
-# Fast — 372 tests in ~6s (in-memory SQLite, dummy cache, no Redis required)
+# Full suite — ~396 tests in ~7s (in-memory SQLite, dummy cache, no Redis required)
 ./test.sh
 
-# Specific app
+# A specific app
 ./test.sh users
 ./test.sh providers
-
-# Specific test class
-python marketplace/manage.py test users.tests.CustomUserModelTests --settings=marketplace.test_settings
 ```
 
-Tests use optimized settings: MD5 hashing, in-memory SQLite, `DummyCache`, no NOWPayments API calls.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md#4-testing-requirements) for the full
+testing guide (test settings, organization, debugging, common issues).
 
 ---
 
@@ -89,15 +87,18 @@ Tests use optimized settings: MD5 hashing, in-memory SQLite, `DummyCache`, no NO
 
 ```
 marketplace/
-├── marketplace/        # Project settings, URLs, middleware
-├── users/              # Custom user model, email auth
-├── providers/          # Provider profiles, pricing, preferences
-├── clients/            # Client views, provider directory
-├── reviews/            # Review and rating system
-├── payments/           # Subscription payment processing (NOWPayments)
+├── marketplace/        # Django project: settings, URLs, middleware, WSGI
+├── users/              # Custom user model, email auth, legal pages
+├── providers/          # Provider profiles, services, certifications,
+│                       #   pricing, gallery, preferences, location data
+├── clients/            # Public directory/detail, filters, client accounts
+├── reviews/            # Reviews, categories, replies
+├── payments/           # Subscription payments (NOWPayments)
 ├── templates/          # Server-side rendered HTML
 └── static/             # JS, CSS assets
 ```
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for a detailed breakdown.
 
 ## Key features
 

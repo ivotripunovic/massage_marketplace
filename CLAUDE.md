@@ -19,7 +19,7 @@ This is a Django-based massage therapy marketplace platform that connects servic
 
 ### Testing
 ```bash
-# Run all tests with optimized settings (84 tests in ~0.24s)
+# Run all tests with optimized settings (~396 tests in ~7s)
 ./test.sh
 
 # Run specific app tests

@@ -63,40 +63,124 @@ def create_user(email: str, password: str) -> User:
 
 **All code must be tested before committing.**
 
-Run tests locally (with optimized test database):
+Fastest path — from the repository root:
 ```bash
-# Run all tests (uses test_settings.py for faster execution)
-python manage.py test --settings=marketplace.test_settings
+# Run the full suite with optimized settings (~7s, ~396 tests)
+./test.sh
 
-# Run all tests with verbosity
-python manage.py test --settings=marketplace.test_settings -v 2
-
-# Run specific app tests
-python manage.py test --settings=marketplace.test_settings users
-
-# Run with verbosity
-python manage.py test --settings=marketplace.test_settings users -v 2
-
-# Run specific test class
-python manage.py test --settings=marketplace.test_settings users.tests.CustomUserModelTests
-
-# Run tests with coverage (if coverage.py is installed)
-coverage run --source='.' manage.py test --settings=marketplace.test_settings
-coverage report
-coverage html  # Generate HTML report
+# Run a specific app
+./test.sh users
+./test.sh providers
 ```
 
-**Test Coverage Requirements:**
-- Models: 100% coverage
-- Forms: 100% coverage
-- Views: 100% coverage
-- Utils: 100% coverage
+Under the hood `./test.sh` runs:
+
+```bash
+python marketplace/manage.py test users providers reviews payments.tests \
+    users.test_security users.test_legal --settings=marketplace.test_settings
+```
+
+Equivalent manual commands (run from the repository root):
+
+```bash
+# All tests
+python marketplace/manage.py test --settings=marketplace.test_settings
+
+# With verbosity
+python marketplace/manage.py test --settings=marketplace.test_settings -v 2
+
+# Specific app / class / method
+python marketplace/manage.py test users --settings=marketplace.test_settings
+python marketplace/manage.py test users.tests.CustomUserModelTests --settings=marketplace.test_settings
+python marketplace/manage.py test users.tests.CustomUserModelTests.test_create_user --settings=marketplace.test_settings
+```
+
+> `payments/tests_sandbox.py` (live NOWPayments sandbox integration) is
+> excluded from `./test.sh`. Run it explicitly when needed:
+> `python marketplace/manage.py test payments.tests_sandbox --settings=marketplace.test_settings`
+
+#### Test settings
+
+`marketplace/test_settings.py` inherits the main settings and optimizes for speed:
+
+- **MD5 password hashing** — ~196x faster than PBKDF2
+- **In-memory SQLite** — no disk I/O
+- **No password validators** — faster user creation
+- **Locmem email backend** — fast email assertions
+- **DummyCache** — no Redis required
+- **Rate limiting disabled** — security tests re-enable it explicitly
+- **`NOWPAYMENTS_API_KEY = ""`** — no real API calls; `get_currencies()` returns the fallback list immediately
+
+Without `--settings=marketplace.test_settings`, tests use production-like PBKDF2
+hashing and take dramatically longer. Always use the fast settings during
+development.
+
+#### Test organization
+
+```
+marketplace/
+├── users/
+│   ├── tests.py          # models, auth, email verification
+│   ├── test_forms.py     # form validation
+│   ├── test_views.py     # view responses
+│   ├── test_security.py  # rate limiting, auth hardening
+│   └── test_legal.py     # legal pages
+├── providers/tests.py    # models, services, certification, location, preferences
+├── clients/tests.py      # directory, detail, filters, autocomplete APIs
+├── reviews/tests.py      # reviews, categories, replies
+├── payments/tests.py     # payment model, IPN webhook, admin flows
+└── payments/tests_sandbox.py  # live sandbox integration (excluded by default)
+```
 
 **Test File Naming:**
-- `tests.py` - Main tests for models
+- `tests.py` - Main tests for models and views
 - `test_forms.py` - Form tests
 - `test_views.py` - View tests
-- `test_utils.py` - Utility function tests
+- `test_<feature>.py` - Focused suites (e.g. `test_security.py`)
+
+#### Writing tests
+
+```python
+from django.test import TestCase, Client
+from users.models import User
+
+class UserTests(TestCase):
+    def test_user_creation(self):
+        user = User.objects.create_user(
+            email="test@example.com", password="testpass123"
+        )
+        self.assertEqual(user.email, "test@example.com")
+```
+
+Best practices:
+1. One assertion per test method (when possible)
+2. Clear names: `test_user_creation_with_valid_email`
+3. Use `setUp`/`tearDown` for shared data
+4. Test both success and failure cases
+5. Mock external dependencies (email, NOWPayments API)
+6. Keep tests isolated (no inter-test dependencies)
+
+#### Debugging tests
+
+```bash
+# Single test, interactive
+python marketplace/manage.py test users.tests.UserTests.test_create_user -v 2
+
+# Reuse the test database between runs
+python marketplace/manage.py test users --keepdb --settings=marketplace.test_settings
+```
+
+Add `import pdb; pdb.set_trace()` inside a test to drop into a debugger.
+
+#### Common issues
+
+- **"No module named 'users'"** — use `python marketplace/manage.py ...` from the
+  repo root (or `python manage.py ...` from inside `marketplace/`).
+- **Tests are slow** — you forgot `--settings=marketplace.test_settings`; use `./test.sh`.
+- **Database locked errors** — the suite uses in-memory SQLite; re-run rather than
+  reusing on-disk state.
+
+**Test Coverage Requirements:** aim for full coverage on models, forms, views, and utils.
 
 ### 5. Pull Request Process
 
@@ -120,21 +204,22 @@ coverage html  # Generate HTML report
 ### 6. Documentation
 
 - Update `README.md` for setup changes
-- Update `PROGRESS.md` when tasks are completed
+- Update `docs/` when behaviour or architecture changes
 - Add docstrings to all functions and classes
 - Comment complex logic
 - Update this file with any new conventions
+
+> Historical planning documents live in `docs/archive/` and are not maintained.
 
 ## Task Workflow
 
 Each task follows this pattern:
 
-1. **Plan**: Read requirements in TASK_LIST.md
+1. **Plan**: Break the work into atomic steps
 2. **Implement**: Write code with tests
 3. **Test**: Run full test suite (all passing)
-4. **Document**: Update PROGRESS.md
-5. **Mark Complete**: Update TASK_LIST.md status to [✓ DONE]
-6. **Commit**: Push changes with clear commit message
+4. **Document**: Update `README.md` / `docs/` as needed
+5. **Commit**: Push changes with a clear commit message
 
 ## Running the Project Locally
 
@@ -148,13 +233,13 @@ venv\Scripts\activate  # Windows
 pip install -r requirements.txt
 
 # Run migrations
-python manage.py migrate
+python marketplace/manage.py migrate
 
 # Create superuser
-python manage.py createsuperuser
+python marketplace/manage.py createsuperuser
 
 # Start development server
-python manage.py runserver
+python marketplace/manage.py runserver
 
 # Access admin
 # http://localhost:8000/admin
@@ -165,38 +250,38 @@ python manage.py runserver
 ### Migrations
 Always create migrations after model changes:
 ```bash
-python manage.py makemigrations
-python manage.py migrate
+python marketplace/manage.py makemigrations
+python marketplace/manage.py migrate
 ```
 
 ### Resetting Database (Development Only)
 ```bash
-rm db.sqlite3
-python manage.py migrate
-python manage.py createsuperuser
+rm marketplace/db.sqlite3
+python marketplace/manage.py migrate
+python marketplace/manage.py createsuperuser
 ```
 
 ## Common Commands
 
 ```bash
 # Run tests
-python manage.py test <app>
+./test.sh <app>   # e.g. ./test.sh providers
 
 # Create migration
-python manage.py makemigrations
+python marketplace/manage.py makemigrations
 
 # Apply migrations
-python manage.py migrate
+python marketplace/manage.py migrate
 
 # Check for issues
-python manage.py check
+python marketplace/manage.py check
 
 # Shell with context
-python manage.py shell
+python marketplace/manage.py shell
 
 # Create fixture (for testing data)
-python manage.py dumpdata > fixtures.json
-python manage.py loaddata fixtures.json
+python marketplace/manage.py dumpdata > fixtures.json
+python marketplace/manage.py loaddata fixtures.json
 ```
 
 ## Environment Variables
@@ -215,7 +300,7 @@ Never commit `.env` file (it's in `.gitignore`).
 git checkout -b feature/task-name
 
 # 2. Make changes and test
-python manage.py test
+./test.sh
 
 # 3. Stage and commit
 git add .
@@ -230,7 +315,7 @@ git push origin feature/task-name
 ## Questions?
 
 Check:
-1. TASK_LIST.md for specific requirements
-2. PROGRESS.md for what's been done
-3. README.md for setup help
-4. This file for conventions
+1. README.md for setup help and feature overview
+2. docs/ for architecture, schema, flows and deployment
+3. This file for conventions and testing
+4. docs/archive/ for historical planning documents

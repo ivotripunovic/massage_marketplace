@@ -1,413 +1,313 @@
-# Massage Marketplace - Architecture Documentation
+# Massage Marketplace — Architecture
 
-## System Architecture Overview
+Django 5.2 marketplace connecting massage-therapy providers with clients.
+Providers pay a monthly cryptocurrency subscription (NOWPayments) to be listed;
+clients browse and read reviews for free. Server-rendered HTML with minimal JS.
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Client Browser                           │
-├─────────────────────────────────────────────────────────────────┤
-│  HTML/CSS/JavaScript (Tailwind CSS)                             │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-                    HTTP/HTTPS
-                         │
-┌────────────────────────▼────────────────────────────────────────┐
-│              Django 5.0 Web Application Server                  │
-├─────────────────────────────────────────────────────────────────┤
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │ Django URL Router (marketplace/urls.py)                 │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                         │                                       │
-│  ┌──────────────────────▼──────────────────────────────────┐  │
-│  │ Views Layer (Class-Based & Function-Based Views)       │  │
-│  ├────────────────────────────────────────────────────────┤  │
-│  │ • Authentication (users/views.py)                       │  │
-│  │ • Provider Management (providers/views.py)              │  │
-│  │ • Payment Management (payments/views.py)                │  │
-│  │ • Admin Interfaces                                      │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                         │                                       │
-│  ┌──────────────────────▼──────────────────────────────────┐  │
-│  │ Forms & Validation (*/forms.py)                         │  │
-│  │ • Signup, Login, Password Reset                         │  │
-│  │ • Provider Profile, Service, Certification              │  │
-│  │ • Subscription Settings                                 │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                         │                                       │
-│  ┌──────────────────────▼──────────────────────────────────┐  │
-│  │ Business Logic (Models)                                 │  │
-│  ├────────────────────────────────────────────────────────┤  │
-│  │ • User (Custom AbstractUser)                            │  │
-│  │ • Provider                                              │  │
-│  │ • Service                                               │  │
-│  │ • Certification                                         │  │
-│  │ • Review                                                │  │
-│  │ • SubscriptionPayment                                   │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                         │                                       │
-│  ┌──────────────────────▼──────────────────────────────────┐  │
-│  │ Template Layer (HTML Rendering)                         │  │
-│  ├────────────────────────────────────────────────────────┤  │
-│  │ • Base template with navigation                         │  │
-│  │ • Reusable includes (_messages, _form, _cards)          │  │
-│  │ • App-specific templates                                │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└────────────────────────┬────────────────────────────────────────┘
-                         │
-                         ├──────────────────────────┐
-                         │                          │
-        ┌────────────────▼──────────────┐  ┌────────▼──────────────┐
-        │   SQLite Database (Dev)        │  │   PostgreSQL (Prod)   │
-        │   or PostgreSQL (Prod)         │  └───────────────────────┘
-        │   - users_user                 │
-        │   - providers_provider         │
-        │   - providers_service          │
-        │   - providers_certification    │
-        │   - reviews_review             │
-        │   - payments_payment           │
-        └───────────────────────────────┘
-                         │
-        ┌────────────────▼──────────────┐
-        │   File Storage (Media Files)   │
-        ├────────────────────────────────┤
-        │ • Provider photos              │
-        │ • Certifications               │
-        │ • Local: media/                │
-        │ • Prod: Minio/S3               │
-        └────────────────────────────────┘
-```
+---
 
-## Application Structure
+## 1. System overview
 
 ```
-marketplace/
-├── marketplace/                    # Django project configuration
-│   ├── settings.py                # Project settings (DEBUG, DATABASES, APPS, etc.)
-│   ├── test_settings.py           # Optimized test database settings
-│   ├── urls.py                    # URL routing configuration
-│   └── wsgi.py                    # WSGI application entry point
-│
-├── users/                          # User authentication and management
-│   ├── models.py                  # Custom User model (extends AbstractUser)
-│   ├── views.py                   # Auth views (Signup, Login, Password Reset)
-│   ├── forms.py                   # Auth forms (SignupForm, LoginForm)
-│   ├── backends.py                # Email-based authentication backend
-│   ├── utils.py                   # Email verification token utilities
-│   ├── admin.py                   # Django admin customization
-│   └── tests.py                   # User model and auth tests
-│
-├── providers/                      # Provider profiles and services
-│   ├── models.py                  # Provider, Service, Certification models
-│   ├── views.py                   # Provider views and admin views
-│   ├── forms.py                   # Provider, Service, Certification forms
-│   ├── admin.py                   # Django admin with inlines
-│   └── tests.py                   # Provider functionality tests
-│
-├── payments/                       # Payment and subscription management
-│   ├── models.py                  # SubscriptionPayment model
-│   ├── views.py                   # Admin payment views
-│   ├── admin.py                   # Payment admin interface
-│   └── tests.py                   # Payment functionality and admin tests
-│
-├── reviews/                        # Review and rating system
-│   ├── models.py                  # Review model
-│   ├── admin.py                   # Review admin
-│   └── tests.py                   # Review tests
-│
-├── clients/                        # Client-related functionality (future)
-│   ├── models.py                  # Client model (future)
-│   └── views.py                   # Client views (future)
-│
-├── templates/                      # HTML templates
-│   ├── base.html                  # Base layout with navigation
-│   ├── includes/                  # Reusable template includes
-│   │   ├── _messages.html         # Message display
-│   │   ├── _form.html             # Generic form rendering
-│   │   ├── _service_card.html     # Service card component
-│   │   ├── _certification_card.html # Cert card component
-│   │   └── _pagination.html       # Pagination component
-│   ├── users/                     # Auth templates
-│   │   ├── signup.html
-│   │   ├── login.html
-│   │   ├── password_reset.html
-│   │   └── verify_email_error.html
-│   ├── providers/                 # Provider templates
-│   │   ├── dashboard.html
-│   │   ├── profile_edit.html
-│   │   ├── service_form.html
-│   │   ├── service_list.html
-│   │   ├── certification_form.html
-│   │   ├── subscription.html
-│   │   └── subscription_confirm.html
-│   ├── admin/                     # Admin templates
-│   │   ├── provider_list.html
-│   │   ├── payment_list.html
-│   │   └── payment_detail.html
-│   └── emails/                    # Email templates
-│       ├── verify_email.html
-│       └── subscription_confirmation.html
-│
-├── static/                         # Static files (CSS, JS, images)
-│   └── css/                        # Custom CSS (if needed)
-│
-├── media/                          # User-uploaded files
-│   ├── providers/
-│   │   ├── photos/
-│   │   └── certifications/
-│
-├── docs/                           # Project documentation
-│   ├── ARCHITECTURE.md
-│   ├── DATABASE_SCHEMA.md
-│   ├── PROVIDER_FLOWS.md
-│   └── SPRINT1_SUMMARY.md
-│
-└── conftest.py                     # Pytest configuration and fixtures
+┌─────────────────────────────────────────────────────────────┐
+│                        Browser                              │
+│  Django templates · Tailwind (CDN) · location-autocomplete.js│
+└───────────────────────────┬─────────────────────────────────┘
+                            │ HTTP/HTTPS
+┌───────────────────────────▼─────────────────────────────────┐
+│                  Django 5.2 application                     │
+│  urls.py → views → forms → models → templates               │
+│  middleware: RateLimitMiddleware                            │
+│  context processor: subscription_price                      │
+└───────┬───────────────┬───────────────┬─────────────────────┘
+        │               │               │
+   ┌────▼────┐     ┌────▼────┐     ┌────▼─────────────┐
+   │ SQLite  │     │  Redis  │     │  NOWPayments API │
+   │ (dev)   │     │ (prod)  │     │  (create/IPN)    │
+   │ Postgres│     │ cache   │     └──────────────────┘
+   │ (prod)  │     └─────────┘
+   └─────────┘
+        │
+   ┌────▼──────────────┐   ┌──────────────┐   ┌──────────────┐
+   │ Media (local FS)  │   │ Sentry       │   │ journald     │
+   │ photos/gallery/   │   │ error track  │   │ JSON logs    │
+   │ certifications    │   └──────────────┘   └──────────────┘
+   └───────────────────┘
 ```
 
-## Technology Stack
+Production runs Gunicorn + Nginx behind the bare-repo `post-receive` deploy hook.
+See [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-### Backend
-- **Framework**: Django 5.0
-- **Language**: Python 3.11+
-- **ORM**: Django ORM with PostgreSQL/SQLite
+---
 
-### Frontend
-- **Template Engine**: Django Templates
-- **CSS Framework**: Tailwind CSS (via CDN)
-- **Form Handling**: Django Forms
-- **JavaScript**: Vanilla JS for simple interactivity
+## 2. Repository layout
 
-### Database
-- **Development**: SQLite3
-- **Production**: PostgreSQL 14+
-- **Migrations**: Django migrations
+```
+massage_marketplace/
+├── marketplace/                 # Django project root
+│   ├── manage.py
+│   ├── marketplace/             # Project package
+│   │   ├── settings.py          # env-driven settings
+│   │   ├── test_settings.py     # fast test overrides (MD5, in-memory, DummyCache)
+│   │   ├── urls.py              # all routes
+│   │   ├── middleware.py        # RateLimitMiddleware
+│   │   ├── context_processors.py# subscription_price (global template var)
+│   │   ├── wsgi.py / asgi.py
+│   ├── users/                   # auth, custom User, legal pages
+│   ├── providers/               # Provider + catalog + location + preferences
+│   ├── clients/                 # public directory/detail, filters, autocomplete APIs
+│   ├── reviews/                 # reviews, categories, replies
+│   ├── payments/                # NOWPayments client + subscription payments
+│   ├── templates/               # base.html + per-app templates + includes/ + emails/
+│   ├── static/                  # js/location-autocomplete.js, images
+│   ├── media/                   # uploaded photos, gallery, certifications (gitignored)
+│   ├── fixtures/ (providers/)   # continent/country/city seed data
+│   └── db.sqlite3               # local dev database
+├── deploy/                      # gunicorn.conf.py, marketplace.service, nginx.conf,
+│                                #   post-receive, setup.sh, backup.sh
+├── docs/                        # this doc, schema, flows, theme, deployment
+│   └── archive/                 # historical PRD + task list
+├── test.sh                      # fast test runner
+└── requirements.txt
+```
+
+---
+
+## 3. Applications
+
+### 3.1 `users` — authentication & accounts
+
+- **`User(AbstractUser)`** (`users/models.py`): email is `USERNAME_FIELD`, `username`
+  removed, `user_type ∈ {provider, client, admin}`, `is_email_verified`,
+  `email_verification_token`, `phone_number`. Table `users_user`.
+- **`CustomUserManager`**: normalises/lowercases email, `create_user` /
+  `create_superuser`.
+- **`users/backends.py` — `EmailBackend`**: case-insensitive email auth. Registered
+  as the sole `AUTHENTICATION_BACKENDS` entry.
+- **`users/utils.py`**: `generate_email_verification_token`, `verify_email_token`
+  (one-time use), `send_verification_email`, plus password-reset token helpers.
+- **Views**: `SignupView`, `CheckEmailView`, `VerifyEmailView`,
+  `ResendVerificationView`, `LoginView`, `LogoutView`, `PasswordResetView`,
+  `PasswordResetSentView`, `PasswordResetConfirmView`.
+- **Management command**: `test_email` (SMTP smoke test).
+
+### 3.2 `providers` — profiles & catalog
+
+Models (`providers/models.py`):
+
+| Model | Purpose |
+|-------|---------|
+| `Continent` / `Country` / `City` | Location reference data; **US excluded** by fixture design |
+| `Provider` | Profile, location FKs, subscription status/renewal, pricing/preferences root, gallery; `slug` generated on save |
+| `ProviderGalleryImage` | Up to `MAX_IMAGES_PER_PROVIDER = 10` gallery images |
+| `ProviderAttributeDefinition` / `ProviderAttributeValue` | Admin-defined typed custom attributes (string/int/bool) |
+| `ProviderPricing` | One-to-one structured price grid (apartment/outside × day/night × 1h/2h) |
+| `PreferenceGroup` / `PreferenceSubgroup` / `PreferenceSubgroupOption` | Admin-defined preference tree |
+| `ProviderPreference` | Per-provider on/off toggle per subgroup |
+| `ProviderPreferenceCustomOption` | Provider free-text option per subgroup |
+| `ProviderCustomPreference` | Provider-created preference item ("Other" group) |
+
+Provider helpers: `get_name()`, `get_absolute_url()` (slug-based),
+`is_subscription_active()`, `activate_subscription(payment_method)`
+(sets `active` + 30-day renewal), `deactivate_subscription()`,
+`average_rating()` (averages category ratings).
+
+Mixin: **`ProviderRequiredMixin`** (login + `user_type == 'provider'`).
+
+Views: `ProviderDashboardView`, `ProviderProfileUpdateView` (profile + pricing +
+preferences), `ProviderSubscriptionView`, `CryptoPaymentView`,
+`CryptoPaymentStatusView`, `SubscriptionConfirmView`, `GalleryImageCreateView`,
+`GalleryImageDeleteView`, `AdminProviderListView`, `AdminRequiredMixin`.
+
+Signals (`providers/signals.py`, registered from `ProvidersConfig.ready()`):
+invalidate the `pref_groups_tree` cache when preference-tree models change.
+
+Fixtures: `providers/fixtures/00*.json` (continents, countries, cities by
+continent). Load order documented in [`ui_theme.md`](ui_theme.md).
+
+### 3.3 `clients` — public marketplace
+
+No models (`clients/models.py` empty); all logic in views:
+
+- `ProviderDirectoryView` — public list at `/` and `/providers/`; filters by
+  `service` type, `country`, `city`, `price_min`, `price_max` via GET params;
+  only `subscription_status='active'` + verified providers; paginated 20/page;
+  caches counts (`CachedCountPaginator`).
+- `ProviderDetailView` — public profile at `/providers/<slug>/`; 404 for
+  inactive/unverified; prefetches gallery, reviews + category ratings + replies,
+  attribute values, preferences and pricing.
+- `ClientProfileView`, `ClientReviewsView` — authenticated client account pages.
+- `country_search_api`, `city_search_api` — JSON autocomplete endpoints
+  (`/api/countries/search/`, `/api/cities/search/`), backed by
+  `static/js/location-autocomplete.js`.
+
+`ClientRequiredMixin` gates the client account views.
+
+### 3.4 `reviews`
+
+- `ReviewCategory` — admin-defined rating dimensions.
+- `Review` — one per `(provider, client)`, authenticated clients only, ≤250-char
+  comment. `average_rating()` averages its category ratings.
+- `ReviewCategoryRating` — 1–5 per category, unique per `(review, category)`.
+- `ReviewReply` — provider's one-to-one response (≤500 chars).
+
+Views: `ReviewSubmitView` (login required), `ReviewReplyView`.
+Routes are slug-based: `/providers/<slug>/review/` and `.../<pk>/reply/`.
+
+### 3.5 `payments`
+
+- `SubscriptionPayment` (`payments/models.py`): amount, dynamic
+  `payment_method` choices from `SUPPORTED_CURRENCIES`, `status ∈ {pending,
+  completed, failed, partial}`, and NOWPayments fields (`nowpayments_payment_id`,
+  `pay_address`, `pay_amount`, `pay_currency`, `invoice_url`, `actually_paid`).
+- `payments/nowpayments.py`: API client + IPN verification.
+  - `SUPPORTED_CURRENCIES` — curated list (currently USDT on Polygon `usdtmatic`
+    and BSC `usdtbsc`), each with network, EIP-681 contract, chain id, decimals.
+    **Add a coin by appending one entry** — no other code changes.
+  - `get_currencies()` — fetches `/full-currencies`, filtered to supported codes,
+    cached 1 hour; falls back to `FALLBACK_CURRENCIES` when API key is blank or
+    API unreachable.
+  - `create_payment(...)` — `POST /payment`; honours `NOWPAYMENTS_SANDBOX`.
+  - `verify_ipn_signature(...)` — HMAC-SHA512 over key-sorted JSON, compared with
+    `hmac.compare_digest`; rejects when the secret is unset.
+- Views: `NowPaymentsWebhookView` (IPN), plus admin endpoints
+  `AdminDashboardView`, `AdminPaymentListView`, `AdminPaymentDetailView`,
+  `AdminPaymentApproveView`, `AdminProviderDetailView`,
+  `AdminProviderSuspendView`, `AdminAnalyticsView` (all `AdminRequiredMixin`).
+- Management command: `monitor_crypto_payments` (reconciliation).
+
+---
+
+## 4. Request flow (URL map)
+
+| Area | Routes |
+|------|--------|
+| Public | `/`, `/providers/`, `/providers/<slug>/` |
+| Reviews | `/providers/<slug>/review/`, `/providers/<slug>/review/<pk>/reply/` |
+| Auth | `/auth/signup/`, `/auth/check-email/`, `/auth/resend-email/`, `/auth/verify-email/<token>/`, `/auth/login/`, `/auth/logout/`, `/auth/password-reset/…` |
+| Client | `/client/profile/`, `/client/reviews/` |
+| Provider | `/provider/dashboard/`, `/provider/profile/`, `/provider/subscription/…`, `/provider/gallery/upload/`, `/provider/gallery/<pk>/delete/` |
+| Internal admin | `/internal/admin/…` (dashboard, providers, payments, analytics) |
+| Legal | `/terms/`, `/privacy/`, `/payment-policy/` |
+| APIs | `/api/countries/search/`, `/api/cities/search/` |
+| Webhook | `/payments/webhook/nowpayments/` |
+| Django admin | `/admin/` |
+
+---
+
+## 5. Key flows
 
 ### Authentication
-- **Method**: Email-based (custom backend)
-- **Password Hashing**: Django's default (PBKDF2)
-- **Session Management**: Django sessions
-- **Email Verification**: Token-based (one-time use)
+`Signup → create User (unverified) → verification token stored → email (console
+in dev) → VerifyEmailView marks verified + clears token → LoginView via
+EmailBackend → session`. Password reset reuses the same token pattern.
 
-### File Storage
-- **Development**: Local filesystem (`media/`)
-- **Production**: Minio/S3-compatible object storage
+### Provider onboarding
+`ProviderProfileUpdateView` saves profile + location + `ProviderPricing` +
+preference selections; photos and gallery images are validated (type/size),
+resized with PIL, and stored under `media/providers/…`.
 
-### Email
-- **Backend**: Console (dev), SMTP (production)
-- **Templates**: HTML + plain text
+### Subscription & crypto payment
+1. `ProviderSubscriptionView` — provider picks a supported coin.
+2. `CryptoPaymentView` — calls `create_payment()`, stores a `SubscriptionPayment`
+   (`pending`) with `pay_address` / `pay_amount` / `invoice_url`; renders address +
+   QR (EIP-681 deep link).
+3. `CryptoPaymentStatusView` — polls status via NOWPayments.
+4. `NowPaymentsWebhookView` (IPN) — verifies HMAC signature, then on completed
+   payment calls `Provider.activate_subscription(payment_method)` and marks the
+   record `completed`; partial/failed/expired states update status accordingly.
+5. Daily `expire_subscriptions` command deactivates past-due providers, emails
+   renewal reminders (3 days out) and an admin summary.
 
-### Testing
-- **Framework**: Django TestCase + unittest
-- **Coverage**: 90%+ on core logic
-- **Command**: `python manage.py test --settings=marketplace.test_settings`
+### Reviews
+Authenticated clients submit one review per provider with per-category ratings;
+the provider can post a single reply. Ratings roll up via
+`Provider.average_rating()`.
 
-## Data Flow
+---
 
-### 1. Provider Signup & Activation
-```
-User → Signup Form → EmailBackend
-  ↓
-User.objects.create_user() → User Model
-  ↓
-generate_email_verification_token() → Token stored in User
-  ↓
-send_verification_email() → Email template rendered
-  ↓
-User clicks link → verify_email_token()
-  ↓
-User marked as verified → Ready to complete profile
-```
+## 6. Cross-cutting concerns
 
-### 2. Provider Profile Setup
-```
-Logged-in Provider → Dashboard
-  ↓
-Edit Profile Form → ProviderProfileUpdateView
-  ↓
-Form validation → Image resizing
-  ↓
-Provider.save() + User.save()
-  ↓
-Profile displayed on dashboard with stats
-```
+### Settings & environment (`marketplace/settings.py`)
+Env-driven via `python-dotenv` (`.env`). Key toggles:
+- `DEBUG` selects console/verbose vs JSON logging, DummyCache vs Redis, and
+  production-only security headers (HSTS, SSL redirect, secure cookies).
+- `SUBSCRIPTION_AMOUNT` (default 29.99) exposed to templates via
+  `subscription_price` context processor.
+- `NOWPAYMENTS_API_KEY`, `NOWPAYMENTS_IPN_SECRET`, `NOWPAYMENTS_SANDBOX`.
+- `PLATFORM_CRYPTO_ADDRESSES`, `PLATFORM_BANK_DETAILS`, `ADMIN_EMAILS`.
+- `SENTRY_DSN` / `SENTRY_ENVIRONMENT` / `SENTRY_TRACES_SAMPLE_RATE`.
 
-### 3. Service Management
-```
-Provider → Create Service Form
-  ↓
-ServiceForm validation → Price >= $5.00, Duration in (30,60,90)
-  ↓
-Service.objects.create()
-  ↓
-Service appears in provider's service list
-  ↓
-Displayed on provider dashboard and detail page
-```
+### Middleware
+`RateLimitMiddleware` — per-IP POST limiting for named routes via
+`RATE_LIMIT_RULES` (`login` 5/min, `signup` 5/hr, `password_reset` 3/hr). Uses an
+in-process store; for multi-worker production a shared store (Redis) is the
+recommended upgrade path. `RateLimitMiddleware.reset()` aids tests.
 
-### 4. Subscription Payment
-```
-Provider → Activate Subscription
-  ↓
-ProviderSubscriptionView → Select payment method
-  ↓
-Provider.activate_subscription() → Set status='active', renewal_date
-  ↓
-SubscriptionPayment.objects.create() → status='pending'
-  ↓
-send_subscription_confirmation_email() → Template rendered
-  ↓
-Email sent to provider with payment instructions
-  ↓
-Admin → Monitor payment in AdminPaymentListView
-  ↓
-Once payment received → Mark as completed
-```
+### Caching
+Redis in production (`django-redis`), `DummyCache` in dev/test. Used for the
+NOWPayments currency list, homepage/count pagination, and the preference-group
+tree (invalidated by signals).
 
-### 5. Admin Payment Verification
-```
-AdminPaymentListView → Display all pending payments
-  ↓
-Filter by status/method/email
-  ↓
-Click on payment → AdminPaymentDetailView
-  ↓
-Verify transaction details
-  ↓
-Mark as completed/failed
-  ↓
-Update SubscriptionPayment record
-  ↓
-Send confirmation email to provider
-```
+### Observability
+Sentry SDK initialised only when `SENTRY_DSN` is set. Structured JSON logging via
+`python-json-logger` in production, verbose text in dev; output flows to stdout →
+systemd journal. See the `observability` skill for `journalctl` recipes.
 
-## Key Design Patterns
-
-### 1. Model-View-Template (MVT)
-- **Models**: Define data structure and business logic
-- **Views**: Handle requests and return responses
-- **Templates**: Render HTML for responses
-
-### 2. Class-Based Views
-- Inherit from Django generic views (ListView, DetailView, FormView)
-- Implement mixins for access control (LoginRequiredMixin, AdminRequiredMixin)
-- Override methods for customization
-
-### 3. Mixins for Access Control
-```python
-class ProviderRequiredMixin(LoginRequiredMixin):
-    """Only providers can access"""
-    
-class AdminRequiredMixin(LoginRequiredMixin):
-    """Only admins can access"""
-```
-
-### 4. Forms for Validation
-- Django ModelForms for CRUD operations
-- Custom validation in `clean_*` methods
-- Image validation and processing
-
-### 5. Reusable Template Components
-- `_messages.html` - Unified alert display
-- `_form.html` - Generic form rendering
-- `_service_card.html`, `_certification_card.html` - Components
-
-## Security Considerations
-
-### Authentication
-- ✓ Email-based login (no username)
-- ✓ Secure password hashing (PBKDF2)
-- ✓ Email verification tokens (one-time use)
-- ✓ Session-based authentication
-
-### Authorization
-- ✓ User type checks (provider, client, admin)
-- ✓ Ownership verification (can only edit own resources)
-- ✓ Admin-only views with decorators
-
-### Data Protection
-- ✓ CSRF tokens on all POST forms
-- ✓ SQL injection prevented (Django ORM)
-- ✓ XSS prevention (Django template auto-escaping)
-- ✓ Encrypted bank details (TextField, encryption in future)
-
-### File Upload Security
-- ✓ File type validation (JPEG, PNG, GIF only)
-- ✓ File size limits (5MB max)
-- ✓ Image format verification with PIL
-- ✓ Unique filename generation
-
-## Performance Optimizations
-
-### Database
-- `select_related()` for FK relationships
-- `prefetch_related()` for reverse relationships
-- Pagination (50 items per page)
-- Indexes on frequently filtered fields
-
-### Caching (Future)
-- Session-based caching
-- Template fragment caching
-- Database query caching
+### Security
+Email-based auth; CSRF on all forms; Django ORM (SQLi-safe); template
+auto-escaping (XSS-safe); `X_FRAME_OPTIONS=DENY`; signed/one-time verification
+tokens; HMAC-verified payment webhook; file-upload validation (MIME + size +
+PIL verification) with unique filenames.
 
 ### Frontend
-- Tailwind CSS via CDN (no build step needed)
-- Minimal JavaScript
-- Fast page loads
+Server-rendered Django templates extending `templates/base.html` (dark theme,
+Tailwind via CDN). Reusable `templates/includes/` components (messages, form,
+gallery card, pagination). Only bespoke JS is
+`static/js/location-autocomplete.js` (debounced country/city search with
+keyboard navigation and ARIA).
 
-## Deployment Architecture
+---
 
-### Development
-```
-SQLite → Django Dev Server → http://localhost:8000
-```
+## 7. Management commands
 
-### Production
-```
-PostgreSQL ← Django App (Gunicorn)
-Minio S3 ← File uploads
-Nginx ← Reverse proxy
-Let's Encrypt ← SSL/TLS
-```
+| Command | App | Purpose |
+|---------|-----|---------|
+| `expire_subscriptions [--dry-run]` | providers | Deactivate expired, send renewal reminders + admin summary |
+| `check_production` | providers | Production sanity/config checks |
+| `seed_beta_data` | providers | Seed demo providers for beta |
+| `seed_gallery_photos` | providers | Populate gallery images |
+| `monitor_crypto_payments` | payments | Reconcile pending crypto payments |
+| `test_email <addr>` | users | Verify SMTP configuration |
 
-### Scaling (Future)
-- Load balancer (nginx/HAProxy)
-- Multiple app servers
-- Database replication
-- CDN for static files
-- Message queue (Celery) for async tasks
+---
 
-## Testing Strategy
+## 8. Testing
 
-### Unit Tests
-- Model tests (creation, validation, methods)
-- Form tests (validation, cleaning)
+Fast suite: `./test.sh` (~396 tests, ~7s) using
+`marketplace/marketplace/test_settings.py` — MD5 hashing, in-memory SQLite,
+locmem email, DummyCache, rate limiting off, blank NOWPayments key. Live sandbox
+tests live in `payments/tests_sandbox.py` and are excluded by default. Full
+guide in [`../CONTRIBUTING.md`](../CONTRIBUTING.md#4-testing-requirements).
 
-### Integration Tests
-- View tests (access control, functionality)
-- End-to-end user flows
+---
 
-### Coverage Goals
-- Models: 100%
-- Forms: 100%
-- Views: 95%+
-- Overall: 90%+
+## 9. Deployment
 
-## Future Enhancements
+Gunicorn (2 sync workers on a 1 GB VPS) behind Nginx; static/media served by
+Nginx; Redis for cache; PostgreSQL in production. Deploys run
+`git push production main` → `post-receive` hook (checkout, pip install,
+migrate, collectstatic, service restart). Details, systemd unit, SSL, backups
+and monitoring: [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
-### Phase 2
-- Client marketplace with search/filter
-- Booking system
-- Real-time notifications
-- Payment processing integration
+---
 
-### Phase 3
-- Mobile app (React Native)
-- Advanced analytics
-- Ratings and reviews
-- Messaging system
+## 10. Known limitations / future work
 
-### Phase 4
-- Multi-language support
-- Marketing automation
-- Affiliate program
-- Analytics dashboard
+- `RateLimitMiddleware` uses an in-process store (swap for Redis at scale).
+- Geolocation is fixture-based (capitals + major cities); no radius/"nearby"
+  search or map view yet.
+- Country/city fixtures exclude the US by design.
+- Single subscription tier; no automated recurring billing (active window is set
+  to 30 days and expired by cron).
+</content>

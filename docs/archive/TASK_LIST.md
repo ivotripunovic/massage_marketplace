@@ -1,3 +1,7 @@
+> **Historical / archived.** This task list reflects early planning and is no
+> longer maintained. For current setup and conventions see `README.md` and
+> `CONTRIBUTING.md`.
+
 # Massage Marketplace - Detailed Task List for Code Implementation
 
 **Status:** Ready for development  
