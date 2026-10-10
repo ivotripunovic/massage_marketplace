@@ -180,6 +180,11 @@ EMAIL_PORT = int(os.getenv("EMAIL_PORT", "25"))
 EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "False").lower() in ("true", "1", "yes")
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+
+# Reject signup emails whose domain has no MX/A record (DNS lookup at signup)
+EMAIL_CHECK_DELIVERABILITY = os.getenv(
+    "EMAIL_CHECK_DELIVERABILITY", "true"
+).lower() in ("true", "1", "yes")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "noreply@massagemarketplace.com")
 
 # Authentication

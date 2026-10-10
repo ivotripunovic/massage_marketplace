@@ -1,6 +1,7 @@
 from django import forms
 from django.core.exceptions import ValidationError
 from django.contrib.auth import authenticate
+from users.email_checks import validate_signup_email
 from users.models import User
 
 
@@ -52,8 +53,8 @@ class SignupForm(forms.Form):
     )
 
     def clean_email(self):
-        """Validate email is unique."""
-        email = self.cleaned_data.get("email", "").lower()
+        """Validate email can receive mail and is unique."""
+        email = validate_signup_email(self.cleaned_data.get("email", ""))
 
         if User.objects.filter(email__iexact=email).exists():
             raise ValidationError("An account with this email already exists.")

@@ -11,3 +11,5 @@ gunicorn==25.1.0
 django-redis==6.0.0
 pytest==9.0.2
 pytest-django==4.12.0
+email-validator==2.3.0
+disposable-email-domains==0.0.278

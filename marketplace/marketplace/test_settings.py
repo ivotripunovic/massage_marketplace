@@ -37,6 +37,9 @@ CACHES = {
 # Disable NOWPayments API calls during tests (get_currencies returns fallback)
 NOWPAYMENTS_API_KEY = ""
 
+# No DNS lookups for signup email deliverability during tests
+EMAIL_CHECK_DELIVERABILITY = False
+
 # Pin subscription price so tests are unaffected by SUBSCRIPTION_MONTHLY_PRICE env var
 from decimal import Decimal
 SUBSCRIPTION_AMOUNT = Decimal("29.99")

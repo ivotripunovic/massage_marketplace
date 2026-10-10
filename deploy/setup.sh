@@ -88,6 +88,14 @@ EXPIRE_CMD="${APP_DIR}/venv/bin/python ${APP_DIR}/marketplace/manage.py expire_s
 EXPIRE_LOG="/var/log/marketplace/expire_subscriptions.log"
 (crontab -l 2>/dev/null || true; echo "0 1 * * * ${EXPIRE_CMD} >> ${EXPIRE_LOG} 2>&1") | crontab -
 
+# ---- Unverified account purge cron job ----
+# Runs daily at 01:30 to delete accounts that never verified their email (7+ days old).
+# The log file is the permanent record of deleted accounts.
+echo "Setting up unverified account purge cron job..."
+PURGE_CMD="${APP_DIR}/venv/bin/python ${APP_DIR}/marketplace/manage.py purge_unverified_users"
+PURGE_LOG="/var/log/marketplace/purge_unverified.log"
+(crontab -l 2>/dev/null || true; echo "30 1 * * * ${PURGE_CMD} >> ${PURGE_LOG} 2>&1") | crontab -
+
 # ---- Backup cron job ----
 echo "Setting up daily backup cron job..."
 (crontab -l 2>/dev/null || true; echo "0 2 * * * ${APP_DIR}/deploy/backup.sh >> /var/log/marketplace/backup.log 2>&1") | crontab -

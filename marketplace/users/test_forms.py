@@ -1,4 +1,8 @@
-from django.test import TestCase
+from unittest.mock import patch
+
+from django.test import TestCase, override_settings
+from email_validator import EmailUndeliverableError
+
 from users.forms import SignupForm
 from users.models import User
 
@@ -110,3 +114,48 @@ class SignupFormTests(TestCase):
         )
         self.assertFalse(form.is_valid())
         self.assertIn("password", form.errors)
+
+
+class SignupEmailDeliverabilityTests(TestCase):
+    """Test that signup rejects disposable and undeliverable email addresses."""
+
+    def _form(self, email):
+        return SignupForm(
+            data={
+                "email": email,
+                "password": "testpass123",
+                "password_confirm": "testpass123",
+                "user_type": "provider",
+                "accept_terms": True,
+            }
+        )
+
+    def test_disposable_domain_rejected(self):
+        form = self._form("someone@mailinator.com")
+        self.assertFalse(form.is_valid())
+        self.assertIn("Disposable", form.errors["email"][0])
+
+    def test_disposable_subdomain_rejected(self):
+        form = self._form("someone@mx.mailinator.com")
+        self.assertFalse(form.is_valid())
+        self.assertIn("Disposable", form.errors["email"][0])
+
+    @override_settings(EMAIL_CHECK_DELIVERABILITY=True)
+    @patch("users.email_checks.validate_email")
+    def test_undeliverable_domain_rejected(self, mock_validate):
+        mock_validate.side_effect = EmailUndeliverableError("no MX record")
+        form = self._form("someone@nonexistent-domain-xyz123.com")
+        self.assertFalse(form.is_valid())
+        self.assertIn("cannot receive mail", form.errors["email"][0])
+        self.assertTrue(mock_validate.call_args.kwargs["check_deliverability"])
+
+    @override_settings(EMAIL_CHECK_DELIVERABILITY=True)
+    @patch("users.email_checks.validate_email")
+    def test_deliverable_domain_accepted(self, mock_validate):
+        form = self._form("Someone@Gmail.com")
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["email"], "someone@gmail.com")
+
+    def test_deliverability_check_disabled_in_tests(self):
+        form = self._form("someone@nonexistent-domain-xyz123.com")
+        self.assertTrue(form.is_valid(), form.errors)
