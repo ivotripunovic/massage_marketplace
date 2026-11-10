@@ -118,7 +118,7 @@ class ProviderAdmin(admin.ModelAdmin):
         (
             "Payment Information",
             {
-                "fields": ("crypto_address", "bank_account_encrypted"),
+                "fields": ("crypto_address",),
                 "classes": ("collapse",),
             },
         ),
