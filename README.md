@@ -108,5 +108,6 @@ See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for a detailed breakdown.
 - Automatic payment confirmation via IPN webhook
 - Client reviews with per-category ratings and provider replies
 - Location-based provider search (country/city, non-US)
+- Provider tours: dated city stops so travelling providers appear in other cities (see [`docs/PROVIDER_TOURS.md`](docs/PROVIDER_TOURS.md))
 - Redis caching for high-traffic endpoints (production only)
 - Sentry error tracking + structured JSON logging to systemd journal

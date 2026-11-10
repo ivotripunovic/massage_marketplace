@@ -106,6 +106,7 @@ Models (`providers/models.py`):
 | `ProviderPreference` | Per-provider on/off toggle per subgroup |
 | `ProviderPreferenceCustomOption` | Provider free-text option per subgroup |
 | `ProviderCustomPreference` | Provider-created preference item ("Other" group) |
+| `TourStop` | Dated visit to a city (tour schedule); see [`PROVIDER_TOURS.md`](PROVIDER_TOURS.md) |
 
 Provider helpers: `get_name()`, `get_absolute_url()` (slug-based),
 `is_subscription_active()`, `activate_subscription(payment_method)`
@@ -117,7 +118,8 @@ Mixin: **`ProviderRequiredMixin`** (login + `user_type == 'provider'`).
 Views: `ProviderDashboardView`, `ProviderProfileUpdateView` (profile + pricing +
 preferences), `ProviderSubscriptionView`, `CryptoPaymentView`,
 `CryptoPaymentStatusView`, `SubscriptionConfirmView`, `GalleryImageCreateView`,
-`GalleryImageDeleteView`, `AdminProviderListView`, `AdminRequiredMixin`.
+`GalleryImageDeleteView`, `TourStopListCreateView`, `TourStopDeleteView`,
+`AdminProviderListView`, `AdminRequiredMixin`.
 
 Signals (`providers/signals.py`, registered from `ProvidersConfig.ready()`):
 invalidate the `pref_groups_tree` cache when preference-tree models change.
@@ -130,7 +132,9 @@ continent). Load order documented in [`ui_theme.md`](ui_theme.md).
 No models (`clients/models.py` empty); all logic in views:
 
 - `ProviderDirectoryView` — public list at `/` and `/providers/`; filters by
-  `service` type, `country`, `city`, `price_min`, `price_max` via GET params;
+  `country_id` / `city_id` (home location or tour stop), `date_from` /
+  `date_to`, `price_min`, `price_max` and more via GET params. Location and
+  date logic lives in `clients/tour_search.py`;
   only `subscription_status='active'` + verified providers; paginated 20/page;
   caches counts (`CachedCountPaginator`).
 - `ProviderDetailView` — public profile at `/providers/<slug>/`; 404 for
@@ -186,7 +190,7 @@ Routes are slug-based: `/providers/<slug>/review/` and `.../<pk>/reply/`.
 | Reviews | `/providers/<slug>/review/`, `/providers/<slug>/review/<pk>/reply/` |
 | Auth | `/auth/signup/`, `/auth/check-email/`, `/auth/resend-email/`, `/auth/verify-email/<token>/`, `/auth/login/`, `/auth/logout/`, `/auth/password-reset/…` |
 | Client | `/client/profile/`, `/client/reviews/` |
-| Provider | `/provider/dashboard/`, `/provider/profile/`, `/provider/subscription/…`, `/provider/gallery/upload/`, `/provider/gallery/<pk>/delete/` |
+| Provider | `/provider/dashboard/`, `/provider/profile/`, `/provider/subscription/…`, `/provider/gallery/upload/`, `/provider/gallery/<pk>/delete/`, `/provider/tour/`, `/provider/tour/<pk>/delete/` |
 | Internal admin | `/internal/admin/…` (dashboard, providers, payments, analytics) |
 | Legal | `/terms/`, `/privacy/`, `/payment-policy/` |
 | APIs | `/api/countries/search/`, `/api/cities/search/` |

@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import UploadedFile
 from PIL import Image
 import io
-from providers.models import Provider, ProviderGalleryImage
+from providers.models import City, Provider, ProviderGalleryImage, TourStop
 
 
 class ProviderPhotoForm(forms.ModelForm):
@@ -193,5 +193,62 @@ class GalleryImageForm(forms.ModelForm):
             if current_count >= ProviderGalleryImage.MAX_IMAGES_PER_PROVIDER:
                 raise ValidationError(
                     f"You can upload a maximum of {ProviderGalleryImage.MAX_IMAGES_PER_PROVIDER} gallery images."
+                )
+        return cleaned_data
+
+
+class TourStopForm(forms.ModelForm):
+    """Form for adding a tour stop. Date/overlap rules live in TourStop.clean()."""
+
+    city = forms.ModelChoiceField(
+        queryset=City.objects.filter(country__is_active=True).select_related("country"),
+        widget=forms.HiddenInput(attrs={"id": "tour_city_id"}),
+        error_messages={
+            "required": "Please select a city.",
+            "invalid_choice": "Please select a city from the list.",
+        },
+    )
+
+    class Meta:
+        model = TourStop
+        fields = ("city", "start_date", "end_date", "note")
+        labels = {
+            "start_date": "From",
+            "end_date": "To",
+            "note": "Note (optional)",
+        }
+        widgets = {
+            "start_date": forms.DateInput(
+                attrs={"type": "date", "class": "input-dark w-full"},
+                format="%Y-%m-%d",
+            ),
+            "end_date": forms.DateInput(
+                attrs={"type": "date", "class": "input-dark w-full"},
+                format="%Y-%m-%d",
+            ),
+            "note": forms.TextInput(
+                attrs={
+                    "class": "input-dark w-full",
+                    "placeholder": "e.g. Hotel visits only",
+                }
+            ),
+        }
+
+    def __init__(self, *args, provider=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.provider = provider
+        if provider is not None:
+            # Set before model validation so TourStop.clean() can check overlaps.
+            self.instance.provider = provider
+
+    def clean(self):
+        """Enforce the per-provider limit on current/upcoming stops (R6)."""
+        cleaned_data = super().clean()
+        if self.provider and not self.instance.pk:
+            upcoming = TourStop.objects.filter(provider=self.provider).upcoming()
+            if upcoming.count() >= TourStop.MAX_UPCOMING_STOPS:
+                raise ValidationError(
+                    f"You can have at most {TourStop.MAX_UPCOMING_STOPS} "
+                    "upcoming tour stops."
                 )
         return cleaned_data

@@ -22,10 +22,12 @@ from providers.models import (
     ProviderPreference,
     ProviderPreferenceCustomOption,
     ProviderCustomPreference,
+    TourStop,
 )
 from providers.forms import (
     SubscriptionSettingsForm,
     GalleryImageForm,
+    TourStopForm,
 )
 import logging
 
@@ -71,6 +73,12 @@ class ProviderDashboardView(ProviderRequiredMixin, TemplateView):
             context["attribute_values"] = ProviderAttributeValue.objects.select_related(
                 "definition"
             ).filter(provider=provider, definition__is_active=True)
+            context["next_tour_stop"] = (
+                TourStop.objects.filter(provider=provider)
+                .upcoming()
+                .select_related("city__country")
+                .first()
+            )
         except Provider.DoesNotExist:
             # Provider profile not yet created, redirect to create
             context["provider"] = None
@@ -1018,3 +1026,66 @@ class GalleryImageDeleteView(ProviderRequiredMixin, DeleteView):
             return super().post(request, *args, **kwargs)
         except (PermissionError, ProviderGalleryImage.DoesNotExist):
             return redirect("gallery_upload")
+
+
+class TourStopListCreateView(ProviderRequiredMixin, CreateView):
+    """List the provider's current/upcoming tour stops and add a new one."""
+
+    model = TourStop
+    form_class = TourStopForm
+    template_name = "providers/tour_manage.html"
+    success_url = reverse_lazy("tour_manage")
+
+    def get_provider(self):
+        if not hasattr(self, "_provider"):
+            self._provider = get_object_or_404(Provider, user=self.request.user)
+        return self._provider
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["provider"] = self.get_provider()
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.provider = self.get_provider()
+        response = super().form_valid(form)
+        logger.info(
+            "Tour stop created",
+            extra={
+                "provider_id": self.object.provider_id,
+                "tour_stop_id": self.object.pk,
+            },
+        )
+        messages.success(self.request, f"Tour stop in {self.object.city.name} added.")
+        return response
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["tour_stops"] = (
+            TourStop.objects.filter(provider=self.get_provider())
+            .upcoming()
+            .select_related("city__country")
+        )
+        context["max_stops"] = TourStop.MAX_UPCOMING_STOPS
+        # Re-populate the city picker label after a failed submit.
+        form = context["form"]
+        cleaned = getattr(form, "cleaned_data", None) or {}
+        city = cleaned.get("city")
+        context["selected_city"] = city
+        return context
+
+
+class TourStopDeleteView(ProviderRequiredMixin, DeleteView):
+    """Delete one of the current provider's tour stops (POST only)."""
+
+    model = TourStop
+    success_url = reverse_lazy("tour_manage")
+    http_method_names = ["post"]
+
+    def get_queryset(self):
+        # Scoping to the owner turns foreign IDs into a 404.
+        return TourStop.objects.filter(provider__user=self.request.user)
+
+    def form_valid(self, form):
+        messages.success(self.request, "Tour stop removed.")
+        return super().form_valid(form)

@@ -41,6 +41,8 @@ from providers.views import (
     CryptoPaymentStatusView,
     GalleryImageCreateView,
     GalleryImageDeleteView,
+    TourStopListCreateView,
+    TourStopDeleteView,
 )
 from payments.views import (
     AdminPaymentListView,
@@ -147,6 +149,16 @@ urlpatterns = [
         "provider/gallery/<int:pk>/delete/",
         GalleryImageDeleteView.as_view(),
         name="gallery_delete",
+    ),
+    path(
+        "provider/tour/",
+        TourStopListCreateView.as_view(),
+        name="tour_manage",
+    ),
+    path(
+        "provider/tour/<int:pk>/delete/",
+        TourStopDeleteView.as_view(),
+        name="tour_delete",
     ),
     # Admin URLs
     path("internal/admin/", AdminDashboardView.as_view(), name="admin_dashboard"),

@@ -6,7 +6,7 @@ source venv/bin/activate
 
 if [ -z "$1" ]; then
     # Run all tests (sandbox integration tests excluded — run separately, see below)
-    python marketplace/manage.py test users providers reviews payments.tests users.test_security users.test_legal --settings=marketplace.test_settings
+    python marketplace/manage.py test users providers reviews payments.tests users.test_security users.test_legal clients.test_tours --settings=marketplace.test_settings
 else
     # Run specific app tests
     python marketplace/manage.py test "$1" --settings=marketplace.test_settings

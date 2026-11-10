@@ -12,31 +12,8 @@ from django.db.models import Avg, Count, OuterRef, Q, Prefetch, Subquery
 from django.db.models.functions import Coalesce
 from django.http import JsonResponse
 from django.urls import reverse_lazy
+from django.utils import timezone
 from django.views.decorators.http import require_GET
-
-# ---------------------------------------------------------------------------
-# Cache keys and TTLs
-# ---------------------------------------------------------------------------
-PREF_GROUPS_CACHE_KEY = "pref_groups_tree"
-PREF_GROUPS_CACHE_TTL = 3600  # 1 hour — invalidated by providers.signals
-
-COUNTRIES_API_CACHE_TTL = 3600  # 1 hour
-CITIES_API_CACHE_TTL = 3600  # 1 hour
-PROVIDER_COUNT_CACHE_TTL = 60  # 60 s — short TTL, no explicit invalidation needed
-
-
-class CachedCountPaginator(Paginator):
-    """Paginator that caches the COUNT(*) query for 60 seconds."""
-
-    @cached_property
-    def count(self):
-        key = f"provider_count:{hash(str(self.object_list.query))}"
-        result = cache.get(key)
-        if result is None:
-            result = self.object_list.count()
-            cache.set(key, result, PROVIDER_COUNT_CACHE_TTL)
-        return result
-
 
 from providers.models import (
     Provider,
@@ -51,8 +28,45 @@ from providers.models import (
     ProviderPreference,
     ProviderPreferenceCustomOption,
     ProviderCustomPreference,
+    TourStop,
 )
 from reviews.models import Review
+from clients.tour_search import (
+    apply_location_filter,
+    attach_tour_stops,
+    parse_search_window,
+    provider_counts_by,
+)
+
+# ---------------------------------------------------------------------------
+# Cache keys and TTLs
+# ---------------------------------------------------------------------------
+PREF_GROUPS_CACHE_KEY = "pref_groups_tree"
+PREF_GROUPS_CACHE_TTL = 3600  # 1 hour — invalidated by providers.signals
+
+COUNTRIES_API_CACHE_TTL = 3600  # 1 hour
+CITIES_API_CACHE_TTL = 3600  # 1 hour
+PROVIDER_COUNT_CACHE_TTL = 60  # 60 s — short TTL, no explicit invalidation needed
+
+
+def _int_or_none(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+class CachedCountPaginator(Paginator):
+    """Paginator that caches the COUNT(*) query for 60 seconds."""
+
+    @cached_property
+    def count(self):
+        key = f"provider_count:{hash(str(self.object_list.query))}"
+        result = cache.get(key)
+        if result is None:
+            result = self.object_list.count()
+            cache.set(key, result, PROVIDER_COUNT_CACHE_TTL)
+        return result
 
 
 @require_GET
@@ -69,17 +83,8 @@ def country_search_api(request):
     if cached is not None:
         return JsonResponse(cached)
 
-    # Get provider counts per country
-    provider_counts = dict(
-        Provider.objects.filter(
-            subscription_status="active",
-            user__is_email_verified=True,
-            country__isnull=False,
-        )
-        .values("country")
-        .annotate(count=Count("id"))
-        .values_list("country", "count")
-    )
+    # Provider counts per country (home location + upcoming tour stops)
+    provider_counts = provider_counts_by("country")
 
     # Filter by query if provided
     countries_qs = Country.objects.filter(is_active=True).select_related("continent")
@@ -134,18 +139,8 @@ def city_search_api(request):
     if cached is not None:
         return JsonResponse(cached)
 
-    # Get provider counts per city
-    provider_counts = dict(
-        Provider.objects.filter(
-            subscription_status="active",
-            user__is_email_verified=True,
-            city__isnull=False,
-            country_id=country_id,
-        )
-        .values("city")
-        .annotate(count=Count("id"))
-        .values_list("city", "count")
-    )
+    # Provider counts per city (home location + upcoming tour stops)
+    provider_counts = provider_counts_by("city", country_id=country_id)
 
     cities_qs = City.objects.filter(country_id=country_id).select_related("country")
 
@@ -187,6 +182,11 @@ class ProviderDirectoryView(ListView):
     context_object_name = "providers"
     paginate_by = 20
     paginator_class = CachedCountPaginator
+
+    @cached_property
+    def search_window(self):
+        """Client's requested dates (see clients.tour_search)."""
+        return parse_search_window(self.request.GET)
 
     @cached_property
     def _filter_attribute_definitions(self):
@@ -236,17 +236,14 @@ class ProviderDirectoryView(ListView):
         city_id = self.request.GET.get("city_id", "").strip()
         keyword = self.request.GET.get("keyword", "").strip()
 
-        # Filter by location using ForeignKey fields
-        if country_id:
-            try:
-                queryset = queryset.filter(country_id=int(country_id))
-            except ValueError:
-                pass
-        if city_id:
-            try:
-                queryset = queryset.filter(city_id=int(city_id))
-            except ValueError:
-                pass
+        # Filter by location: home city/country or a tour stop there.
+        # A city implies its country, so it takes precedence.
+        queryset = apply_location_filter(
+            queryset,
+            self.search_window,
+            country_id=_int_or_none(country_id),
+            city_id=_int_or_none(city_id),
+        )
 
         # Filter by keyword (search in bio, user name)
         if keyword:
@@ -349,6 +346,7 @@ class ProviderDirectoryView(ListView):
         context = super().get_context_data(**kwargs)
 
         # Build stats from annotated queryset (no extra queries)
+        attach_tour_stops(context["providers"])
         providers_with_stats = []
         for provider in context["providers"]:
             card_attributes = []
@@ -406,7 +404,19 @@ class ProviderDirectoryView(ListView):
         # Add filter choices and current values
         context["current_country_id"] = self.request.GET.get("country_id", "")
         context["current_city_id"] = self.request.GET.get("city_id", "")
+        # Mirrors get_queryset(): a non-integer city_id is ignored there.
+        context["city_filter_applied"] = (
+            _int_or_none(context["current_city_id"]) is not None
+        )
         context["current_keyword"] = self.request.GET.get("keyword", "")
+        window = self.search_window
+        context["current_date_from"] = (
+            window.date_from.isoformat() if window.dates_given else ""
+        )
+        context["current_date_to"] = (
+            window.date_to.isoformat() if window.dates_given else ""
+        )
+        context["today"] = timezone.localdate()
 
         # Get country and city names for display if IDs are set
         if context["current_country_id"]:
@@ -509,6 +519,9 @@ class ProviderDirectoryView(ListView):
             base_params["city_id"] = context["current_city_id"]
         if context["current_keyword"]:
             base_params["keyword"] = context["current_keyword"]
+        if window.dates_given:
+            base_params["date_from"] = context["current_date_from"]
+            base_params["date_to"] = context["current_date_to"]
         context["base_filter_params"] = urlencode(base_params)
 
         return context
@@ -537,6 +550,17 @@ class ProviderDetailView(DetailView):
         # Get gallery images
         context["gallery_images"] = ProviderGalleryImage.objects.filter(
             provider=provider
+        )
+
+        # Current and upcoming tour stops (docs/PROVIDER_TOURS.md §5)
+        tour_stops = list(
+            TourStop.objects.filter(provider=provider)
+            .upcoming()
+            .select_related("city__country")
+        )
+        context["tour_stops"] = tour_stops
+        context["current_tour_stop"] = next(
+            (stop for stop in tour_stops if stop.is_current), None
         )
 
         # Get reviews with category ratings and replies

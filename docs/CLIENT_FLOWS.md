@@ -17,6 +17,8 @@ subscription are listed (`subscription_status='active'` and
 - Responsive grid of active, verified providers; 20 per page with pagination.
 - Each card shows the provider photo/avatar, name, average rating + review count,
   and a pricing snippet (apartment price preferred, else outside).
+- Touring providers carry a badge: "Visiting 12 Dec – 18 Dec", "Here now · until
+  18 Dec", or, with no location filter, "On tour: Paris until 18 Dec".
 - Empty state when no providers match.
 
 **Filters** (GET parameters on `/providers/`):
@@ -24,12 +26,27 @@ subscription are listed (`subscription_status='active'` and
 | Param | Meaning |
 |-------|---------|
 | `keyword` | matches bio / first name / last name |
-| `country_id`, `city_id` | exact location FKs (city list narrows by country) |
+| `country_id`, `city_id` | home location **or** a tour stop there (city takes precedence over country) |
+| `date_from`, `date_to` | ISO dates; restricts tour matches to stops overlapping the range, and hides providers who are away from home then. Invalid values are ignored, past dates are clamped to today, and a reversed range is swapped |
 | `price_min`, `price_max` | bound on `pricing__apartment_day_1h` |
 | `apartment=1` / `outside=1` | availability |
 | `min_rating` | minimum average rating (annotated subquery) |
 | `has_photo=1` | only providers with a profile photo |
 | `pref` (repeatable) | any matching preference subgroup (OR) |
+
+**Tour search rules** (`clients/tour_search.py`, full spec in
+[`PROVIDER_TOURS.md`](PROVIDER_TOURS.md#4-search-semantics)):
+
+- With no dates given, all current and upcoming visits to the searched
+  location match. A provider counts as "away" from home only if a stop
+  covers today.
+- With dates given, both tour matches and away-from-home use the client's
+  range.
+- Each provider appears once. The badge shows the earliest matching stop.
+
+The "When" inputs live in the filter sidebar, and the nav search forms keep
+the dates. The provider counts in the country and city autocomplete include
+upcoming tour stops, and leave out providers who are away from home today. They are cached for 1 hour, like the rest of those APIs.
 
 The country/city pickers use the autocomplete APIs `/api/countries/search/` and
 `/api/cities/search/` (`country_search_api`, `city_search_api`) via
@@ -49,6 +66,8 @@ Returns 404 for missing, inactive, or unverified providers. The page shows:
 - **Pricing**: the structured apartment/outside × day/night grid + notes.
 - **Preferences**: the provider's checked subgroups, custom options and
   "Other" items, plus `preference_comment`.
+- **Tour schedule**: current and upcoming stops (city, country, dates, note),
+  plus a "Currently in X until …" banner when a stop is in progress.
 - **Gallery**: `ProviderGalleryImage`s.
 - **Reviews**: list newest-first with per-category ratings and the provider's
   reply; rating summary computed from `ReviewCategoryRating`.
@@ -132,7 +151,10 @@ images carry alt text and touch targets are ≥44 px.
 2. Each filter narrows results; autocomplete returns countries/cities.
 3. Profiles load gallery, pricing grid, preferences and reviews; inactive or
    unverified slugs 404.
-4. As a client, submit a review (per-category ratings) and confirm it appears;
+4. Search a city a provider is touring: they appear with a badge. Search their
+   home city with dates inside the tour: they're hidden. With dates after the
+   tour they're back. Their profile lists the schedule.
+5. As a client, submit a review (per-category ratings) and confirm it appears;
    attempt to submit twice and confirm the uniqueness rule.
 
 Automated coverage runs via `./test.sh` (see

@@ -10,6 +10,7 @@ from .models import (
     PreferenceGroup,
     PreferenceSubgroup,
     PreferenceSubgroupOption,
+    TourStop,
 )
 
 
@@ -20,6 +21,16 @@ class GalleryImageInline(admin.TabularInline):
     extra = 1
     fields = ("image", "caption", "uploaded_at")
     readonly_fields = ("uploaded_at",)
+
+
+class TourStopInline(admin.TabularInline):
+    """Inline editor for a provider's tour stops."""
+
+    model = TourStop
+    extra = 0
+    fields = ("city", "start_date", "end_date", "note", "created_at")
+    readonly_fields = ("created_at",)
+    autocomplete_fields = ("city",)
 
 
 @admin.register(Continent)
@@ -93,7 +104,7 @@ class ProviderAdmin(admin.ModelAdmin):
         "city__name",
     )
     readonly_fields = ("created_at", "updated_at")
-    inlines = [GalleryImageInline]
+    inlines = [GalleryImageInline, TourStopInline]
     autocomplete_fields = ("country", "city")
 
     fieldsets = (

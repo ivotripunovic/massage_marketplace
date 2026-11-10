@@ -44,6 +44,12 @@
     <!-- Attributes Table -->
     <div class="card-dark p-6 md:p-8 mb-8">
         <h2 class="text-2xl font-display font-bold text-gold mb-4">{{ provider.get_name }}</h2>
+        {% if current_tour_stop %}
+        <div class="mb-4 bg-gold/15 border border-gold/40 text-gold rounded-md px-3 py-2 text-sm">
+            Currently in <strong>{{ current_tour_stop.city.name }}, {{ current_tour_stop.city.country.name }}</strong>
+            until {{ current_tour_stop.end_date|date:"j M Y" }}
+        </div>
+        {% endif %}
         <table class="w-full text-sm">
             <tbody>
                 {% if provider.phone %}
@@ -90,6 +96,26 @@
         <p class="mt-2 text-text-secondary whitespace-pre-line leading-relaxed">{{ provider.bio }}</p>
         {% endif %}
     </div>
+
+    <!-- Tour Schedule -->
+    {% if tour_stops %}
+    <div class="card-dark p-6 md:p-8 mb-8" id="tour-schedule">
+        <h2 class="text-2xl font-display font-bold text-gold mb-1">Tour Schedule</h2>
+        <p class="text-text-muted text-sm mb-4">Planning around a visit? Call ahead to arrange a session in your city.</p>
+        <ul class="divide-y divide-dark-300 text-sm">
+            {% for stop in tour_stops %}
+            <li class="py-2 flex flex-wrap items-baseline justify-between gap-x-4">
+                <span class="text-text-primary font-semibold">
+                    {{ stop.city.name }}, {{ stop.city.country.name }}
+                    {% if stop.is_current %}<span class="ml-1 text-xs bg-gold text-dark font-bold px-1.5 py-0.5 rounded">Now</span>{% endif %}
+                </span>
+                <span class="text-text-secondary">{{ stop.start_date|date:"j M" }} – {{ stop.end_date|date:"j M Y" }}</span>
+                {% if stop.note %}<span class="w-full text-text-muted">{{ stop.note }}</span>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
 
     <!-- Pricing Section -->
     {% if pricing %}

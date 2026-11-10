@@ -1,0 +1,14 @@
+{% comment %}
+Tour badge for a provider card. Context: stop (TourStop), hide_city (truthy when the
+search is already for this city, so the name is redundant).
+{% endcomment %}
+<p class="inline-flex items-center gap-1 text-xs font-medium bg-gold/15 text-gold border border-gold/40 rounded px-1.5 py-0.5 mb-1">
+    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+    </svg>
+    {% if stop.is_current %}
+        {% if hide_city %}Here now · until {{ stop.end_date|date:"j M" }}{% else %}On tour: {{ stop.city.name }} until {{ stop.end_date|date:"j M" }}{% endif %}
+    {% else %}
+        Visiting{% if not hide_city %} {{ stop.city.name }}{% endif %} {{ stop.start_date|date:"j M" }} – {{ stop.end_date|date:"j M" }}
+    {% endif %}
+</p>

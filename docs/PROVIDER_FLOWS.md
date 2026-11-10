@@ -69,6 +69,26 @@ Success returns to the profile page with a message.
   `ProviderGalleryImage.MAX_IMAGES_PER_PROVIDER = 10`.
 - `GalleryImageDeleteView` is POST-only and verifies ownership before deleting.
 
+### Tour schedule
+
+**Paths**: `/provider/tour/` (`tour_manage`), `/provider/tour/<pk>/delete/` (`tour_delete`)
+
+Travelling providers publish dated **tour stops** (city + inclusive date range +
+optional note) so they appear in other cities' search results. Full rules are in
+[`PROVIDER_TOURS.md`](PROVIDER_TOURS.md).
+
+- `TourStopListCreateView` lists current and upcoming stops and renders
+  `TourStopForm`, which uses the shared country → city autocomplete. Validation
+  is in `TourStop.clean()`: the end date can't be before the start date or in
+  the past, a stop lasts at most 90 days, and a provider's stops can't overlap.
+  The form adds the cap of `TourStop.MAX_UPCOMING_STOPS = 20` current or
+  upcoming stops.
+- `TourStopDeleteView` is POST-only. Its queryset is scoped to the logged-in
+  provider, so another provider's stop returns 404.
+- While a stop overlaps the client's search dates, the provider is hidden from
+  their home city and country results.
+- Admins can edit stops in the `TourStopInline` on the Provider admin page.
+
 ---
 
 ## 4. Dashboard
@@ -76,8 +96,8 @@ Success returns to the profile page with a message.
 **Path**: `/provider/dashboard/`
 
 `ProviderDashboardView` is the provider hub: profile summary and avatar,
-subscription status / renewal date, and links to edit the profile, manage the
-subscription, and manage gallery images. Query counts are kept low with
+subscription status / renewal date, the next or current tour stop, and links to
+edit the profile, manage the subscription, gallery images and tour schedule. Query counts are kept low with
 `select_related` / `prefetch_related`.
 
 ---
@@ -164,6 +184,9 @@ See [`DATABASE_SCHEMA.md`](DATABASE_SCHEMA.md) for field-level detail.
 4. Start a subscription: pick a coin, confirm address + QR render, simulate IPN,
    confirm the provider becomes active with a renewal date.
 5. Post a review as a client and reply to it as the provider.
+6. Add a tour stop in another city for today, and check that it shows as "Now"
+   on `/provider/tour/` and the dashboard. Try a reversed range, a past range
+   and an overlapping stop, and check that each is rejected. Delete the stop.
 
 Automated coverage runs via `./test.sh providers` (see
 [`../CONTRIBUTING.md`](../CONTRIBUTING.md#4-testing-requirements)).

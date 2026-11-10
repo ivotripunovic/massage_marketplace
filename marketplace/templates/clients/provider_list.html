@@ -41,6 +41,10 @@
     {% if current_keyword %}
     <input type="hidden" name="keyword" value="{{ current_keyword }}">
     {% endif %}
+    {% if current_date_from %}
+    <input type="hidden" name="date_from" value="{{ current_date_from }}">
+    <input type="hidden" name="date_to" value="{{ current_date_to }}">
+    {% endif %}
     <button type="submit" class="bg-gold hover:bg-gold-light text-dark p-1.5 rounded transition-colors" title="Search">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
@@ -72,6 +76,10 @@
     </div>
     {% if current_keyword %}
     <input type="hidden" name="keyword" value="{{ current_keyword }}">
+    {% endif %}
+    {% if current_date_from %}
+    <input type="hidden" name="date_from" value="{{ current_date_from }}">
+    <input type="hidden" name="date_to" value="{{ current_date_to }}">
     {% endif %}
     <button type="submit" class="bg-gold text-dark p-1 rounded flex-shrink-0">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -122,6 +130,29 @@
                        class="text-xs text-text-muted hover:text-gold transition-colors">Clear</a>
                     {% endif %}
                 </div>
+
+                <!-- When (tour dates) -->
+                <details open class="mb-2 bg-dark-100 border border-dark-300 rounded-lg overflow-hidden">
+                    <summary class="px-3 py-2 cursor-pointer text-sm font-medium text-text-secondary hover:text-text-primary select-none list-none flex items-center justify-between">
+                        When
+                        <svg class="w-3 h-3 text-text-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </summary>
+                    <div class="px-3 pb-3 flex flex-col gap-2">
+                        <label class="text-xs text-text-muted">From
+                            <input type="date" name="date_from" value="{{ current_date_from }}"
+                                   min="{{ today|date:'Y-m-d' }}"
+                                   class="input-dark w-full text-xs py-1 px-2 mt-0.5">
+                        </label>
+                        <label class="text-xs text-text-muted">To
+                            <input type="date" name="date_to" value="{{ current_date_to }}"
+                                   min="{{ today|date:'Y-m-d' }}"
+                                   class="input-dark w-full text-xs py-1 px-2 mt-0.5">
+                        </label>
+                        <p class="text-xs text-text-muted">Includes providers visiting on tour.</p>
+                    </div>
+                </details>
 
                 <!-- Price (1h) -->
                 <details open class="mb-2 bg-dark-100 border border-dark-300 rounded-lg overflow-hidden">
@@ -312,6 +343,9 @@
                             </span>
                             {% endif %}
                         </div>
+                        {% if provider.tour_stop %}
+                        {% include "includes/_tour_badge.html" with stop=provider.tour_stop hide_city=city_filter_applied %}
+                        {% endif %}
 
                         <!-- Two-column: Attributes (left) | Services (right) -->
                         <div class="flex gap-3 mt-2">

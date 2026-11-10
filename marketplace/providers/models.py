@@ -538,3 +538,101 @@ class ProviderCustomPreference(models.Model):
 
     def __str__(self):
         return f"{self.provider.get_name()} – {self.name}"
+
+
+class TourStopQuerySet(models.QuerySet):
+    """Query helpers for tour stops."""
+
+    def overlapping(self, date_from, date_to=None):
+        """Stops whose inclusive date range overlaps [date_from, date_to].
+
+        ``date_to=None`` means an open-ended window (date_from onwards).
+        """
+        qs = self.filter(end_date__gte=date_from)
+        if date_to is not None:
+            qs = qs.filter(start_date__lte=date_to)
+        return qs
+
+    def upcoming(self):
+        """Current and future stops (not yet ended)."""
+        return self.filter(end_date__gte=timezone.localdate())
+
+
+class TourStop(models.Model):
+    """A dated visit by a provider to a city other than (or including) home.
+
+    See docs/PROVIDER_TOURS.md for the business rules.
+    """
+
+    MAX_UPCOMING_STOPS = 20
+    MAX_DURATION_DAYS = 90
+
+    provider = models.ForeignKey(
+        Provider, on_delete=models.CASCADE, related_name="tour_stops"
+    )
+    city = models.ForeignKey(City, on_delete=models.PROTECT, related_name="tour_stops")
+    start_date = models.DateField()
+    end_date = models.DateField()
+    note = models.CharField(
+        max_length=200,
+        blank=True,
+        default="",
+        help_text="Optional note shown to clients, e.g. 'Hotel visits only'",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    objects = TourStopQuerySet.as_manager()
+
+    class Meta:
+        db_table = "providers_tour_stop"
+        verbose_name = "Tour Stop"
+        verbose_name_plural = "Tour Stops"
+        ordering = ["start_date"]
+        indexes = [
+            models.Index(fields=["city", "end_date"]),
+            models.Index(fields=["provider", "start_date"]),
+        ]
+
+    def __str__(self):
+        return f"{self.provider.get_name()} – {self.city} ({self.start_date} → {self.end_date})"
+
+    def clean(self):
+        """Validate date rules R2–R5 (R6 limit is enforced in the form)."""
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+        if not self.start_date or not self.end_date:
+            return
+
+        errors = {}
+        if self.end_date < self.start_date:
+            errors["end_date"] = "End date cannot be before the start date."
+        elif (self.end_date - self.start_date).days + 1 > self.MAX_DURATION_DAYS:
+            errors["end_date"] = (
+                f"A tour stop can last at most {self.MAX_DURATION_DAYS} days."
+            )
+        # R3 applies on creation only; finished stops are kept (R7) and must
+        # not block re-saving them, e.g. via the admin inline.
+        if self._state.adding and self.end_date < timezone.localdate():
+            errors.setdefault("end_date", "End date cannot be in the past.")
+        if errors:
+            raise ValidationError(errors)
+
+        if self.provider_id:
+            clash = (
+                TourStop.objects.filter(provider_id=self.provider_id)
+                .overlapping(self.start_date, self.end_date)
+                .exclude(pk=self.pk)
+                .select_related("city")
+                .first()
+            )
+            if clash:
+                raise ValidationError(
+                    f"This overlaps your stop in {clash.city.name} "
+                    f"({clash.start_date:%d %b} – {clash.end_date:%d %b %Y})."
+                )
+
+    @property
+    def is_current(self):
+        today = timezone.localdate()
+        return self.start_date <= today <= self.end_date

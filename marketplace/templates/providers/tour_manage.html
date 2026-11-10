@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Tour Schedule - Massage Marketplace{% endblock %}
+
+{% block content %}
+{% include "includes/_messages.html" %}
+<div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+<div class="mb-8">
+    <h1 class="text-3xl font-bold mb-2">Tour Schedule</h1>
+    <p class="text-text-secondary">
+        Travelling? Add the cities you'll visit and when. Clients searching those cities will find you
+        for those dates. While you're away you won't show up in your home city's results.
+        ({{ tour_stops|length }}/{{ max_stops }} upcoming stops)
+    </p>
+</div>
+
+{% if tour_stops|length < max_stops %}
+<div class="card-dark p-6 mb-8">
+    <h2 class="text-xl font-bold mb-4">Add a Tour Stop</h2>
+    <form method="post" class="space-y-4" novalidate>
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div class="relative">
+                <label for="tour-country-autocomplete" class="block text-sm font-medium text-text-primary mb-1">
+                    Country <span class="text-red-400">*</span>
+                </label>
+                <input type="text" id="tour-country-autocomplete"
+                       value="{{ selected_city.country.name|default:'' }}"
+                       placeholder="Select country..."
+                       class="input-dark w-full" autocomplete="off">
+                <input type="hidden" id="tour_country_id" value="{{ selected_city.country_id|default:'' }}">
+            </div>
+            <div class="relative">
+                <label for="tour-city-autocomplete" class="block text-sm font-medium text-text-primary mb-1">
+                    City <span class="text-red-400">*</span>
+                </label>
+                <input type="text" id="tour-city-autocomplete"
+                       value="{{ selected_city.name|default:'' }}"
+                       placeholder="Select city..."
+                       class="input-dark w-full" autocomplete="off">
+                {{ form.city }}
+                {% if form.city.errors %}
+                <p class="mt-1 text-red-400 text-sm">{{ form.city.errors.0 }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label for="{{ form.start_date.id_for_label }}" class="block text-sm font-medium text-text-primary mb-1">
+                    {{ form.start_date.label }} <span class="text-red-400">*</span>
+                </label>
+                {{ form.start_date }}
+                {% if form.start_date.errors %}
+                <p class="mt-1 text-red-400 text-sm">{{ form.start_date.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label for="{{ form.end_date.id_for_label }}" class="block text-sm font-medium text-text-primary mb-1">
+                    {{ form.end_date.label }} <span class="text-red-400">*</span>
+                </label>
+                {{ form.end_date }}
+                {% if form.end_date.errors %}
+                <p class="mt-1 text-red-400 text-sm">{{ form.end_date.errors.0 }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div>
+            <label for="{{ form.note.id_for_label }}" class="block text-sm font-medium text-text-primary mb-1">
+                {{ form.note.label }}
+            </label>
+            {{ form.note }}
+            {% if form.note.errors %}
+            <p class="mt-1 text-red-400 text-sm">{{ form.note.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        {% if form.non_field_errors %}
+        <div class="bg-red-900/50 border border-red-700 rounded-md p-3">
+            {% for error in form.non_field_errors %}
+            <p class="text-red-300 text-sm">{{ error }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <button type="submit" class="btn-gold px-6 py-2 rounded">Add Stop</button>
+    </form>
+</div>
+{% else %}
+<div class="bg-amber-900/50 border border-amber-700 rounded-md p-4 mb-8">
+    <p class="text-amber-300">You have reached the maximum of {{ max_stops }} upcoming tour stops. Remove one to add another.</p>
+</div>
+{% endif %}
+
+<div class="card-dark p-6">
+    <h2 class="text-xl font-bold mb-4">Upcoming Stops</h2>
+    {% if tour_stops %}
+    <ul class="divide-y divide-dark-300">
+        {% for stop in tour_stops %}
+        <li class="py-3 flex items-center justify-between gap-4">
+            <div>
+                <p class="font-semibold">
+                    {{ stop.city.name }}, {{ stop.city.country.name }}
+                    {% if stop.is_current %}<span class="ml-2 text-xs bg-gold text-dark font-bold px-2 py-0.5 rounded">Now</span>{% endif %}
+                </p>
+                <p class="text-text-secondary text-sm">{{ stop.start_date|date:"j M Y" }} – {{ stop.end_date|date:"j M Y" }}</p>
+                {% if stop.note %}<p class="text-text-muted text-sm">{{ stop.note }}</p>{% endif %}
+            </div>
+            <form method="post" action="{% url 'tour_delete' stop.pk %}" onsubmit="return confirm('Remove this tour stop?');">
+                {% csrf_token %}
+                <button type="submit" class="text-red-400 hover:text-red-300 text-sm">Remove</button>
+            </form>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="text-text-secondary">No upcoming tour stops. You're listed in your home city only.</p>
+    {% endif %}
+</div>
+
+<div class="mt-6">
+    <a href="{% url 'provider_dashboard' %}" class="text-gold hover:text-gold-light">&larr; Back to Dashboard</a>
+</div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/location-autocomplete.js' %}?v=3"></script>
+<script>
+(function () {
+    const city = new window.CityAutocomplete('tour-city-autocomplete', 'tour_city_id', {
+        countryInputId: 'tour_country_id'
+    });
+    new window.CountryAutocomplete('tour-country-autocomplete', 'tour_country_id', {
+        onSelect: function () { city.enable(); city.clear(); }
+    });
+    if (!document.getElementById('tour_country_id').value) city.disable();
+})();
+</script>
+{% endblock %}
