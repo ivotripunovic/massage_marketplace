@@ -723,10 +723,12 @@ class ProviderSubscriptionView(ProviderRequiredMixin, FormView):
     def _get_currencies(self):
         try:
             import payments.nowpayments as nowpayments
+
             return nowpayments.get_currencies()
         except Exception as exc:
             logger.error("Failed to fetch NOWPayments currencies: %s", exc)
             from payments.nowpayments import FALLBACK_CURRENCIES
+
             return FALLBACK_CURRENCIES
 
     def get_form_kwargs(self):
@@ -851,13 +853,16 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
             except Exception:
                 logger.exception(
                     "QR code generation failed for payment %s (address=%r)",
-                    payment_record.pk, payment_record.pay_address,
+                    payment_record.pk,
+                    payment_record.pay_address,
                 )
 
         # "Open in Wallet" deeplink: invoice_url opens the NOWPayments hosted
         # page which provides wallet-specific deeplinks with amount pre-filled.
         # Falls back to a plain ethereum:<address> URI if the URL is absent.
-        wallet_uri = payment_record.invoice_url or f"ethereum:{payment_record.pay_address}"
+        wallet_uri = (
+            payment_record.invoice_url or f"ethereum:{payment_record.pay_address}"
+        )
 
         try:
             currencies = nowpayments.get_currencies()
@@ -871,10 +876,15 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
         # response — the API may return a different internal code (e.g. "usdterc20"
         # for a request for "usdtmatic").
         from payments.nowpayments import SUPPORTED_CURRENCIES as _SC
-        _currency_meta = next((c for c in _SC if c["code"] == self.payment_method), None)
+
+        _currency_meta = next(
+            (c for c in _SC if c["code"] == self.payment_method), None
+        )
         display_ticker = "USDT"
         display_network = (
-            _currency_meta["network"].upper() if _currency_meta else self.payment_method.upper()
+            _currency_meta["network"].upper()
+            if _currency_meta
+            else self.payment_method.upper()
         )
 
         context = {
@@ -892,6 +902,7 @@ class CryptoPaymentView(ProviderRequiredMixin, View):
             "payment": payment_record,
         }
         from django.shortcuts import render
+
         return render(request, self.template_name, context)
 
     def post(self, request):
@@ -914,7 +925,6 @@ class CryptoPaymentStatusView(ProviderRequiredMixin, View):
             provider=provider,
         )
         return JsonResponse({"status": payment.status})
-
 
 
 class SubscriptionConfirmView(ProviderRequiredMixin, TemplateView):

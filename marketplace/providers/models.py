@@ -111,9 +111,7 @@ class Provider(models.Model):
         ("suspended", "Suspended"),
     )
 
-    PAYMENT_METHOD_CHOICES = (
-        ("crypto", "Cryptocurrency"),
-    )
+    PAYMENT_METHOD_CHOICES = (("crypto", "Cryptocurrency"),)
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,

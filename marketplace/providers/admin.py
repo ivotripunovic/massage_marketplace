@@ -170,7 +170,9 @@ class ProviderAdmin(admin.ModelAdmin):
         for provider in queryset:
             if provider.subscription_status != "active":
                 provider.subscription_status = "active"
-                provider.subscription_renewal_date = timezone.localdate() + timedelta(days=30)
+                provider.subscription_renewal_date = timezone.localdate() + timedelta(
+                    days=30
+                )
                 provider.save()
                 count += 1
         self.message_user(request, f"{count} provider subscription(s) activated.")

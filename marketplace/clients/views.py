@@ -20,9 +20,9 @@ from django.views.decorators.http import require_GET
 PREF_GROUPS_CACHE_KEY = "pref_groups_tree"
 PREF_GROUPS_CACHE_TTL = 3600  # 1 hour — invalidated by providers.signals
 
-COUNTRIES_API_CACHE_TTL = 3600   # 1 hour
-CITIES_API_CACHE_TTL = 3600      # 1 hour
-PROVIDER_COUNT_CACHE_TTL = 60    # 60 s — short TTL, no explicit invalidation needed
+COUNTRIES_API_CACHE_TTL = 3600  # 1 hour
+CITIES_API_CACHE_TTL = 3600  # 1 hour
+PROVIDER_COUNT_CACHE_TTL = 60  # 60 s — short TTL, no explicit invalidation needed
 
 
 class CachedCountPaginator(Paginator):
@@ -36,6 +36,8 @@ class CachedCountPaginator(Paginator):
             result = self.object_list.count()
             cache.set(key, result, PROVIDER_COUNT_CACHE_TTL)
         return result
+
+
 from providers.models import (
     Provider,
     ProviderGalleryImage,
@@ -294,9 +296,7 @@ class ProviderDirectoryView(ListView):
         # Has photo
         has_photo = self.request.GET.get("has_photo", "").strip()
         if has_photo == "1":
-            queryset = queryset.exclude(
-                Q(photo="") | Q(photo__isnull=True)
-            )
+            queryset = queryset.exclude(Q(photo="") | Q(photo__isnull=True))
 
         # Preference subgroups (OR semantics — any match)
         pref_ids_raw = self.request.GET.getlist("pref")
@@ -393,7 +393,9 @@ class ProviderDirectoryView(ListView):
                 {
                     "provider": provider,
                     "review_count": provider.review_count,
-                    "avg_rating": round(provider.avg_rating, 1) if provider.avg_rating else 0,
+                    "avg_rating": round(provider.avg_rating, 1)
+                    if provider.avg_rating
+                    else 0,
                     "card_attributes": card_attributes,
                     "card_pricing": card_pricing,
                 }
@@ -436,7 +438,11 @@ class ProviderDirectoryView(ListView):
             groups_qs = (
                 PreferenceGroup.objects.filter(is_active=True)
                 .prefetch_related(
-                    Prefetch("subgroups", queryset=active_subgroups_qs, to_attr="active_subgroups")
+                    Prefetch(
+                        "subgroups",
+                        queryset=active_subgroups_qs,
+                        to_attr="active_subgroups",
+                    )
                 )
                 .order_by("display_order", "name")
             )
@@ -444,13 +450,16 @@ class ProviderDirectoryView(ListView):
                 {
                     "name": group.name,
                     "subgroups": [
-                        {"id": sg.id, "name": sg.name}
-                        for sg in group.active_subgroups
+                        {"id": sg.id, "name": sg.name} for sg in group.active_subgroups
                     ],
                 }
                 for group in groups_qs
             ]
-            cache.set(PREF_GROUPS_FILTER_CACHE_KEY, pref_groups_for_filter, PREF_GROUPS_CACHE_TTL)
+            cache.set(
+                PREF_GROUPS_FILTER_CACHE_KEY,
+                pref_groups_for_filter,
+                PREF_GROUPS_CACHE_TTL,
+            )
         context["pref_groups_for_filter"] = pref_groups_for_filter
 
         # Attribute definitions for filter sidebar
@@ -516,12 +525,9 @@ class ProviderDetailView(DetailView):
 
     def get_queryset(self):
         """Only show active verified providers."""
-        return (
-            Provider.objects.filter(
-                subscription_status="active", user__is_email_verified=True
-            )
-            .select_related("user", "country", "city", "pricing")
-        )
+        return Provider.objects.filter(
+            subscription_status="active", user__is_email_verified=True
+        ).select_related("user", "country", "city", "pricing")
 
     def get_context_data(self, **kwargs):
         """Add services and reviews to context."""
@@ -545,9 +551,7 @@ class ProviderDetailView(DetailView):
 
         # Calculate avg rating from prefetched data (no extra query)
         all_ratings = [
-            cr.rating
-            for review in reviews
-            for cr in review.category_ratings.all()
+            cr.rating for review in reviews for cr in review.category_ratings.all()
         ]
         context["avg_rating"] = (
             round(sum(all_ratings) / len(all_ratings), 1) if all_ratings else 0
